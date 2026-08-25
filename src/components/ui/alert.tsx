@@ -18,15 +18,25 @@ const alertVariants = cva(
   },
 );
 
+/**
+ * `role` is opt-in, not `role="alert"` by default.
+ *
+ * It used to default to alert — an assertive live region that interrupts a
+ * screen reader mid-sentence — and four of six call sites immediately overrode
+ * it with `role="note"` or `role="status"`. When most consumers are fighting a
+ * default, the default is wrong: a statically-rendered "India data residency"
+ * panel should not interrupt anyone. Errors pass `role="alert"` explicitly.
+ */
 function Alert({
   className,
   variant,
+  role,
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
   return (
     <div
       data-slot="alert"
-      role="alert"
+      {...(role ? { role } : {})}
       className={cn(alertVariants({ variant }), className)}
       {...props}
     />

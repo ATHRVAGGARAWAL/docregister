@@ -209,6 +209,7 @@ export function SettingsWorkspace({
 
           {notice && (
             <Alert
+              role="alert"
               variant={notice.kind === "success" ? "success" : "destructive"}
               className="sm:col-span-2"
             >

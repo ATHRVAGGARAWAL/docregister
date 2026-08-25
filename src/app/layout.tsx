@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { MotionConfig } from "motion/react";
 import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -67,11 +68,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="flex min-h-full flex-col">
         <ThemeSync />
-        {/* The dot-ruled pad belongs to the register, not to every route — it
-            is there to give a dense page of figures a surface to sit on, and
-            behind a single sign-in field it is just texture. It is rendered by
-            the dashboard instead. */}
-        {children}
+        {/* One switch for every `motion/react` animation in the app.
+            `globals.css` has a `prefers-reduced-motion` block, but it only
+            throttles *CSS* animation — Motion animates from JavaScript, so it
+            sailed straight past. `voice-dock`, `waveform` and `click-spark` each
+            check the preference by hand; `Reveal`, `AnimatedItem` and the
+            revenue hero did not, which meant a doctor who asked their phone for
+            less motion still got a slide and a scale on every register row. */}
+        <MotionConfig reducedMotion="user">{children}</MotionConfig>
       </body>
     </html>
   );

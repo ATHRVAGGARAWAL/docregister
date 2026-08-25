@@ -190,7 +190,7 @@ export function PatientHistorySheet({
           )}
 
           {error && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" role="alert">
               <ShieldCheckIcon className="mt-0.5 size-4" aria-hidden />
               <AlertTitle>Couldn’t open the chart</AlertTitle>
               <AlertDescription>{error}</AlertDescription>

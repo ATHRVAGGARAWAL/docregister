@@ -60,7 +60,14 @@ function TabsContent({
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
-      className={cn("flex-1 outline-none", className)}
+      className={cn(
+        // Radix puts `tabIndex={0}` on the active panel, so it *is* a focus
+        // stop — and `outline-none` with no replacement made it a focus stop
+        // with no visible indicator. `TabsTrigger` two functions up pairs the
+        // two correctly; this did not.
+        "flex-1 outline-none focus-visible:ring-ring/40 focus-visible:ring-[3px] focus-visible:rounded-sm",
+        className,
+      )}
       {...props}
     />
   );

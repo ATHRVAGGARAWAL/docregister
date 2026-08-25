@@ -218,22 +218,25 @@ npm run build
 
 ## Notes on the UI
 
-**Glass is a tier, not a utility.** There are exactly three surfaces — chrome,
-sheet, card — and only the first two carry a real `backdrop-filter`. Blur costs
-per painted pixel and compounds when layers stack; one blurred dock is
-affordable on a mid-range Android, and a screen full of blurred cards is not.
-Blur is also written literally with the `-webkit-` prefix rather than via
-`backdrop-blur-*`, because Tailwind compiles that utility into a chained custom
-property expression WebKit fails to parse — it then drops the declaration and
-the panel looks right on Chrome and washed-out on every iPhone.
+**Paper, not glass.** There are exactly three surfaces — `.slip`, `.slip-flat`
+and `.well` — and none of them blurs. The design started with `backdrop-filter`
+and moved off it: blur costs per painted pixel and compounds when layers stack,
+which a mid-range Android in a clinic pays for on every scroll. What separates
+the tiers now is elevation and a hairline border, both of which cost nothing and
+survive `prefers-contrast: more`, where the depth tokens flatten to none and the
+borders take over.
 
-**The charts were computed, not eyeballed.** The series palette is a separate,
-validated set from the UI accents (the accent hues are stepped for text on
-near-black, which puts them well outside the categorical band for a dark chart
-surface). The trio in `globals.css` clears lightness band, chroma floor,
-adjacent-pair CVD separation, normal-vision separation and 3:1 contrast against
-`#05070f`. Colour follows the entity, never its rank, so changing the range
-never repaints a series.
+**The chart colours were computed, not eyeballed.** The series palette is
+separate from the UI inks, which are stepped for type on a card and sit too dark
+and too low-chroma to work as adjacent categorical marks. The two series in use
+— `--chart-1` and `--chart-2` — are 106° apart in hue and 0.135 apart in
+lightness, which is what keeps them separable under deuteranopia once the hue
+cue collapses, and both clear 3:1 against the card. Colour follows the entity,
+never its rank, so changing the range never repaints a series.
+
+`globals.css` defines three further slots that are unused and **not** validated
+as a set; check them before rendering any of them. The gate figures that were
+printed here previously did not match the tokens they described.
 
 **Not boxy, on purpose.** No 12-column grid of equal cards: a full-bleed revenue
 figure with a hand-drawn sparkline, a horizontally-scrolling stat rail, two
@@ -242,6 +245,8 @@ equal boxes on a phone is exactly the industrial dashboard look this app avoids.
 
 **Accessibility is not colour alone.** Uncertain extracted fields carry a dot
 *and* the words "check this". A legend appears for two or more series and never
-for one. Every chart has a reachable table view. `prefers-reduced-transparency`
-turns the glass opaque through a single custom property, and
-`prefers-reduced-motion` stops the ambient drift and the waveform.
+for one. Every chart has a reachable table view. `prefers-contrast: more` drops
+the elevation tokens and thickens the borders, and `prefers-reduced-motion` is
+honoured in both channels it can reach: the CSS block covers stylesheet
+animation, and `<MotionConfig reducedMotion="user">` in the root layout covers
+everything animated from JavaScript — which is most of it.

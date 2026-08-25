@@ -335,7 +335,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                     </div>
 
                     {status === "error" && (
-                      <Alert id="auth-error" variant="destructive" className="mt-5">
+                      <Alert id="auth-error" variant="destructive" role="alert" className="mt-5">
                         <CircleAlertIcon className="mt-0.5 size-4" aria-hidden />
                         <AlertTitle>Couldn&rsquo;t send the link</AlertTitle>
                         <AlertDescription>{message}</AlertDescription>

@@ -71,15 +71,34 @@
      adjacent categorical marks.
 
      Assigned by entity, never by rank: filtering the date range must never
-     repaint a series. Gates against the card surface, oklch(0.992 …):
+     repaint a series.
 
-       lightness band  PASS  0.47–0.61, all comfortably below the surface
-       chroma floor    PASS  all >= 0.115
-       hue separation  PASS  worst adjacent pair 106 degrees
+     Only --chart-1 and --chart-2 are in use, and that pair is the one the
+     gates below were actually computed for. Gated against --card,
+     oklch(0.998 0.001 90):
+
+       lightness band  PASS  0.47 and 0.605
+       hue separation  PASS  106 degrees apart
        deutan risk     teal/violet is the confusable pair, so they are held
                        0.135 apart in L — under deuteranopia the hue cue
                        collapses and lightness is the only channel left
-       contrast        PASS  all >= 3:1 on the surface */
+       contrast        PASS  both >= 3:1 on the surface (chart-1 is 3.60:1)
+
+     The claims that used to be here were checked and three of them were
+     false, which is worse than having none: a chroma floor of 0.115 that
+     --chart-5 (0.08) does not meet, a "worst adjacent pair 106 degrees" that
+     is really 37 (chart-3 at H 62 against chart-4 at H 25), and a gate
+     surface of oklch(0.992) that does not exist in this file. Nobody noticed
+     because 3, 4 and 5 have never been rendered.
+
+     Note also that --chart-1 light is marginally outside sRGB (linear red
+     ≈ −0.013), so the browser gamut-maps it and the delivered chroma is a
+     little under the nominal 0.115. Fine for a single series against a near
+     white card; it would matter if it were ever paired with another teal.
+
+     --chart-3/4/5 are unused. They are kept as slots for a third and fourth
+     series rather than deleted, but they have NOT been validated as a set —
+     validate them before rendering any of them. */
   --chart-1: oklch(0.605 0.115 182); /* new patients   */
   --chart-2: oklch(0.47 0.15 288); /* returning      */
   --chart-3: oklch(0.585 0.13 62); /* revenue        */
@@ -249,7 +268,6 @@
   /* One easing curve for everything that is not a spring. Mixing curves is the
      fastest way to make a UI feel assembled rather than designed. */
   --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* ---------------------------------------------------------------------------
