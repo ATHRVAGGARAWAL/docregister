@@ -125,3 +125,22 @@ export function formatVisitDay(iso: string | null | undefined): string | null {
     timeZone: "Asia/Kolkata",
   }).format(date);
 }
+
+/**
+ * Today's date in IST as "YYYY-MM-DD".
+ *
+ * Lives here rather than in `analytics.ts` because that module is `server-only`
+ * and the charts are client components that legitimately need to know whether
+ * the last point in a series is actually today. `en-CA` because it formats as
+ * ISO-8601, which is the only locale that does so reliably.
+ */
+export function todayInIndia(): string {
+  return isoDay.format(new Date());
+}
+
+const isoDay = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});

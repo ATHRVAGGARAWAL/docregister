@@ -153,6 +153,16 @@ export function VoiceDock({
       const heldFor = performance.now() - pressedAt.current;
       setSlide(0);
 
+      // The latch exists so the synthetic click that trails a tap does not also
+      // run the keyboard path. But a click only follows a *still* pointerup — a
+      // slide-to-lock drag, or a cancelled gesture, produces none, so the latch
+      // stayed set and swallowed the next keyboard Enter/Space on the mic,
+      // silently disabling keyboard operation of the app's primary control.
+      // Clear it exactly when no click is coming to clear it for us.
+      if (event.type === "pointercancel" || travel >= TAP_SLOP_PX) {
+        pointerHandled.current = false;
+      }
+
       if (locked) return; // stays open until the stop button is pressed
       if (!listening) return;
 

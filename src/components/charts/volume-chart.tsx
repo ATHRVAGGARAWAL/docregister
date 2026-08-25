@@ -11,7 +11,7 @@ import {
 } from "recharts";
 
 import { ChartFrame, ChartTooltip } from "@/components/charts/chart-chrome";
-import { formatCount, formatDayLong, formatDayShort } from "@/lib/format";
+import { formatCount, formatDayLong, formatDayShort, todayInIndia } from "@/lib/format";
 import type { DailyPoint } from "@/lib/types";
 
 const VOLUME = "var(--chart-2)";
@@ -35,6 +35,10 @@ export function VolumeChart({
   loading?: boolean;
 }) {
   const last = data.at(-1);
+  // `data.at(-1)` is the last day in the selected window, which is only today
+  // when the window ends today. Labelling a stale or historical figure "today"
+  // on a clinical dashboard is worse than labelling it with its date.
+  const lastIsToday = last?.day === todayInIndia();
   const peak = data.reduce<DailyPoint | null>(
     (best, point) => (!best || point.patient_count > best.patient_count ? point : best),
     null,
@@ -128,7 +132,7 @@ export function VolumeChart({
           <span className="text-foreground tnum font-medium">
             {formatCount(last.patient_count)}
           </span>{" "}
-          today
+          {lastIsToday ? "today" : `on ${formatDayShort(last.day)}`}
         </p>
       )}
     </ChartFrame>

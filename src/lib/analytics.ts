@@ -1,4 +1,5 @@
 import "server-only";
+import { todayInIndia } from "@/lib/format";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -17,14 +18,10 @@ import type { AnalyticsPayload, DailyPoint } from "@/lib/types";
  */
 
 /** Today's date in IST, regardless of where the server runs. */
-export function todayInIndia(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
+// Defined in `format.ts` so the client charts can use it too — this module is
+// `server-only`, and a chart legitimately needs to know whether its last point
+// is today. Re-exported because every existing caller imports it from here.
+export { todayInIndia };
 
 export function shiftDays(isoDate: string, days: number): string {
   const date = new Date(`${isoDate}T00:00:00Z`);

@@ -8,6 +8,7 @@ import {
   LoaderCircleIcon,
   LogOutIcon,
   ShieldCheckIcon,
+  TriangleAlertIcon,
   StethoscopeIcon,
 } from "lucide-react";
 
@@ -80,12 +81,17 @@ export function SettingsWorkspace({
     }
   }
 
+  // The last selected language cannot be removed — the server rejects an empty
+  // list with a real message the doctor could never reach, because this silently
+  // returned `current` and the button just looked broken. It is now disabled and
+  // explained instead.
+  const isLastLanguage = (code: string) => languages.length === 1 && languages[0] === code;
+
   function toggleLanguage(code: string) {
+    if (isLastLanguage(code)) return;
     setLanguages((current) =>
       current.includes(code)
-        ? current.length === 1
-          ? current
-          : current.filter((language) => language !== code)
+        ? current.filter((language) => language !== code)
         : [...current, code],
     );
   }
@@ -176,11 +182,18 @@ export function SettingsWorkspace({
                     type="button"
                     onClick={() => toggleLanguage(language.code)}
                     aria-pressed={selected}
+                    disabled={isLastLanguage(language.code)}
+                    title={
+                      isLastLanguage(language.code)
+                        ? "Dictation needs at least one language."
+                        : undefined
+                    }
                     className={cn(
                       "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors",
                       selected
                         ? "border-primary/25 bg-primary/10 text-primary"
                         : "border-border bg-background text-muted-foreground hover:text-foreground",
+                      "disabled:cursor-not-allowed disabled:opacity-60",
                     )}
                   >
                     {selected && <CheckIcon className="size-3.5" aria-hidden />}
@@ -202,7 +215,9 @@ export function SettingsWorkspace({
               {notice.kind === "success" ? (
                 <CheckIcon className="mt-0.5 size-4" aria-hidden />
               ) : (
-                <ShieldCheckIcon className="mt-0.5 size-4" aria-hidden />
+                /* Was ShieldCheckIcon: a tick on the failure branch meant the
+                   icon channel said "fine" while only the red tint disagreed. */
+                <TriangleAlertIcon className="mt-0.5 size-4" aria-hidden />
               )}
               <AlertTitle>{notice.kind === "success" ? "Saved" : "Couldn’t save"}</AlertTitle>
               <AlertDescription>{notice.text}</AlertDescription>

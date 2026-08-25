@@ -37,6 +37,9 @@ export interface RecallResult {
  * than one of its panels — same card stock, but the question sits in a recessed
  * well at the top, the way a query sits above its result on a terminal.
  */
+/** How many source visits the panel lists before summarising the rest. */
+const EVIDENCE_LIMIT = 4;
+
 export function RecallPanel({
   question,
   result,
@@ -134,7 +137,7 @@ export function RecallPanel({
 
           {result.encounters.length > 0 && (
             <ol className="border-border divide-border mt-4 divide-y border-t">
-              {result.encounters.slice(0, 4).map((encounter) => (
+              {result.encounters.slice(0, EVIDENCE_LIMIT).map((encounter) => (
                 <li key={encounter.id} className="py-2 text-xs">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="text-muted-foreground">
@@ -171,9 +174,16 @@ export function RecallPanel({
             <Badge variant={result.confidence === "high" ? "default" : "secondary"}>
               {result.confidence} confidence
             </Badge>
+            {/* This claimed "drawn from 9 recorded visits" above a list of four.
+                In a panel whose whole purpose is that the doctor can check the
+                answer against the evidence, five invisible sources is the one
+                thing it must not do. */}
             <span>
               drawn from {result.encounters.length} recorded visit
               {result.encounters.length === 1 ? "" : "s"}
+              {result.encounters.length > EVIDENCE_LIMIT
+                ? ` · ${EVIDENCE_LIMIT} shown`
+                : ""}
             </span>
           </p>
         </>

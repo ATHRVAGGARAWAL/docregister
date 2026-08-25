@@ -3,6 +3,7 @@
 import { CalendarRangeIcon, LoaderCircleIcon, SearchIcon } from "lucide-react";
 
 import { RegisterTimeline } from "@/components/dashboard/register-timeline";
+import { formatINR } from "@/lib/format";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,8 @@ const STATUSES = [
 
 export function RegisterWorkspace({
   entries,
+  totalCount,
+  totalFees,
   loading,
   error,
   days,
@@ -37,6 +40,8 @@ export function RegisterWorkspace({
   onOpenPatient,
 }: {
   entries: RegisterEntry[];
+  totalCount: number;
+  totalFees: number;
   loading: boolean;
   error: string | null;
   days: number;
@@ -48,7 +53,10 @@ export function RegisterWorkspace({
   onSearch: () => void;
   onOpenPatient: (patient: PatientMatch) => void;
 }) {
-  const total = entries.reduce((sum, entry) => sum + (entry.fees_inr ?? 0), 0);
+  // Both figures come from the query, not from this page. Summing `entries`
+  // here made the headline the total of the first 300 rows the server returned,
+  // presented as the total for the period.
+  const showingPartial = totalCount > entries.length;
 
   return (
     <div className="space-y-6">
@@ -66,14 +74,11 @@ export function RegisterWorkspace({
           </p>
         </div>
         <div className="text-left sm:text-right">
-          <p className="tnum text-2xl font-semibold text-money">
-            {new Intl.NumberFormat("en-IN", {
-              style: "currency",
-              currency: "INR",
-              maximumFractionDigits: 0,
-            }).format(total)}
+          <p className="tnum text-2xl font-semibold text-money">{formatINR(totalFees)}</p>
+          <p className="text-xs text-muted-foreground">
+            across {totalCount} visit{totalCount === 1 ? "" : "s"}
+            {showingPartial ? ` · showing ${entries.length}` : ""}
           </p>
-          <p className="text-xs text-muted-foreground">across {entries.length} visible visits</p>
         </div>
       </section>
 

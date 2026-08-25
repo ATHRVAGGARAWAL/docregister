@@ -31,6 +31,9 @@ const viewTitles: Record<AppView, string> = {
 
 type RegisterStatus = "all" | "committed" | "draft";
 
+/** The register opens on a month; the Today chip narrows it. */
+const DEFAULT_REGISTER_DAYS = 30;
+
 export function Dashboard({
   initialProfile,
   initialAnalytics,
@@ -55,11 +58,12 @@ export function Dashboard({
   const [recallLoading, setRecallLoading] = useState(false);
 
   const [registerEntries, setRegisterEntries] = useState(initialEntries);
-  const [registerDays, setRegisterDays] = useState(1);
+  const [registerDays, setRegisterDays] = useState(DEFAULT_REGISTER_DAYS);
   const [registerStatus, setRegisterStatus] = useState<RegisterStatus>("all");
   const [registerQuery, setRegisterQuery] = useState("");
   const [registerLoading, setRegisterLoading] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
+  const [registerTotals, setRegisterTotals] = useState({ count: 0, fees: 0 });
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [chartPatient, setChartPatient] = useState<PatientMatch | null>(null);
 
@@ -89,6 +93,8 @@ export function Dashboard({
   const rangeTicket = useRef(0);
   const registerTicket = useRef(0);
   const recallTicket = useRef(0);
+  // Whether the register workspace has fetched once this session.
+  const registerLoaded = useRef(false);
 
   const loadRange = useCallback(async (days: number) => {
     const ticket = ++rangeTicket.current;
@@ -117,9 +123,14 @@ export function Dashboard({
       const params = new URLSearchParams({ days: String(days) });
       if (status !== "all") params.set("status", status);
       if (query.trim()) params.set("q", query.trim());
-      const payload = await getJson(`/api/register?${params}`);
+      const payload = (await getJson(`/api/register?${params}`)) as {
+        entries?: RegisterEntry[];
+        totalCount?: number;
+        totalFees?: number;
+      };
       if (ticket !== registerTicket.current) return;
-      setRegisterEntries((payload as { entries?: RegisterEntry[] }).entries ?? []);
+      setRegisterEntries(payload.entries ?? []);
+      setRegisterTotals({ count: payload.totalCount ?? 0, fees: payload.totalFees ?? 0 });
     } catch (error) {
       if (ticket !== registerTicket.current) return;
       setRegisterError(messageFor(error, "Could not load the register."));
@@ -162,9 +173,15 @@ export function Dashboard({
 
   function changeView(next: AppView) {
     setView(next);
-    if (next === "register" && registerDays === 1) {
-      setRegisterDays(30);
-      void loadRegister(30, registerStatus, registerQuery);
+    // An explicit "has this been fetched" flag rather than `registerDays === 1`
+    // standing in for it. Using the value as its own sentinel meant a doctor who
+    // deliberately chose the Today filter, went to Overview and came back had
+    // that choice silently replaced with 30 days — every time, with no way to
+    // make it stick.
+    if (next === "register" && !registerLoaded.current) {
+      registerLoaded.current = true;
+      setRegisterDays(DEFAULT_REGISTER_DAYS);
+      void loadRegister(DEFAULT_REGISTER_DAYS, registerStatus, registerQuery);
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -255,6 +272,8 @@ export function Dashboard({
               {view === "register" && (
                 <RegisterWorkspace
                   entries={registerEntries}
+                  totalCount={registerTotals.count}
+                  totalFees={registerTotals.fees}
                   loading={registerLoading}
                   error={registerError}
                   days={registerDays}
