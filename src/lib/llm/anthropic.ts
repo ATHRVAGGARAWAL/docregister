@@ -5,6 +5,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type * as z from "zod/v4";
 
 import { env } from "@/lib/env";
+import { LLM_TIMEOUT_MS } from "./types";
 import {
   LlmError,
   type LlmProvider,
@@ -37,7 +38,17 @@ function modelFor(tier: Tier): string {
 let client: Anthropic | undefined;
 
 function getClient(): Anthropic {
-  if (!client) client = new Anthropic({ apiKey: env.anthropicApiKey });
+  if (!client) {
+    client = new Anthropic({
+      apiKey: env.anthropicApiKey,
+      // The SDK defaults to a 10-minute timeout and its own retries. Both are
+      // wrong here: the route dies at `maxDuration = 60` regardless, so a longer
+      // budget just means the doctor waits for a failure that was already
+      // certain. Retries are handled one level up, where they can fail over.
+      timeout: LLM_TIMEOUT_MS,
+      maxRetries: 0,
+    });
+  }
   return client;
 }
 

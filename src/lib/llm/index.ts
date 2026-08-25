@@ -3,6 +3,7 @@ import "server-only";
 import { llmProviderName } from "@/lib/env";
 import { AnthropicProvider } from "./anthropic";
 import { GeminiProvider } from "./gemini";
+import { LlmError as LlmErrorClass } from "./types";
 import type { LlmProvider, StructuredRequest, StructuredResult } from "./types";
 
 export { LlmError } from "./types";
@@ -34,9 +35,31 @@ export function getLlmProvider(): LlmProvider {
   return created;
 }
 
-/** The single entry point the prompt modules use. */
-export function generateStructured<T>(
+/**
+ * The single entry point the prompt modules use.
+ *
+ * Retries once on a retryable failure. Both adapters set `LlmError.retryable`
+ * carefully — rate limits and 5xx yes, auth and content-filter refusals no —
+ * and until now nothing read it: the flag was a contract with no implementation,
+ * and a single transient 503 mid-clinic surfaced to the doctor as a hard
+ * failure with a re-dictation as the only recovery.
+ *
+ * One retry, not a loop. The route's own budget is finite, and a provider that
+ * fails twice in a row is not having a blip.
+ */
+export async function generateStructured<T>(
   request: StructuredRequest<T>,
 ): Promise<StructuredResult<T>> {
-  return getLlmProvider().generate(request);
+  try {
+    return await getLlmProvider().generate(request);
+  } catch (error) {
+    if (!(error instanceof LlmErrorClass) || !error.retryable) throw error;
+
+    console.warn(`[llm] retrying after ${error.code}`);
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    return getLlmProvider().generate(request);
+  }
 }
+
+/** Long enough for a rate limit window to move, short enough to stay in budget. */
+const RETRY_DELAY_MS = 1_200;

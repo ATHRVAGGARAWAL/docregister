@@ -2,6 +2,7 @@ import "server-only";
 
 import { env } from "@/lib/env";
 import {
+  STT_TIMEOUT_MS,
   SttError,
   type SttProvider,
   type TranscribeInput,
@@ -74,8 +75,12 @@ export class SarvamProvider implements SttProvider {
         method: "POST",
         headers: { "api-subscription-key": env.sarvamApiKey },
         body: form,
+        signal: AbortSignal.timeout(STT_TIMEOUT_MS),
       });
     } catch (cause) {
+      if (cause instanceof DOMException && cause.name === "TimeoutError") {
+        throw new SttError("Sarvam did not respond in time", "provider_error", true);
+      }
       throw new SttError(`Could not reach Sarvam: ${String(cause)}`, "provider_error", true);
     }
 

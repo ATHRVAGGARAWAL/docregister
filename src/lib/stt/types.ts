@@ -88,3 +88,17 @@ export class SttError extends Error {
     this.name = "SttError";
   }
 }
+
+/**
+ * How long a single STT request may take before it is abandoned.
+ *
+ * Nothing in this app had a timeout. A provider that accepts the connection and
+ * then stalls held the route open for its full `maxDuration = 60`, with the
+ * doctor watching a spinner, and then failed anyway — and when the primary
+ * stalls, the failover leg would serialise a second unbounded wait inside the
+ * same budget. 20s leaves room for both legs plus the surrounding work.
+ *
+ * A timeout is `retryable`, which is what makes it fail *over* rather than just
+ * fail: a stalled vendor is exactly the case the second provider exists for.
+ */
+export const STT_TIMEOUT_MS = 20_000;

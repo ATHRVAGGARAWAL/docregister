@@ -94,3 +94,10 @@ export interface LlmProvider {
   readonly name: string;
   generate<T>(request: StructuredRequest<T>): Promise<StructuredResult<T>>;
 }
+
+/**
+ * How long one model call may take. The API routes cap at `maxDuration = 60`,
+ * so anything beyond this is time the doctor spends watching a spinner in front
+ * of a failure that has already happened.
+ */
+export const LLM_TIMEOUT_MS = 25_000;

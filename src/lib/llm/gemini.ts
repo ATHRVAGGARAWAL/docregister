@@ -13,6 +13,7 @@ import {
 import * as z from "zod/v4";
 
 import { env } from "@/lib/env";
+import { LLM_TIMEOUT_MS } from "./types";
 import {
   LlmError,
   type LlmProvider,
@@ -92,7 +93,16 @@ const SAFETY: SafetySetting[] = [
 let client: GoogleGenAI | undefined;
 
 function getClient(): GoogleGenAI {
-  if (!client) client = new GoogleGenAI({ apiKey: env.geminiApiKey });
+  if (!client) {
+    client = new GoogleGenAI({
+      apiKey: env.geminiApiKey,
+      // Bounded for the same reason as the Anthropic client: this file's own
+      // notes record a model that "hung past 90 seconds" on repeat calls, and
+      // the mitigation at the time was to avoid the model. A timeout is the
+      // mitigation that generalises.
+      httpOptions: { timeout: LLM_TIMEOUT_MS },
+    });
+  }
   return client;
 }
 

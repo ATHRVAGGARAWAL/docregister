@@ -2,6 +2,7 @@ import "server-only";
 
 import { env } from "@/lib/env";
 import {
+  STT_TIMEOUT_MS,
   SttError,
   type SttProvider,
   type TranscribeInput,
@@ -68,11 +69,20 @@ export class ElevenLabsProvider implements SttProvider {
       .slice(0, 100);
     for (const term of keyterms) form.append("keyterms", term);
 
-    const response = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
-      method: "POST",
-      headers: { "xi-api-key": apiKey },
-      body: form,
-    });
+    let response: Response;
+    try {
+      response = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+        method: "POST",
+        headers: { "xi-api-key": apiKey },
+        body: form,
+        signal: AbortSignal.timeout(STT_TIMEOUT_MS),
+      });
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === "TimeoutError") {
+        throw new SttError("ElevenLabs did not respond in time", "provider_error", true);
+      }
+      throw new SttError(`Could not reach ElevenLabs: ${String(cause)}`, "provider_error", true);
+    }
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
