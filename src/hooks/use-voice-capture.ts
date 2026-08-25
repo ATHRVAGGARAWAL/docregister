@@ -147,11 +147,15 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
       if (!aliveRef.current) return;
       const name = (cause as DOMException)?.name;
       setError(
-        name === "NotAllowedError"
-          ? "Microphone access was blocked. Enable it in your browser settings and try again."
-          : name === "NotFoundError"
-            ? "No microphone found on this device."
-            : "Could not start recording on this device.",
+        // Already written for the doctor by the recorder's preflight, and more
+        // specific than anything that can be reconstructed from the name here.
+        name === "MicUnavailableError"
+          ? (cause as Error).message
+          : name === "NotAllowedError"
+            ? "Microphone access was blocked. Enable it in your browser settings and try again."
+            : name === "NotFoundError"
+              ? "No microphone found on this device."
+              : "Could not start recording on this device.",
       );
       setPhase("error");
       return;

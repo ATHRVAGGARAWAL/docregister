@@ -70,7 +70,16 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
   // recording, and the doctor can retry instead of losing the consultation.
   const upload = await supabase.storage
     .from("dictations")
-    .upload(audioPath, buffer, { contentType: mimeType, upsert: false });
+    // Storage matches `allowed_mime_types` as an exact string, and
+    // MediaRecorder reports the negotiated type *with* its codec parameter
+    // ("audio/webm;codecs=opus" on every Chromium browser). The parameter
+    // describes the codec, not a different kind of object to store, so it is
+    // dropped here — `audio_mime` below keeps the full value for playback and
+    // for anyone debugging what the browser actually produced.
+    .upload(audioPath, buffer, {
+      contentType: mimeType.split(";")[0].trim(),
+      upsert: false,
+    });
 
   if (upload.error) {
     console.error("[transcribe] upload failed", upload.error);

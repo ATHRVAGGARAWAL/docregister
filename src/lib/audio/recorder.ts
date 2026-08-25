@@ -102,6 +102,24 @@ export class VoiceRecorder {
    * most common iOS voice-capture bug.
    */
   async start(): Promise<void> {
+    // Preflight, before the AudioContext exists. `navigator.mediaDevices` is
+    // undefined — not a method that rejects — outside a secure context, so
+    // calling straight through throws a bare TypeError that reads to the caller
+    // like a broken device. It is neither: the hardware is fine and the origin
+    // is not. http://<lan-ip>:3000, the URL `next dev` prints for testing on a
+    // real phone, is exactly that origin, so this is the first thing a doctor
+    // trying the app on their own handset would hit.
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      const insecure = typeof window !== "undefined" && !window.isSecureContext;
+      const error = new Error(
+        insecure
+          ? "Recording needs a secure connection. Open the app over https, or on localhost."
+          : "This browser cannot record audio.",
+      );
+      error.name = "MicUnavailableError";
+      throw error;
+    }
+
     const AudioCtx: typeof AudioContext =
       window.AudioContext ??
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;

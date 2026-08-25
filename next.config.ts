@@ -22,6 +22,23 @@ const nextConfig: NextConfig = {
   // the chunk layout, roughly which version. Nothing here needs to advertise.
   poweredByHeader: false,
 
+  // Dev only. Next blocks cross-origin requests to dev assets, so opening the
+  // Network URL that `next dev` prints — the obvious way to try the app on a
+  // real phone — serves the SSR HTML but 403s every `/_next/static/chunks/*`.
+  // React then never hydrates: the page looks right and every control is dead,
+  // including the record key, which fails with no error because no handler is
+  // attached to fail. Private ranges only; this list is not consulted in a
+  // production build.
+  allowedDevOrigins: [
+    "192.168.*.*",
+    "172.16.*.*",
+    "172.17.*.*",
+    "172.18.*.*",
+    "172.19.*.*",
+    "10.*.*.*",
+    "*.local",
+  ],
+
   async headers() {
     return [
       { source: "/_next/static/:path*", headers: staticHeaders },
