@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import type { TablesUpdate } from "@/lib/supabase/database.types";
 import { ApiError, readBody, withDoctor } from "@/lib/api/http";
 import { normaliseDuration, normaliseFrequency, normaliseRoute } from "@/lib/llm/dosage";
 
@@ -47,11 +48,16 @@ export const PATCH = withDoctor<Params>(async ({ supabase, request, params, doct
     throw new ApiError("This visit has already been saved to the register.", 409);
   }
 
-  const patch: Record<string, unknown> = {};
-  if ("patient_name_spoken" in body) patch.patient_name_spoken = body.patient_name_spoken;
+  // Typed against the generated schema rather than `Record<string, unknown>`,
+  // so a column that does not exist is a compile error rather than a silently
+  // ignored key. The free-text fields go through `coerceText`, which is what
+  // stops `{"diagnosis": {"a": 1}}` or a 10 MB string reaching Postgres — they
+  // were previously written straight through with no check of any kind.
+  const patch: TablesUpdate<"encounters"> = {};
+  if ("patient_name_spoken" in body) patch.patient_name_spoken = coerceText(body.patient_name_spoken);
   if ("age_years" in body) patch.age_years = coerceAge(body.age_years);
-  if ("diagnosis" in body) patch.diagnosis = body.diagnosis;
-  if ("treatment" in body) patch.treatment = body.treatment;
+  if ("diagnosis" in body) patch.diagnosis = coerceText(body.diagnosis);
+  if ("treatment" in body) patch.treatment = coerceText(body.treatment);
   if ("fees_inr" in body) patch.fees_inr = coerceFees(body.fees_inr);
 
   if (Object.keys(patch).length > 0) {
@@ -135,4 +141,21 @@ function coerceFees(value: unknown): number | null {
   if (!Number.isFinite(fees) || fees < 0) throw new ApiError("Fees cannot be negative.");
   if (fees > 1_000_000) throw new ApiError("That fee looks wrong — please check it.");
   return fees;
+}
+
+/**
+ * A clinical free-text field: a string of sane length, or nothing.
+ *
+ * Anything else is dropped rather than rejected, because a malformed value here
+ * is a client bug and the rest of the edit is still worth saving. The cap is
+ * deliberate — these columns are unbounded `text`, and nothing upstream limited
+ * what reached them.
+ */
+const MAX_TEXT = 2_000;
+
+function coerceText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, MAX_TEXT);
 }

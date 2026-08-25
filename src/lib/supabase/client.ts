@@ -2,6 +2,8 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 
+import type { Database } from "@/lib/supabase/database.types";
+
 /**
  * Browser Supabase client. Only ever sees the anon key, and every table it can
  * reach is guarded by RLS — a stolen anon key still cannot read another
@@ -14,5 +16,5 @@ export function getSupabaseBrowserClient() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key!);
+  return createBrowserClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, key!);
 }

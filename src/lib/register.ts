@@ -16,27 +16,6 @@ import type { RegisterEntry } from "@/lib/types";
  * show something that is real but not yet signed.
  */
 
-interface EncounterRow {
-  id: string;
-  occurred_at: string;
-  patient_id: string | null;
-  patient_name_spoken: string | null;
-  age_years: number | null;
-  diagnosis: string | null;
-  treatment: string | null;
-  fees_inr: number | string | null;
-  is_new_patient: boolean | null;
-  visit_number: number | null;
-  status: RegisterEntry["status"];
-  patients: { full_name: string } | null;
-  prescription_items: {
-    drug_name: string;
-    strength: string | null;
-    frequency_label: string | null;
-    position: number;
-  }[];
-}
-
 export async function loadTodayRegister(
   supabase: SupabaseClient,
   doctorId: string,
@@ -72,12 +51,12 @@ export async function loadRegister(
     return [];
   }
 
-  return ((data ?? []) as unknown as EncounterRow[]).map((row) => ({
+  return (data ?? []).map((row) => ({
     id: row.id,
     occurred_at: row.occurred_at,
     // The linked chart name wins over the transcribed one: once a doctor has
     // confirmed which patient this is, their spelling is the record.
-    patient_name: row.patients?.full_name ?? row.patient_name_spoken ?? "Unnamed",
+    patient_name: embedded(row.patients)?.full_name ?? row.patient_name_spoken ?? "Unnamed",
     patient_id: row.patient_id,
     age_years: row.age_years,
     diagnosis: row.diagnosis,
@@ -86,7 +65,11 @@ export async function loadRegister(
     is_new_patient: row.is_new_patient,
     visit_number: row.visit_number,
     status: row.status,
-    drugs: [...row.prescription_items]
+    // Defensive spread of a *copy* of a possibly-absent embed. PostgREST returns
+    // an embedded relation as an object, an array, or nothing depending on how
+    // it infers the FK, and `[...undefined]` is a TypeError — which the old
+    // `as unknown as` cast promised would never happen.
+    drugs: [...(row.prescription_items ?? [])]
       .sort((a, b) => a.position - b.position)
       .map((item) =>
         [item.drug_name, item.strength, item.frequency_label]
@@ -173,4 +156,18 @@ export async function searchRegister(
     totalCount: Number(rows[0]?.total_count ?? 0),
     totalFees: Number(rows[0]?.total_fees ?? 0),
   };
+}
+
+/**
+ * Normalise a PostgREST embedded to-one relation.
+ *
+ * It comes back as an object when the foreign key is inferred as to-one and as
+ * a single-element array when it is not, and which one you get depends on
+ * schema metadata rather than on anything at the call site. The old code
+ * assumed "object" behind an `as unknown as` cast, so the array case would have
+ * silently rendered every patient as "Unnamed" with no error anywhere.
+ */
+function embedded<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
 }

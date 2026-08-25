@@ -48,6 +48,9 @@ export interface TranscribeInput {
   vocabularyHints?: string[];
 }
 
+/** The provider names `transcripts.provider` accepts. */
+export type SttProviderName = "sarvam" | "elevenlabs" | "indicconformer" | "mock";
+
 export interface TranscribeResult {
   /** Provider output, shown verbatim to the doctor. Never LLM-rewritten. */
   text: string;
@@ -55,14 +58,19 @@ export interface TranscribeResult {
   romanText?: string;
   detectedLanguage?: string;
   durationMs?: number;
-  provider: string;
+  provider: SttProviderName;
   model: string;
   /** Present only when the provider reports one; do not synthesise a value. */
   confidence?: number;
 }
 
 export interface SttProvider {
-  readonly name: string;
+  /**
+   * Matches the `stt_provider` enum, because this value is written straight into
+   * `transcripts.provider`. Declaring it `string` let a typo reach the database
+   * as a constraint violation at runtime rather than a compile error here.
+   */
+  readonly name: SttProviderName;
   /**
    * The durable path. Its output is the transcript of record for the clinical
    * document — the live WebSocket stream is only UI feedback.

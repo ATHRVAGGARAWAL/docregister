@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import type { Json } from "@/lib/supabase/database.types";
 import { ApiError, readBody, withDoctor } from "@/lib/api/http";
 import { normaliseDuration, normaliseFrequency, normaliseRoute } from "@/lib/llm/dosage";
 import { extractEncounter } from "@/lib/llm/extract";
@@ -147,7 +148,7 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
     // The model's untouched output, kept beside the edited columns. When a
     // field is later disputed, this is what shows whether the model got it
     // wrong or the doctor changed their mind.
-    extracted_raw: extraction as unknown as Record<string, unknown>,
+    extracted_raw: extraction as unknown as Json,
     low_confidence_fields: [
       ...new Set([...extraction.uncertain_fields, ...issues.map((issue) => issue.field)]),
     ],
