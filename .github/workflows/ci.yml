@@ -1,0 +1,26 @@
+name: CI
+
+# There are no unit tests for most of this app yet, so typecheck + lint is the
+# floor rather than the ceiling. It is still the difference between a type error
+# reaching main and not: `next typegen && tsc --noEmit` is what catches a schema
+# drift after `database.types.ts` is regenerated.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      # `next typegen` needs the route types, which need a config load; it does
+      # not need secrets, and nothing here talks to Supabase or a model.
+      - run: npm run typecheck
+      - run: npm run test:unit

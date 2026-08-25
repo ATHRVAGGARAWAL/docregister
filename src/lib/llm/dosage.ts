@@ -39,6 +39,13 @@ export const FREQUENCY_LABELS: Record<FrequencyCode, string> = {
  * Spoken forms across English, Hindi and Punjabi, plus the written shorthand a
  * doctor might dictate directly. Matched against a normalised lowercase form.
  */
+// The Gurmukhi and Devanagari patterns carry no `\b`, deliberately. JavaScript's
+// word boundary is defined on ASCII `[A-Za-z0-9_]`, so `\bਦੋ` can never match:
+// there is no ASCII word character for the boundary to sit against. Every
+// native-script entry in this table was written with `\b` and was therefore
+// unreachable — "ਦੋ ਵਾਰ" and "दो बार" fell through to `needsReview` while the
+// romanised "do baar" beside them worked, in an app built for exactly the
+// doctors who would say the former.
 const FREQUENCY_PATTERNS: { code: FrequencyCode; patterns: RegExp[] }[] = [
   {
     code: "OD",
@@ -48,8 +55,8 @@ const FREQUENCY_PATTERNS: { code: FrequencyCode; patterns: RegExp[] }[] = [
       /\bone\s+time\s+(a\s+)?day\b/,
       /\bdin\s+(mein|me)\s+(ek|1)\s+baar\b/,
       /\bek\s+baar\b/,
-      /\bਇੱਕ\s*ਵਾਰ\b/,
-      /\bएक\s*बार\b/,
+      /ਇੱਕ\s*ਵਾਰ/,
+      /एक\s*बार/,
       /\b1-0-0\b/,
       /\b0-0-1\b/,
     ],
@@ -63,9 +70,9 @@ const FREQUENCY_PATTERNS: { code: FrequencyCode; patterns: RegExp[] }[] = [
       /\bdo\s+baar\b/,
       /\bsubah\s+shaam\b/,
       /\bsavere\s+shaam\b/,
-      /\bਦੋ\s*ਵਾਰ\b/,
-      /\bदो\s*बार\b/,
-      /\bसुबह\s*शाम\b/,
+      /ਦੋ\s*ਵਾਰ/,
+      /दो\s*बार/,
+      /सुबह\s*शाम/,
       /\b1-0-1\b/,
     ],
   },
@@ -76,8 +83,8 @@ const FREQUENCY_PATTERNS: { code: FrequencyCode; patterns: RegExp[] }[] = [
       /\bthrice\b/,
       /\bthree\s+times\b/,
       /\bteen\s+baar\b/,
-      /\bਤਿੰਨ\s*ਵਾਰ\b/,
-      /\bतीन\s*बार\b/,
+      /ਤਿੰਨ\s*ਵਾਰ/,
+      /तीन\s*बार/,
       /\b1-1-1\b/,
     ],
   },
@@ -91,8 +98,8 @@ const FREQUENCY_PATTERNS: { code: FrequencyCode; patterns: RegExp[] }[] = [
       /\bh\.?s\.?\b/,
       /\bat\s+(bed\s?time|night)\b/,
       /\braat\s+(ko|mein)\b/,
-      /\bਰਾਤ\s*ਨੂੰ\b/,
-      /\bरात\s*को\b/,
+      /ਰਾਤ\s*ਨੂੰ/,
+      /रात\s*को/,
       /\bsone\s+se\s+pehle\b/,
     ],
   },
@@ -104,8 +111,8 @@ const FREQUENCY_PATTERNS: { code: FrequencyCode; patterns: RegExp[] }[] = [
       /\bas\s+(and\s+when\s+)?(needed|required)\b/,
       /\bif\s+(needed|required|pain|fever)\b/,
       /\bzaroorat\s+(pe|par|ho\s+to)\b/,
-      /\bਲੋੜ\s*ਪੈਣ\b/,
-      /\bज़रूरत\s*पड़ने\b/,
+      /ਲੋੜ\s*ਪੈਣ/,
+      /ज़रूरत\s*पड़ने/,
     ],
   },
   {
@@ -122,7 +129,7 @@ const FREQUENCY_PATTERNS: { code: FrequencyCode; patterns: RegExp[] }[] = [
       /\bevery\s+other\s+day\b/,
       /\balternate\s+day/,
       /\bek\s+din\s+chhod\s?kar\b/,
-      /\bਇੱਕ\s*ਦਿਨ\s*ਛੱਡ/,
+      /ਇੱਕ\s*ਦਿਨ\s*ਛੱਡ/,
     ],
   },
 ];
@@ -138,7 +145,11 @@ export interface NormalisedFrequency {
 
 export function normaliseFrequency(spoken: string | null): NormalisedFrequency {
   if (!spoken || !spoken.trim()) {
-    return { code: null, label: "—", needsReview: false };
+    // A frequency the doctor never stated needs a human more than a garbled one
+    // does, not less. This returned `needsReview: false`, so the prescription
+    // line with nothing at all in the frequency column was the one line that
+    // never asked to be looked at — while "twice a dya" did.
+    return { code: null, label: "—", needsReview: true };
   }
 
   const haystack = spoken.toLowerCase().replace(/\s+/g, " ").trim();
