@@ -181,6 +181,25 @@ breaks that deadlock at sign-up.
 npm run dev      # Next on :3000 and the STT proxy on :8787, together
 ```
 
+**Testing on a real phone.** `next dev` also prints a Network URL
+(`http://<lan-ip>:3000`). Recording will not work there and cannot be made to:
+`navigator.mediaDevices` is undefined outside a secure context, so the browser
+never exposes a microphone over plain http to anything but `localhost`. Use:
+
+```bash
+npm run dev:https   # same pair, with a locally-trusted certificate
+```
+
+and open the `https://<lan-ip>:3000` URL on the handset. Add that origin to the
+Supabase redirect allow-list too, or the magic link will bounce.
+
+One caveat, so it is not a surprise: the live-transcript proxy still speaks
+`ws://`, which an https page treats as mixed content and blocks. Dictation,
+extraction and commit all work — the interim text that streams while you speak
+does not, and the recorder degrades to "Live transcription unavailable" rather
+than failing the recording. The blob that becomes the transcript of record is
+captured by `MediaRecorder`, not by that socket.
+
 With `STT_PROVIDER=mock` and `LLM_MOCK=1` — the defaults in the example env —
 the entire dictate → review → commit loop works offline with no paid API keys,
 including a canned Hinglish live-transcript stream. Sign in, then optionally run

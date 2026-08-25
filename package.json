@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n next,stt -c cyan,magenta \"next dev\" \"tsx watch server/stt-proxy.ts\"",
+    "dev:https": "concurrently -n next,stt -c cyan,magenta \"next dev --experimental-https\" \"tsx watch server/stt-proxy.ts\"",
     "dev:next": "next dev",
     "dev:proxy": "tsx watch server/stt-proxy.ts",
     "build": "next build",

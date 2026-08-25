@@ -11,7 +11,8 @@
 -- safe to re-run and easy to clear out before real use:
 --
 --   delete from encounters where extracted_raw ->> 'seed' = 'true';
---   delete from patients   where notes = 'seed';
+--   delete from patients p where p.notes = 'seed'
+--     and not exists (select 1 from encounters e where e.patient_id = p.id);
 
 do $$
 declare
@@ -25,7 +26,9 @@ declare
   v_dx_idx   int;
   -- Phone numbers are unique per clinic, so walk a counter rather than hoping
   -- random() does not collide.
-  v_seq      int := 200;
+  -- Set from the data below, not hardcoded: a surviving walk-in from an earlier
+  -- run already owns its number, and reusing it collides on the phone index.
+  v_seq      int;
 
   -- Pools for walk-in patients, so the new-vs-returning chart has something to
   -- show on every day rather than a wall of new charts in week one.
@@ -90,16 +93,48 @@ begin
   end if;
   v_clinic := v_doctor.clinic_id;
 
+
   -- Idempotent: clear any previous run before writing a new one.
+  --
+  -- The patient delete is guarded rather than unconditional. `patient_id` is
+  -- `on delete set null`, so removing a seed patient that a *real* committed
+  -- encounter still points at nulls that encounter's `patient_id` and trips
+  -- `encounters_committed_needs_patient` — which aborts the whole script. That
+  -- is not a corner case: linking a dictated visit to a demo patient is exactly
+  -- what happens when someone tries the app against this seed, and it made the
+  -- script fail on its second run.
+  --
+  -- Leaving those patients behind is the right answer, not a compromise. Once a
+  -- real visit is attached to a chart the chart is no longer demo data, and a
+  -- seed script has no business deleting a row a clinical record depends on.
   delete from encounters where clinic_id = v_clinic and extracted_raw ->> 'seed' = 'true';
-  delete from patients   where clinic_id = v_clinic and notes = 'seed';
+  delete from patients p
+   where p.clinic_id = v_clinic
+     and p.notes = 'seed'
+     and not exists (select 1 from encounters e where e.patient_id = p.id);
+
+  -- After the cleanup, so the counter reflects only the walk-ins that actually
+  -- survived rather than drifting upward on every run.
+  -- `greatest(200, …)` keeps the floor the hardcoded value used to provide: the
+  -- fixed roster above owns the low numbers, so a surviving roster patient must
+  -- not drag the walk-in counter down into that block.
+  select greatest(200, coalesce(max(substring(phone from 6)::int), 200))
+    into v_seq
+    from patients
+   where clinic_id = v_clinic
+     and phone ~ '^98110[0-9]{5}$';
 
   for v_i in 1 .. array_length(v_names, 1) loop
     insert into patients (clinic_id, full_name, phone, age_years, notes, created_by, first_seen_at)
     values (
       v_clinic, v_names[v_i], v_phones[v_i], v_ages[v_i], 'seed', v_doctor.id,
       now() - (interval '1 day' * (60 - v_i * 3))
-    );
+    )
+    -- A roster patient survives the cleanup above when a real visit is attached
+    -- to it. Reuse that chart rather than colliding with its phone number, and
+    -- do not overwrite its name or age: a real encounter is pointing at it, and
+    -- the person on file outranks the demo fixture.
+    on conflict (clinic_id, phone) where phone is not null do nothing;
   end loop;
 
   -- Three weeks of register, ending today.
