@@ -49,7 +49,20 @@ interface StartMessage {
   sampleRate?: number;
 }
 
-const server = new WebSocketServer({ port: PORT });
+const server = new WebSocketServer({
+  port: PORT,
+  // `ws` defaults to a 100 MB frame. Nothing here is remotely that big: the
+  // worklet emits Int16 PCM in small chunks, so anything larger is either a bug
+  // or someone using an authenticated socket as free memory.
+  maxPayload: 1 << 20,
+});
+
+// Without this an EADDRINUSE — or any socket-level error — is an unhandled
+// 'error' event, which takes the whole process down and with it every doctor's
+// live transcript, not just the one that failed.
+server.on("error", (error) => {
+  console.error("[stt-proxy] server error", error);
+});
 
 server.on("connection", (client) => {
   let upstream: WebSocket | null = null;
@@ -101,6 +114,32 @@ server.on("connection", (client) => {
         client.close(4401, "unauthorised");
         return;
       }
+
+      // Authentication was never the whole job. `0004_audit_and_limits.sql`
+      // sets a 40/hour ceiling on transcription, and it only ever covered the
+      // HTTP path — this socket streams to the same paid vendor and spent from
+      // the same budget without ever asking. Metered as the user, so the
+      // policy applies per doctor exactly as it does over HTTP.
+      const scoped = createClient(SUPABASE_URL, SUPABASE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${start.token}` } },
+      });
+      const { data: allowed, error: limitError } = await scoped.rpc(
+        "consume_rate_limit",
+        { p_action: "transcribe" },
+      );
+      // Fail closed on an error, but not on a missing function: a deployment
+      // that has not run 0004 should still be able to dictate.
+      if (limitError && limitError.code !== "42883" && limitError.code !== "PGRST202") {
+        console.error("[stt-proxy] rate limit check failed", limitError.code);
+        client.close(1011, "rate limit unavailable");
+        return;
+      }
+      if (allowed === false) {
+        client.close(4429, "rate limited");
+        return;
+      }
+
       authorised = true;
 
       if (MOCK) {
