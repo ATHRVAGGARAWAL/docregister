@@ -1,0 +1,177 @@
+import { NextResponse } from "next/server";
+
+import { ApiError, withDoctor } from "@/lib/api/http";
+import { SARVAM_SYNC_LIMIT_MS, SttError, transcribeWithFailover } from "@/lib/stt";
+
+/**
+ * POST /api/encounters/transcribe
+ *
+ * multipart/form-data: audio, mimeType, durationMs, sampleRate, liveText, languages
+ * -> { transcriptId, text, romanText, languageCode, degraded, durationMs }
+ *
+ * Step 1 of 3 in the dictation pipeline. Deliberately separate from extraction
+ * so that a failed or unconvincing LLM pass can be retried without asking the
+ * doctor to say it all again — the audio and the transcript are already saved.
+ */
+
+// Buffer and the multipart body both need Node, and STT round-trips can take
+// tens of seconds on a clinic's mobile connection.
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const MAX_BYTES = 25 * 1024 * 1024;
+
+export const POST = withDoctor(async ({ doctor, supabase, request }) => {
+  const form = await request.formData().catch(() => null);
+  if (!form) throw new ApiError("Expected multipart/form-data.");
+
+  const audio = form.get("audio");
+  if (!(audio instanceof Blob)) throw new ApiError("No audio file was attached.");
+  if (audio.size === 0) throw new ApiError("The audio file was empty.");
+  if (audio.size > MAX_BYTES) throw new ApiError("That recording is too large.", 413);
+
+  const mimeType = String(form.get("mimeType") || audio.type || "audio/webm");
+  const durationMs = Number(form.get("durationMs")) || undefined;
+  const sampleRate = Number(form.get("sampleRate")) || undefined;
+  const liveText = String(form.get("liveText") || "") || null;
+  const languages = String(form.get("languages") || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (durationMs && durationMs > SARVAM_SYNC_LIMIT_MS) {
+    throw new ApiError(
+      "That recording is longer than 30 seconds. Dictate one patient at a time.",
+      413,
+    );
+  }
+
+  const transcriptId = crypto.randomUUID();
+  // Browsers record webm/mp4/ogg, but the route also accepts an uploaded file,
+  // and naming WAV bytes ".webm" makes the stored dictation refuse to open for
+  // whoever pulls it up to check what the doctor actually said.
+  const extension = mimeType.includes("mp4")
+    ? "m4a"
+    : mimeType.includes("ogg")
+      ? "ogg"
+      : mimeType.includes("wav")
+        ? "wav"
+        : mimeType.includes("mpeg")
+          ? "mp3"
+          : "webm";
+  // Clinic-scoped path. Storage policies key off the first path segment, so the
+  // clinic id has to lead — it is what makes one clinic's audio unreachable
+  // from another clinic's session.
+  const audioPath = `${doctor.clinic_id}/${doctor.id}/${transcriptId}.${extension}`;
+
+  const buffer = Buffer.from(await audio.arrayBuffer());
+
+  // Store the audio before transcribing. If STT fails we still hold the
+  // recording, and the doctor can retry instead of losing the consultation.
+  const upload = await supabase.storage
+    .from("dictations")
+    .upload(audioPath, buffer, { contentType: mimeType, upsert: false });
+
+  if (upload.error) {
+    console.error("[transcribe] upload failed", upload.error);
+    throw new ApiError("Could not save the recording.", 502);
+  }
+
+  // Bias the recogniser toward drugs this doctor actually prescribes. A full
+  // Indian formulary is far too large to send; their own top-N is both small
+  // and far better targeted.
+  const { data: topDrugs } = await supabase.rpc("doctor_top_drugs", {
+    p_doctor_id: doctor.id,
+    p_limit: 40,
+  });
+  const vocabularyHints = (topDrugs ?? []).map(
+    (row: { drug_name: string }) => row.drug_name,
+  );
+
+  let result;
+  try {
+    result = await transcribeWithFailover({
+      audio: buffer,
+      mimeType,
+      sampleRate,
+      durationMs,
+      languageHint: languages[0] ?? doctor.dictation_langs?.[0] ?? "unknown",
+      mode: "codemix",
+      vocabularyHints,
+    });
+  } catch (error) {
+    if (error instanceof SttError) {
+      // The doctor gets `sttMessage`, which is deliberately vague — a provider's
+      // raw response can carry back fragments of the request. But something has
+      // to hold the real reason or a failure here is undiagnosable, so it goes
+      // to the server log with the audio's shape, which is usually the culprit.
+      console.error("[transcribe] stt failed", {
+        code: error.code,
+        message: error.message,
+        bytes: buffer.length,
+        mimeType,
+        durationMs,
+        languageHint: languages[0] ?? doctor.dictation_langs?.[0] ?? "unknown",
+      });
+      const status =
+        error.code === "auth" ? 502 : error.code === "rate_limited" ? 429 : 422;
+      throw new ApiError(sttMessage(error), status);
+    }
+    throw error;
+  }
+
+  const { data, error } = await supabase
+    .from("transcripts")
+    .insert({
+      id: transcriptId,
+      clinic_id: doctor.clinic_id,
+      doctor_id: doctor.id,
+      // `raw_text` is the provider's output and is never overwritten by the
+      // LLM. It is the evidence behind every structured field downstream.
+      raw_text: result.text,
+      roman_text: result.romanText ?? null,
+      live_text: liveText,
+      audio_path: audioPath,
+      audio_mime: mimeType,
+      duration_ms: durationMs ?? result.durationMs ?? null,
+      language_code: result.detectedLanguage ?? null,
+      provider: result.provider,
+      model: result.model,
+      confidence: result.confidence ?? null,
+      degraded: result.degraded,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("[transcribe] insert failed", error);
+    throw new ApiError("Could not save the transcript.", 500);
+  }
+
+  return NextResponse.json({
+    transcriptId: data.id,
+    text: result.text,
+    romanText: result.romanText ?? null,
+    languageCode: result.detectedLanguage ?? null,
+    provider: result.provider,
+    degraded: result.degraded,
+    durationMs: durationMs ?? null,
+  });
+}, { rateLimit: "transcribe" });
+
+function sttMessage(error: SttError): string {
+  switch (error.code) {
+    case "too_long":
+      return "That recording was too long. Dictate one patient at a time.";
+    case "empty_audio":
+      return "No speech was detected in that recording.";
+    case "unsupported_format":
+      return "This device produced an audio format we cannot transcribe.";
+    case "rate_limited":
+      return "The transcription service is busy. Try again in a moment.";
+    case "auth":
+      return "Transcription is not configured. Check the server API key.";
+    default:
+      return "Transcription failed. Your recording was saved — try again.";
+  }
+}

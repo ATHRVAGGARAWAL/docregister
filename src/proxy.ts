@@ -1,0 +1,128 @@
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+
+import { buildCsp, securityHeaders } from "@/lib/security/headers";
+
+/**
+ * Next 16 renamed middleware to **proxy**: the file is `proxy.ts`, the export is
+ * `proxy`, and the edge runtime is no longer supported here — this always runs
+ * on Node. Writing this as `middleware.ts` would simply never execute, which is
+ * a silent failure mode worth knowing about, because the app would still build
+ * and every route would quietly be unauthenticated.
+ *
+ * Three jobs, in this order:
+ *
+ *  1. Mint a per-request CSP nonce. It has to happen before anything renders,
+ *     because Next reads the nonce out of the request's own CSP header while
+ *     server-rendering and stamps it onto every script tag it emits.
+ *  2. Refresh the Supabase session. Access tokens are short-lived; without a
+ *     refresh on each navigation a doctor gets signed out mid-clinic.
+ *  3. Bounce unauthenticated requests to /login before a Server Component can
+ *     start rendering patient data.
+ */
+export async function proxy(request: NextRequest) {
+  const dev = process.env.NODE_ENV === "development";
+
+  // Fresh per request. A nonce reused across responses is just a very long
+  // 'unsafe-inline'.
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const csp = buildCsp(nonce, { dev });
+
+  // The request headers are how the nonce reaches the renderer. Setting it only
+  // on the response would protect nothing: React would emit un-nonced script
+  // tags and the browser would refuse to run its own framework bundle.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", csp);
+
+  const withRequestHeaders = { request: { headers: requestHeaders } };
+  let response = NextResponse.next(withRequestHeaders);
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          // Write to both the request (so the same pass sees the fresh token)
+          // and the response (so the browser keeps it).
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next(withRequestHeaders);
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options),
+          );
+        },
+      },
+    },
+  );
+
+  // Must be getUser(), not getSession(). getSession() reads the cookie without
+  // verifying its signature, so a forged cookie would pass. getUser() checks
+  // with the auth server.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+  const isPublic =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico";
+
+  if (!user && !isPublic) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    // Send them back where they were headed once they sign in.
+    if (pathname !== "/") url.searchParams.set("next", pathname);
+    return decorate(NextResponse.redirect(url), { csp, dev, authenticated: false });
+  }
+
+  if (user && pathname.startsWith("/login")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    url.search = "";
+    return decorate(NextResponse.redirect(url), { csp, dev, authenticated: true });
+  }
+
+  return decorate(response, { csp, dev, authenticated: Boolean(user) });
+}
+
+/**
+ * Attach the header set to whichever response we ended up with.
+ *
+ * Applied to redirects as well as to rendered pages. A redirect is still a
+ * document the browser will act on, and it is the response an unauthenticated
+ * attacker sees most often.
+ */
+function decorate(
+  response: NextResponse,
+  { csp, dev, authenticated }: { csp: string; dev: boolean; authenticated: boolean },
+): NextResponse {
+  response.headers.set("Content-Security-Policy", csp);
+  for (const [key, value] of Object.entries(securityHeaders({ dev }))) {
+    response.headers.set(key, value);
+  }
+
+  // Anything rendered for a signed-in doctor contains patient data. Clinic
+  // computers are shared and the back button is a real disclosure path, so
+  // these responses are never written to disk and never served from cache
+  // after sign-out.
+  if (authenticated) {
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+  }
+
+  return response;
+}
+
+export const config = {
+  // Skip static assets and the audio worklet — running an auth round trip for
+  // every icon is pure latency.
+  matcher: [
+    "/((?!_next/static|_next/image|worklets|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?)$).*)",
+  ],
+};
