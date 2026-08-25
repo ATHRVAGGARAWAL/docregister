@@ -2,8 +2,20 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AlertTriangle, Check, Loader2, Plus, Trash2, UserPlus } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronRight,
+  FileClock,
+  Loader2,
+  Plus,
+  ShieldCheck,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
 
+import { PatientHistorySheet } from "@/components/patients/patient-history-sheet";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,6 +64,8 @@ export function ReviewSheet({
   const [fees, setFees] = useState(draft.extraction.fees_inr?.toString() ?? "");
   const [drugs, setDrugs] = useState<PrescriptionItem[]>(draft.extraction.prescription);
   const [patient, setPatient] = useState<PatientMatch | null>(null);
+  const [patientCandidates, setPatientCandidates] = useState(draft.suggestedPatients);
+  const [historyPatient, setHistoryPatient] = useState<PatientMatch | null>(null);
   const [asNew, setAsNew] = useState(draft.suggestedPatients.length === 0);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -112,20 +126,29 @@ export function ReviewSheet({
   }
 
   return (
-    <Sheet
-      open
-      onOpenChange={(next) => {
-        if (!next) onDiscard();
-      }}
-    >
+    <>
+      <Sheet
+        open
+        onOpenChange={(next) => {
+          if (!next && !historyPatient) onDiscard();
+        }}
+      >
       {/* No `aria-label` here: the sheet has a real `SheetTitle`, and an
           aria-label on the container would win over it and announce a second,
           slightly different name for the same dialog. */}
-      <SheetContent>
+      <SheetContent className="sm:max-w-2xl">
         <SheetHeader>
-          <SheetTitle>Review this visit</SheetTitle>
-          <SheetDescription>Nothing is saved until you confirm.</SheetDescription>
+          <SheetTitle>Review &amp; confirm</SheetTitle>
+          <SheetDescription>Check the clinical details before they enter the register.</SheetDescription>
         </SheetHeader>
+
+        <Alert variant="default" role="note" className="mx-5 mb-3 w-auto shrink-0">
+          <ShieldCheck className="mt-0.5 size-4 text-primary" aria-hidden />
+          <AlertTitle>Not saved yet</AlertTitle>
+          <AlertDescription>
+            Transcription and extraction are suggestions. You remain the final reviewer.
+          </AlertDescription>
+        </Alert>
 
         {(draft.warnings.length > 0 || draft.degraded) && (
           /* Warning stock: solid tinted card, full-strength border, and an icon.
@@ -159,7 +182,7 @@ export function ReviewSheet({
 
           {draft.suggestedPatients.length > 0 && (
             <PatientPicker
-              candidates={draft.suggestedPatients}
+              candidates={patientCandidates}
               selectedId={patient?.id ?? null}
               asNew={asNew}
               onSelect={(match) => {
@@ -169,6 +192,11 @@ export function ReviewSheet({
               onSelectNew={() => {
                 setAsNew(true);
                 setPatient(null);
+              }}
+              onViewHistory={(match) => {
+                setPatient(match);
+                setAsNew(false);
+                setHistoryPatient(match);
               }}
             />
           )}
@@ -354,12 +382,40 @@ export function ReviewSheet({
               ) : (
                 <Check className="size-4" aria-hidden />
               )}
-              Save to register
+              Confirm &amp; save
             </Button>
           </div>
         </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </SheetContent>
+      </Sheet>
+
+      <PatientHistorySheet
+        patient={historyPatient}
+        open={historyPatient !== null}
+        onOpenChange={(open) => {
+          if (!open) setHistoryPatient(null);
+        }}
+        onUsePatient={(match) => {
+          setPatient(match);
+          setAsNew(false);
+          setHistoryPatient(null);
+        }}
+        onPatientUpdated={(updated) => {
+          const applyUpdate = (match: PatientMatch): PatientMatch =>
+            match.id === updated.id
+              ? {
+                  ...match,
+                  full_name: updated.full_name,
+                  phone: updated.phone,
+                  age_years: updated.age_years,
+                }
+              : match;
+          setPatientCandidates((current) => current.map(applyUpdate));
+          setPatient((current) => (current ? applyUpdate(current) : current));
+          setHistoryPatient((current) => (current ? applyUpdate(current) : current));
+        }}
+      />
+    </>
   );
 }
 
@@ -393,12 +449,14 @@ function PatientPicker({
   asNew,
   onSelect,
   onSelectNew,
+  onViewHistory,
 }: {
   candidates: PatientMatch[];
   selectedId: string | null;
   asNew: boolean;
   onSelect: (match: PatientMatch) => void;
   onSelectNew: () => void;
+  onViewHistory: (match: PatientMatch) => void;
 }) {
   // Names that appear more than once in this shortlist. These are the rows
   // where a wrong pick is most likely and least visible.
@@ -431,6 +489,9 @@ function PatientPicker({
       <legend className="text-muted-foreground text-xs">
         Which chart is this? Nothing is linked until you choose.
       </legend>
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        Open a chart to review the patient&rsquo;s complete recorded history before linking this visit.
+      </p>
 
       {indistinguishable && (
         <p
@@ -454,6 +515,7 @@ function PatientPicker({
               title={match.full_name}
               collides={collisions.has(match.full_name.trim().toLowerCase())}
               detail={describe(match)}
+              onOpenHistory={() => onViewHistory(match)}
             />
           </li>
         ))}
@@ -503,6 +565,7 @@ function PatientOption({
   detail,
   collides,
   icon,
+  onOpenHistory,
 }: {
   checked: boolean;
   onSelect: () => void;
@@ -510,11 +573,29 @@ function PatientOption({
   detail: string;
   collides?: boolean;
   icon?: React.ReactNode;
+  onOpenHistory?: () => void;
 }) {
+  const patientDetails = (
+    <span className="min-w-0 flex-1">
+      <span className="text-foreground flex items-center gap-1.5 text-sm font-medium">
+        {icon}
+        <span className="truncate">{title}</span>
+        {collides && (
+          <span className="border-money/40 text-money shrink-0 rounded-sm border px-1.5 py-0.5 text-[0.6875rem] leading-none font-normal">
+            same name
+          </span>
+        )}
+      </span>
+      {/* Tabular figures so the ages and phone tails line up down the column
+          and two rows can be compared by scanning rather than by reading. */}
+      <span className="text-muted-foreground tnum mt-0.5 block text-xs">{detail}</span>
+    </span>
+  );
+
   return (
-    <label
+    <div
       className={cn(
-        "pressable flex w-full cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+        "pressable flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 transition-colors",
         // `:has()` rather than a JS focus handler: the ring belongs to the row,
         // the focus belongs to the input inside it, and the browser already
         // knows how to connect the two.
@@ -524,42 +605,54 @@ function PatientOption({
           : "border-border bg-card shadow-flat hover:bg-secondary",
       )}
     >
-      <input
-        type="radio"
-        name="patient-chart"
-        className="sr-only"
-        checked={checked}
-        onChange={onSelect}
-      />
-
-      {/* A real radio dial, drawn rather than borrowed, so it matches the
-          material of everything around it. `aria-hidden` because the input it
-          shadows is already announcing the state. */}
-      <span
-        aria-hidden
+      <label
         className={cn(
-          "grid size-4 shrink-0 place-items-center rounded-full border transition-colors",
-          checked ? "border-primary bg-primary" : "border-border",
+          "flex cursor-pointer items-center gap-3",
+          onOpenHistory ? "shrink-0" : "min-w-0 flex-1",
         )}
       >
-        {checked && <span className="bg-primary-foreground size-1.5 rounded-full" />}
-      </span>
+        <input
+          type="radio"
+          name="patient-chart"
+          className="sr-only"
+          checked={checked}
+          onChange={onSelect}
+          aria-label={`Select ${title}`}
+        />
 
-      <span className="min-w-0 flex-1">
-        <span className="text-foreground flex items-center gap-1.5 text-sm font-medium">
-          {icon}
-          <span className="truncate">{title}</span>
-          {collides && (
-            <span className="border-money/40 text-money shrink-0 rounded-sm border px-1.5 py-0.5 text-[0.6875rem] leading-none font-normal">
-              same name
-            </span>
+        {/* A real radio dial, drawn rather than borrowed, so it matches the
+            material of everything around it. `aria-hidden` because the input it
+            shadows is already announcing the state. */}
+        <span
+          aria-hidden
+          className={cn(
+            "grid size-4 shrink-0 place-items-center rounded-full border transition-colors",
+            checked ? "border-primary bg-primary" : "border-border",
           )}
+        >
+          {checked && <span className="bg-primary-foreground size-1.5 rounded-full" />}
         </span>
-        {/* Tabular figures so the ages and phone tails line up down the column
-            and two rows can be compared by scanning rather than by reading. */}
-        <span className="text-muted-foreground tnum mt-0.5 block text-xs">{detail}</span>
-      </span>
-    </label>
+        {!onOpenHistory && patientDetails}
+      </label>
+
+      {onOpenHistory && (
+        <button
+          type="button"
+          onClick={() => {
+            onSelect();
+            onOpenHistory();
+          }}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {patientDetails}
+          <span className="hidden shrink-0 items-center gap-1 text-xs font-medium text-primary sm:flex">
+            <FileClock className="size-4" aria-hidden />
+            View chart
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-primary" aria-hidden />
+        </button>
+      )}
+    </div>
   );
 }
 

@@ -61,7 +61,9 @@ begin
     -- A draft becoming a register entry is the moment that matters clinically,
     -- so it gets its own action rather than being one 'update' among many.
     v_action := case
-      when new.status is distinct from old.status and new.status = 'committed'
+      when tg_table_name = 'encounters'
+        and (to_jsonb(new) ->> 'status') is distinct from (to_jsonb(old) ->> 'status')
+        and (to_jsonb(new) ->> 'status') = 'committed'
       then 'commit'::audit_action
       else 'update'::audit_action
     end;

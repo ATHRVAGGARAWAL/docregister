@@ -37,19 +37,17 @@ export default async function RegisterPage() {
 
   return (
     <Dashboard
-      doctorName={shortName(doctor.full_name)}
+      initialProfile={{
+        fullName: doctor.full_name,
+        email: doctor.email,
+        speciality: doctor.speciality,
+        registrationNo: doctor.registration_no,
+        role: doctor.role,
+        dictationLangs: doctor.dictation_langs ?? ["hi-IN", "en-IN"],
+      }}
       initialAnalytics={analytics}
       initialEntries={entries}
       liveProxyUrl={liveProxyUrl}
-      dictationLangs={doctor.dictation_langs ?? ["hi-IN", "en-IN"]}
     />
   );
-}
-
-/** "Dr. Arjun Mehta" -> "Dr. Mehta". A greeting, not a nameplate. */
-function shortName(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  const honorific = /^(dr\.?|prof\.?)$/i.test(parts[0]) ? parts.shift() : null;
-  const last = parts.at(-1) ?? fullName;
-  return honorific ? `${honorific.replace(/\.?$/, ".")} ${last}` : last;
 }

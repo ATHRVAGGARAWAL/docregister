@@ -1,10 +1,11 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Loader2, Quote, X } from "lucide-react";
+import { ChevronRightIcon, Loader2, Quote, UserRoundIcon, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { PatientMatch } from "@/hooks/use-voice-capture";
 import { formatDayLong, formatINR } from "@/lib/format";
 
 export interface RecallResult {
@@ -20,6 +21,7 @@ export interface RecallResult {
     prescription: { drug_name: string; strength: string | null; frequency: string | null }[];
   }[];
   candidates: { id: string; full_name: string }[];
+  resolvedPatient: { id: string; full_name: string | null } | null;
 }
 
 /**
@@ -41,12 +43,14 @@ export function RecallPanel({
   loading,
   onDismiss,
   onPickPatient,
+  onOpenPatient,
 }: {
   question: string;
   result: RecallResult | null;
   loading: boolean;
   onDismiss: () => void;
   onPickPatient: (patientId: string) => void;
+  onOpenPatient: (patient: PatientMatch) => void;
 }) {
   return (
     <motion.section
@@ -81,6 +85,34 @@ export function RecallPanel({
 
           {result.caveat && (
             <p className="text-money mt-2 text-xs">{result.caveat}</p>
+          )}
+
+          {result.resolvedPatient && (
+            <button
+              type="button"
+              onClick={() =>
+                onOpenPatient({
+                  id: result.resolvedPatient!.id,
+                  full_name: result.resolvedPatient!.full_name || "Patient",
+                  phone: null,
+                  age_years: null,
+                  last_visit: result.encounters[0]?.occurred_at ?? null,
+                  visit_count: result.encounters.length,
+                })
+              }
+              className="mt-4 flex w-full items-center gap-3 rounded-xl border border-primary/20 bg-primary/8 px-3.5 py-3 text-left transition-colors hover:bg-primary/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/12 text-primary">
+                <UserRoundIcon className="size-4" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">
+                  {result.resolvedPatient.full_name || "Patient chart"}
+                </span>
+                <span className="block text-xs text-muted-foreground">Open complete medical history</span>
+              </span>
+              <ChevronRightIcon className="size-4 shrink-0 text-primary" aria-hidden />
+            </button>
           )}
 
           {/* Ambiguous name — the doctor disambiguates, the system never guesses. */}

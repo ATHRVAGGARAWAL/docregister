@@ -9,6 +9,7 @@ import { Waveform } from "@/components/voice/waveform";
 import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/format";
 import type { CapturePhase } from "@/hooks/use-voice-capture";
+import { cn } from "@/lib/utils";
 
 /**
  * The floating dock — the app's one persistent control.
@@ -218,7 +219,7 @@ export function VoiceDock({
   return (
     <div
       ref={dockRef}
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+      className="pointer-events-none fixed right-0 bottom-[4.75rem] left-0 z-40 flex justify-center px-4 pb-3 lg:bottom-0 lg:left-[17rem] lg:pb-[max(1rem,env(safe-area-inset-bottom))]"
     >
       <p className="sr-only" role="status" aria-live="polite">
         {activity}
@@ -227,7 +228,10 @@ export function VoiceDock({
       <motion.div
         layout
         transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        className="slip pointer-events-auto w-full max-w-xl p-3"
+        className={cn(
+          "slip pointer-events-auto w-full max-w-lg p-3",
+          !listening && !busy && "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2",
+        )}
       >
         <AnimatePresence mode="popLayout" initial={false}>
           {/* ---- Listening ------------------------------------------------ */}
@@ -314,7 +318,7 @@ export function VoiceDock({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="well flex items-center gap-2 px-3"
+              className="well flex h-12 items-center gap-2 px-3"
             >
               <Search className="text-muted-foreground size-4 shrink-0" aria-hidden />
               <input
@@ -329,13 +333,18 @@ export function VoiceDock({
         </AnimatePresence>
 
         {error && (
-          <p role="alert" className="text-destructive mt-2 px-1 text-sm">
+          <p role="alert" className="text-destructive col-span-full mt-2 px-1 text-sm">
             {error}
           </p>
         )}
 
         {/* ---- The key ---------------------------------------------------- */}
-        <div className="mt-3 flex items-center justify-center gap-3">
+        <div
+          className={cn(
+            "flex items-center justify-center gap-3",
+            listening || busy ? "mt-3" : "mt-0",
+          )}
+        >
           {listening && locked ? (
             <>
               <Button variant="outline" size="icon" onClick={onCancel}>
@@ -396,7 +405,10 @@ export function VoiceDock({
                       reduceMotion ? 1 : 1 + level * 0.1
                     })`,
                   }}
-                  className="bg-primary text-primary-foreground shadow-key active:shadow-key-down focus-visible:ring-ring focus-visible:ring-offset-background grid size-16 place-items-center rounded-full transition-[box-shadow] duration-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
+                  className={cn(
+                    "bg-primary text-primary-foreground shadow-key active:shadow-key-down focus-visible:ring-ring focus-visible:ring-offset-background grid place-items-center rounded-full transition-[box-shadow] duration-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50",
+                    listening ? "size-16" : "size-12",
+                  )}
                   aria-label={
                     listening
                       ? "Stop recording and review this visit"
@@ -407,11 +419,6 @@ export function VoiceDock({
                 </button>
               </ClickSpark>
 
-              {!listening && !busy && (
-                /* Both gestures named, because a doctor who cannot hold has no
-                   way to discover the tap if the label only mentions holding. */
-                <span className="text-muted-foreground mt-2 text-xs">Tap or hold to dictate</span>
-              )}
             </div>
           )}
         </div>

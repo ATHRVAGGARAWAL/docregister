@@ -47,7 +47,7 @@ export async function getCurrentDoctor() {
 
   const { data, error } = await supabase
     .from("doctors")
-    .select("id, clinic_id, full_name, speciality, role, dictation_langs")
+    .select("id, clinic_id, full_name, registration_no, speciality, role, dictation_langs")
     .eq("id", user.id)
     .single();
 

@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { startOfDayInIndia, todayInIndia } from "@/lib/analytics";
+import { shiftDays, startOfDayInIndia, todayInIndia } from "@/lib/analytics";
 import type { RegisterEntry } from "@/lib/types";
 
 /**
@@ -41,6 +41,18 @@ export async function loadTodayRegister(
   supabase: SupabaseClient,
   doctorId: string,
 ): Promise<RegisterEntry[]> {
+  return loadRegister(supabase, doctorId, { days: 1 });
+}
+
+export async function loadRegister(
+  supabase: SupabaseClient,
+  doctorId: string,
+  options: { days?: number; limit?: number } = {},
+): Promise<RegisterEntry[]> {
+  const days = Math.min(Math.max(options.days ?? 30, 1), 365);
+  const limit = Math.min(Math.max(options.limit ?? 300, 1), 500);
+  const from = shiftDays(todayInIndia(), -(days - 1));
+
   const { data, error } = await supabase
     .from("encounters")
     .select(
@@ -50,10 +62,10 @@ export async function loadTodayRegister(
        prescription_items ( drug_name, strength, frequency_label, position )`,
     )
     .eq("doctor_id", doctorId)
-    .gte("occurred_at", startOfDayInIndia(todayInIndia()))
+    .gte("occurred_at", startOfDayInIndia(from))
     .in("status", ["committed", "draft"])
     .order("occurred_at", { ascending: false })
-    .limit(200);
+    .limit(limit);
 
   if (error) {
     console.error("[register] load failed", error);

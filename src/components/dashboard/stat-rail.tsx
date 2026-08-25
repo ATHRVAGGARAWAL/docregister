@@ -58,7 +58,7 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
 
   return (
     <div
-      className="no-scrollbar -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:overflow-visible sm:px-0"
+      className="no-scrollbar -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 xl:grid-cols-4"
       role="list"
     >
       {tiles.map((tile, index) => (
@@ -68,7 +68,7 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.05 * index, ease: [0.22, 1, 0.36, 1] }}
-          className="slip-flat min-w-[9.5rem] shrink-0 snap-start px-4 py-3.5 sm:min-w-0"
+          className="min-w-[10rem] shrink-0 snap-start rounded-xl border border-border bg-card px-4 py-4 shadow-flat sm:min-w-0"
         >
           <div className="flex items-center gap-1.5">
             {tile.swatch && (
@@ -82,8 +82,8 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
           </div>
 
           <p
-            className={`tnum mt-1 text-2xl font-semibold tracking-tight ${
-              tile.money ? "text-money" : "text-foreground"
+            className={`tnum mt-2 text-2xl font-semibold tracking-tight ${
+              tile.money ? "text-primary" : "text-foreground"
             }`}
           >
             <CountUp

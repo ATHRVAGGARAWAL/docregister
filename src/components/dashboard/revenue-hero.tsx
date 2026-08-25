@@ -42,24 +42,25 @@ export function RevenueHero({
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="slip px-5 py-5 sm:px-6 sm:py-6"
+      className="grid overflow-hidden rounded-2xl border border-border bg-card shadow-raise md:grid-cols-[minmax(0,0.8fr)_minmax(18rem,1.2fr)]"
     >
-      <div className="flex items-start justify-between gap-4">
-        <p className="text-muted-foreground text-[11px] font-medium tracking-[0.14em] uppercase">
-          Takings today
-        </p>
+      <div className="flex flex-col justify-between border-b border-border p-5 sm:p-6 md:border-b-0 md:border-r">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Today&rsquo;s revenue
+          </p>
+          <h1 className="tnum mt-3 text-[2.75rem] font-semibold leading-none tracking-[-0.045em] text-foreground sm:text-6xl">
+            <CountUp to={todayRevenue} duration={1} format={formatINR} />
+          </h1>
+        </div>
 
         {delta !== null && (
-          /* A stamped mark rather than a tinted pill: solid border at full
-             strength, arrow and sign both present, so the direction survives
-             being read in greyscale or by someone who cannot separate the two
-             hues. */
           <span
             className={cn(
-              "inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-[11px] font-medium",
+              "mt-5 inline-flex w-fit items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium",
               up
-                ? "border-primary/30 bg-primary/10 text-primary"
-                : "border-destructive/30 bg-destructive/10 text-destructive",
+                ? "border-primary/25 bg-primary/10 text-primary"
+                : "border-destructive/25 bg-destructive/10 text-destructive",
             )}
           >
             {up ? (
@@ -71,18 +72,13 @@ export function RevenueHero({
               {up ? "+" : "−"}
               {Math.abs(delta)}%
             </span>
-            <span className="text-muted-foreground font-normal">vs yesterday</span>
+            <span className="text-muted-foreground font-normal">from yesterday</span>
           </span>
         )}
       </div>
-
-      {/* Proportional tracking pulled tight: at this size the default letter
-          spacing makes a rupee figure read as loose. */}
-      <h1 className="text-money tnum mt-2 text-[2.75rem] leading-none font-semibold tracking-[-0.035em] sm:text-6xl">
-        <CountUp to={todayRevenue} duration={1} format={formatINR} />
-      </h1>
-
-      <Sparkline points={points} />
+      <div className="flex min-h-44 items-end p-5 sm:p-6">
+        <Sparkline points={points} />
+      </div>
     </motion.section>
   );
 }
@@ -118,7 +114,7 @@ function Sparkline({ points }: { points: DailyPoint[] }) {
   const end = coords.at(-1)!;
 
   return (
-    <figure className="mt-5">
+    <figure className="w-full">
       <svg
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
@@ -126,11 +122,11 @@ function Sparkline({ points }: { points: DailyPoint[] }) {
         role="img"
         aria-label={`Revenue over the last ${points.length} days, ${formatINR(values[0])} to ${formatINR(values.at(-1)!)}`}
       >
-        <path d={area} fill="var(--money)" fillOpacity={0.1} />
+        <path d={area} fill="var(--primary)" fillOpacity={0.08} />
         <path
           d={line}
           fill="none"
-          stroke="var(--money)"
+          stroke="var(--primary)"
           strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -142,7 +138,7 @@ function Sparkline({ points }: { points: DailyPoint[] }) {
           cx={end.x}
           cy={end.y}
           r={3.5}
-          fill="var(--money)"
+          fill="var(--primary)"
           stroke="var(--card)"
           strokeWidth={2}
           vectorEffect="non-scaling-stroke"

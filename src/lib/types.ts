@@ -33,3 +33,39 @@ export interface RegisterEntry {
   status: "draft" | "committed" | "discarded";
   drugs: string[];
 }
+
+export interface PatientHistoryPrescription {
+  id: string;
+  drug_name: string;
+  strength: string | null;
+  form: string | null;
+  frequency: string | null;
+  duration: string | null;
+  instructions: string | null;
+}
+
+export interface PatientHistoryEncounter {
+  id: string;
+  occurred_at: string;
+  age_years: number | null;
+  diagnosis: string | null;
+  treatment: string | null;
+  fees_inr: number | null;
+  visit_number: number | null;
+  doctor_name: string | null;
+  prescription: PatientHistoryPrescription[];
+}
+
+export interface PatientHistoryPayload {
+  patient: {
+    id: string;
+    full_name: string;
+    phone: string | null;
+    age_years: number | null;
+    sex: string | null;
+    abha_id: string | null;
+    notes: string | null;
+    first_seen_at: string;
+  };
+  encounters: PatientHistoryEncounter[];
+}
