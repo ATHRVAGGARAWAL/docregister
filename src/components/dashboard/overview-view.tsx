@@ -5,6 +5,7 @@ import { ArrowRightIcon, CalendarDaysIcon, HistoryIcon, Mic2Icon } from "lucide-
 import { MixChart } from "@/components/charts/mix-chart";
 import { VolumeChart } from "@/components/charts/volume-chart";
 import { RegisterTimeline } from "@/components/dashboard/register-timeline";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RevenueHero } from "@/components/dashboard/revenue-hero";
 import { StatRail } from "@/components/dashboard/stat-rail";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
 import { cn } from "@/lib/utils";
 import type { AnalyticsPayload, RegisterEntry } from "@/lib/types";
+
+/** How many of today's visits the overview previews before deferring to the register. */
+const RECENT_LIMIT = 5;
 
 const RANGES = [
   { label: "7D", days: 7 },
@@ -25,6 +29,7 @@ export function OverviewView({
   entries,
   range,
   loadingRange,
+  rangeError,
   onRangeChange,
   onStartDictation,
   onOpenRegister,
@@ -36,6 +41,7 @@ export function OverviewView({
   entries: RegisterEntry[];
   range: number;
   loadingRange: boolean;
+  rangeError: string | null;
   onRangeChange: (days: number) => void;
   onStartDictation: () => void;
   onOpenRegister: () => void;
@@ -96,6 +102,14 @@ export function OverviewView({
             ))}
           </div>
         </div>
+        {rangeError && (
+          <Alert variant="destructive" role="alert" className="mb-4">
+            <AlertTitle>Could not load analytics</AlertTitle>
+            <AlertDescription>
+              {rangeError} The charts below are from the last range that loaded.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="grid gap-4 md:grid-cols-2">
           <VolumeChart data={analytics.series} loading={loadingRange} />
           <MixChart data={analytics.series.slice(-14)} loading={loadingRange} />
@@ -107,8 +121,12 @@ export function OverviewView({
           <div className="mb-4 flex items-end justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold tracking-tight">Recent visits</h2>
+              {/* Says what is on screen, not what exists. This read
+                  "12 visits today" above a list of five. */}
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {entries.length} visit{entries.length === 1 ? "" : "s"} today
+                {entries.length > RECENT_LIMIT
+                  ? `Latest ${RECENT_LIMIT} of ${entries.length} visits today`
+                  : `${entries.length} visit${entries.length === 1 ? "" : "s"} today`}
               </p>
             </div>
             <Button variant="ghost" size="sm" onClick={onOpenRegister}>
@@ -116,7 +134,7 @@ export function OverviewView({
             </Button>
           </div>
           <RegisterTimeline
-            entries={entries.slice(0, 5)}
+            entries={entries.slice(0, RECENT_LIMIT)}
             compact
             onOpenPatient={onOpenPatient}
           />

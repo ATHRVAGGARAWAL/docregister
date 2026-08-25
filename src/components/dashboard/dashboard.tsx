@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { BookOpenCheckIcon, CalendarDaysIcon } from "lucide-react";
@@ -59,6 +59,8 @@ export function Dashboard({
   const [registerStatus, setRegisterStatus] = useState<RegisterStatus>("all");
   const [registerQuery, setRegisterQuery] = useState("");
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [chartPatient, setChartPatient] = useState<PatientMatch | null>(null);
 
   const capture = useVoiceCapture({
@@ -79,57 +81,82 @@ export function Dashboard({
     };
   }, []);
 
+  // One counter per fetcher. Clicking 7 days then 90 days fires two requests,
+  // and without this whichever the network happens to return last wins — so the
+  // chart could settle on 7 days' data while the 90-day chip stayed highlighted,
+  // indefinitely. Comparing a captured ticket against the latest before writing
+  // state means a superseded response is dropped instead of applied.
+  const rangeTicket = useRef(0);
+  const registerTicket = useRef(0);
+  const recallTicket = useRef(0);
+
   const loadRange = useCallback(async (days: number) => {
+    const ticket = ++rangeTicket.current;
     setRange(days);
     setLoadingRange(true);
+    setAnalyticsError(null);
     try {
-      const response = await fetch(`/api/analytics/daily?days=${days}`);
-      if (response.ok) setAnalytics(await response.json());
+      const payload = await getJson(`/api/analytics/daily?days=${days}`);
+      if (ticket !== rangeTicket.current) return;
+      setAnalytics(payload as AnalyticsPayload);
+    } catch (error) {
+      if (ticket !== rangeTicket.current) return;
+      // Previously this had no failure branch at all: the spinner stopped, the
+      // old numbers stayed on screen, and nothing said they were stale.
+      setAnalyticsError(messageFor(error, "Could not load analytics."));
     } finally {
-      setLoadingRange(false);
+      if (ticket === rangeTicket.current) setLoadingRange(false);
     }
   }, []);
 
   const loadRegister = useCallback(async (days: number, status: RegisterStatus, query: string) => {
+    const ticket = ++registerTicket.current;
     setRegisterLoading(true);
+    setRegisterError(null);
     try {
       const params = new URLSearchParams({ days: String(days) });
       if (status !== "all") params.set("status", status);
       if (query.trim()) params.set("q", query.trim());
-      const response = await fetch(`/api/register?${params}`);
-      const payload = await response.json();
-      if (response.ok) setRegisterEntries(payload.entries ?? []);
+      const payload = await getJson(`/api/register?${params}`);
+      if (ticket !== registerTicket.current) return;
+      setRegisterEntries((payload as { entries?: RegisterEntry[] }).entries ?? []);
+    } catch (error) {
+      if (ticket !== registerTicket.current) return;
+      setRegisterError(messageFor(error, "Could not load the register."));
     } finally {
-      setRegisterLoading(false);
+      if (ticket === registerTicket.current) setRegisterLoading(false);
     }
   }, []);
 
   const ask = useCallback(async (text: string, patientId?: string) => {
+    const ticket = ++recallTicket.current;
     setView("recall");
     setQuestion(text);
     setRecall(null);
     setRecallLoading(true);
     try {
-      const response = await fetch("/api/recall", {
+      const payload = await getJson("/api/recall", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: text, patientId }),
       });
-      const payload = await response.json();
-      setRecall(
-        response.ok
-          ? payload
-          : {
-              answer: payload?.error ?? "Could not search your register.",
-              confidence: "low",
-              caveat: null,
-              encounters: [],
-              candidates: [],
-              resolvedPatient: null,
-            },
-      );
+      if (ticket !== recallTicket.current) return;
+      setRecall(payload as RecallResult);
+    } catch (error) {
+      if (ticket !== recallTicket.current) return;
+      // The panel renders its loading state on `loading || !result`, so leaving
+      // `recall` null here left the doctor watching "Looking through your
+      // register…" forever with no way out but Dismiss.
+      setRecall({
+        answer: messageFor(error, "Could not search your register."),
+        confidence: "low",
+        caveat: null,
+        encounters: [],
+        candidates: [],
+        resolvedPatient: null,
+      });
     } finally {
-      setRecallLoading(false);
+      if (ticket === recallTicket.current) setRecallLoading(false);
     }
   }, []);
 
@@ -151,7 +178,16 @@ export function Dashboard({
   }, [capture, loadRange, loadRegister, range, registerDays, registerQuery, registerStatus, router]);
 
   async function signOut() {
-    await getSupabaseBrowserClient().auth.signOut();
+    // A failed sign-out used to leave the doctor signed in, on the same screen,
+    // with nothing said — indistinguishable from a button that does nothing.
+    // Navigating regardless is the safer default: the local session is cleared
+    // either way, and `proxy.ts` will bounce an unauthenticated request back to
+    // /login on the next navigation.
+    try {
+      await getSupabaseBrowserClient().auth.signOut();
+    } catch (error) {
+      console.error("[dashboard] sign out failed", error);
+    }
     router.replace("/login");
     router.refresh();
   }
@@ -208,6 +244,7 @@ export function Dashboard({
                   entries={initialEntries}
                   range={range}
                   loadingRange={loadingRange}
+                  rangeError={analyticsError}
                   onRangeChange={(days) => void loadRange(days)}
                   onStartDictation={() => void capture.start()}
                   onOpenRegister={() => changeView("register")}
@@ -219,6 +256,7 @@ export function Dashboard({
                 <RegisterWorkspace
                   entries={registerEntries}
                   loading={registerLoading}
+                  error={registerError}
                   days={registerDays}
                   status={registerStatus}
                   query={registerQuery}
@@ -331,4 +369,33 @@ function shortName(fullName: string): string {
   const honorific = /^(dr\.?|prof\.?)$/i.test(parts[0]) ? parts.shift() : null;
   const last = parts.at(-1) ?? fullName;
   return honorific ? `${honorific.replace(/\.?$/, ".")} ${last}` : last;
+}
+
+/**
+ * Fetch JSON, and turn a failure into a thrown Error carrying the server's own
+ * message where there is one.
+ *
+ * The version this replaces called `response.json()` *before* checking `ok`,
+ * which meant a non-JSON error body — a proxy's 502 HTML page, or an offline
+ * browser — threw a SyntaxError out of a `void`-called async function and
+ * surfaced as an unhandled promise rejection rather than as anything the doctor
+ * could see.
+ */
+async function getJson(input: string, init?: RequestInit): Promise<unknown> {
+  const response = await fetch(input, init);
+  let payload: unknown = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+  if (!response.ok) {
+    const error = (payload as { error?: unknown } | null)?.error;
+    throw new Error(typeof error === "string" ? error : `Request failed (${response.status})`);
+  }
+  return payload;
+}
+
+function messageFor(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
 }

@@ -3,6 +3,7 @@
 import { CalendarRangeIcon, LoaderCircleIcon, SearchIcon } from "lucide-react";
 
 import { RegisterTimeline } from "@/components/dashboard/register-timeline";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
@@ -25,6 +26,7 @@ const STATUSES = [
 export function RegisterWorkspace({
   entries,
   loading,
+  error,
   days,
   status,
   query,
@@ -36,6 +38,7 @@ export function RegisterWorkspace({
 }: {
   entries: RegisterEntry[];
   loading: boolean;
+  error: string | null;
   days: number;
   status: "all" | "committed" | "draft";
   query: string;
@@ -147,6 +150,13 @@ export function RegisterWorkspace({
               Loading register…
             </p>
           </div>
+        ) : error ? (
+          <Alert variant="destructive" role="alert">
+            <AlertTitle>Could not load the register</AlertTitle>
+            <AlertDescription>
+              {error} The visits below, if any, are from your last successful load.
+            </AlertDescription>
+          </Alert>
         ) : (
           <RegisterTimeline entries={entries} onOpenPatient={onOpenPatient} />
         )}

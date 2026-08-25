@@ -72,8 +72,33 @@ export function ReviewSheet({
   const [showTranscript, setShowTranscript] = useState(false);
 
   // Stable across retries so a double-tap on a slow connection commits once.
-  const idempotencyKey = useMemo(() => crypto.randomUUID(), []);
-  const uncertain = new Set(draft.extraction.uncertain_fields);
+  //
+  // Generated in a lazy initialiser rather than during render, and with a
+  // fallback. `crypto.randomUUID` is gated on a secure context, so on
+  // http://<lan-ip>:3000 — the origin this repo's own README documents for
+  // testing on a phone — calling it at render time threw inside render, with no
+  // error boundary above it, and white-screened the sheet *after* the doctor had
+  // already finished dictating. The value only has to be unique per mount, not
+  // unguessable, so a non-crypto fallback is the right trade against losing the
+  // consultation.
+  const [idempotencyKey] = useState(newIdempotencyKey);
+  const uncertain = useMemo(
+    () => new Set(draft.extraction.uncertain_fields),
+    [draft.extraction.uncertain_fields],
+  );
+
+  // Has the doctor put anything of their own into this sheet? Only used to
+  // decide whether an accidental dismissal is allowed to throw the visit away
+  // without asking — picking a chart counts, because that is a decision the
+  // extraction did not make for them.
+  const isDirty =
+    name !== (draft.extraction.patient_name ?? "") ||
+    age !== (draft.extraction.age_years?.toString() ?? "") ||
+    diagnosis !== (draft.extraction.diagnosis ?? "") ||
+    treatment !== (draft.extraction.treatment ?? "") ||
+    fees !== (draft.extraction.fees_inr?.toString() ?? "") ||
+    drugs !== draft.extraction.prescription ||
+    patient !== null;
 
   async function save() {
     if (!name.trim()) {
@@ -82,6 +107,19 @@ export function ReviewSheet({
     }
     if (!patient && !asNew) {
       setFailure("Choose the patient, or add them as new.");
+      return;
+    }
+    // `inputMode="numeric"` is a keyboard hint, not a constraint, so these can
+    // still hold "12o0". That used to become NaN, which `JSON.stringify`
+    // serialises as null — the visit committed with the fee silently missing,
+    // and the fee is the number the whole revenue view is built on. Refuse it
+    // and say so instead.
+    if (!isNumericField(fees)) {
+      setFailure("Fees must be a number, or left blank.");
+      return;
+    }
+    if (!isNumericField(age)) {
+      setFailure("Age must be a number, or left blank.");
       return;
     }
 
@@ -94,14 +132,14 @@ export function ReviewSheet({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           patient_name_spoken: name.trim(),
-          age_years: age === "" ? null : Number(age),
+          age_years: parseNumber(age),
           diagnosis: diagnosis.trim() || null,
           treatment: treatment.trim() || null,
-          fees_inr: fees === "" ? null : Number(fees),
+          fees_inr: parseNumber(fees),
           prescription: drugs,
         }),
       });
-      if (!patch.ok) throw new Error((await patch.json())?.error ?? "Could not save edits.");
+      if (!patch.ok) throw new Error(await errorMessage(patch, "Could not save edits."));
 
       const commit = await fetch(`/api/encounters/${draft.encounterId}/commit`, {
         method: "POST",
@@ -110,11 +148,11 @@ export function ReviewSheet({
           patientId: patient?.id,
           newPatient: patient
             ? undefined
-            : { full_name: name.trim(), age_years: age === "" ? null : Number(age) },
+            : { full_name: name.trim(), age_years: parseNumber(age) },
           idempotencyKey,
         }),
       });
-      if (!commit.ok) throw new Error((await commit.json())?.error ?? "Could not save the visit.");
+      if (!commit.ok) throw new Error(await errorMessage(commit, "Could not save the visit."));
 
       navigator.vibrate?.([8, 40, 8]);
       onCommitted();
@@ -130,13 +168,31 @@ export function ReviewSheet({
       <Sheet
         open
         onOpenChange={(next) => {
-          if (!next && !historyPatient) onDiscard();
+          if (next || historyPatient) return;
+          // Radix closes on Escape and on an outside pointer-down by default,
+          // and closing routes straight to `onDiscard`, which DELETEs the
+          // encounter. On a phone that put an irreversible delete one mistimed
+          // tap beside the sheet away, with no confirm and no undo, on a visit
+          // the doctor had already reviewed. Dismissing is now only a discard
+          // when there is nothing to lose.
+          if (!isDirty || confirmDiscard()) onDiscard();
         }}
       >
       {/* No `aria-label` here: the sheet has a real `SheetTitle`, and an
           aria-label on the container would win over it and announce a second,
           slightly different name for the same dialog. */}
-      <SheetContent className="sm:max-w-2xl">
+      <SheetContent
+        className="sm:max-w-2xl"
+        // Escape and an outside tap are the two accidental paths to losing a
+        // reviewed visit; the explicit Discard button in the footer is
+        // unaffected by either. Outside-tap is refused outright rather than
+        // prompted: on a phone the sheet occupies most of the screen and the
+        // strip beside it is exactly where a thumb lands by mistake.
+        onEscapeKeyDown={(event) => {
+          if (isDirty && !confirmDiscard()) event.preventDefault();
+        }}
+        onPointerDownOutside={(event) => event.preventDefault()}
+      >
         <SheetHeader>
           <SheetTitle>Review &amp; confirm</SheetTitle>
           <SheetDescription>Check the clinical details before they enter the register.</SheetDescription>
@@ -685,4 +741,56 @@ function Field({
       {children}
     </label>
   );
+}
+
+/**
+ * Unique per mount, and never throws.
+ *
+ * `crypto.randomUUID` only exists in a secure context. This app is documented
+ * as testable over http on a LAN address, where it is undefined — so the
+ * fallback is not defensive padding, it is the documented configuration.
+ */
+function newIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `k-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** Blank means "not stated"; anything else has to be a real, finite number. */
+function isNumericField(value: string): boolean {
+  return value.trim() === "" || Number.isFinite(Number(value));
+}
+
+function parseNumber(value: string): number | null {
+  if (value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * A failed request does not promise a JSON body — a proxy 502 or an offline
+ * browser returns HTML, and `.json()` then throws a SyntaxError that replaces
+ * the message the doctor should have seen with a parser error.
+ */
+async function errorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const body = await response.json();
+    return typeof body?.error === "string" ? body.error : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * The one place a reviewed visit can be thrown away by accident.
+ *
+ * `window.confirm` rather than a second nested dialog: this fires from inside
+ * a Radix dismiss handler, where opening another Radix dialog fights the first
+ * one's focus trap for ownership of the same unmount. A native confirm is
+ * synchronous, which is exactly what a `preventDefault()` decision needs.
+ */
+function confirmDiscard(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.confirm("Discard this visit? What you have entered will be lost.");
 }

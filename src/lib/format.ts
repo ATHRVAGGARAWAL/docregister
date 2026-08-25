@@ -14,49 +14,84 @@ const inr = new Intl.NumberFormat("en-IN", {
 
 const plain = new Intl.NumberFormat("en-IN");
 
+/**
+ * `??` catches null and undefined; it does not catch NaN, and these values come
+ * from summed API responses where a NaN is entirely reachable. `formatINR(NaN)`
+ * used to render the string "₹NaN" into the revenue hero.
+ */
+function finite(value: number | null | undefined): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function formatINR(value: number | null | undefined): string {
-  return inr.format(Number(value ?? 0));
+  return inr.format(finite(value));
 }
 
 export function formatCount(value: number | null | undefined): string {
-  return plain.format(Number(value ?? 0));
+  return plain.format(finite(value));
 }
 
 /** Axis ticks only — compact forms save horizontal space a phone doesn't have. */
-export function formatCompactINR(value: number): string {
+export function formatCompactINR(input: number): string {
+  const value = finite(input);
+  if (value < 0) return `-${formatCompactINR(-value)}`;
   if (value >= 10_000_000) return `₹${(value / 10_000_000).toFixed(1)}Cr`;
   if (value >= 100_000) return `₹${(value / 100_000).toFixed(1)}L`;
   if (value >= 1_000) return `₹${Math.round(value / 1_000)}k`;
-  return `₹${value}`;
+  return `₹${Math.round(value)}`;
+}
+
+/**
+ * Hoisted for the same reason `inr` and `plain` are: `formatDayShort` is a
+ * Recharts `tickFormatter`, so constructing a DateTimeFormat inside it built one
+ * per tick per render — ninety of them for a 90-day window.
+ */
+const dayShort = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "short",
+  timeZone: "Asia/Kolkata",
+});
+
+const dayLong = new Intl.DateTimeFormat("en-IN", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  timeZone: "Asia/Kolkata",
+});
+
+const clock = new Intl.DateTimeFormat("en-IN", {
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+  timeZone: "Asia/Kolkata",
+});
+
+/**
+ * `Intl.DateTimeFormat.format()` throws a RangeError on an Invalid Date rather
+ * than returning something harmless. In a chart tick formatter that does not
+ * produce a blank tick — it takes down the whole chart. `formatVisitDay` below
+ * has always guarded; these three did not.
+ */
+function dayStart(iso: string): Date | null {
+  const date = new Date(`${iso}T00:00:00+05:30`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 /** "24 Aug" — short enough for a mobile axis, unambiguous across months. */
 export function formatDayShort(iso: string): string {
-  const date = new Date(`${iso}T00:00:00+05:30`);
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    timeZone: "Asia/Kolkata",
-  }).format(date);
+  const date = dayStart(iso);
+  return date ? dayShort.format(date) : "—";
 }
 
 export function formatDayLong(iso: string): string {
-  const date = new Date(`${iso}T00:00:00+05:30`);
-  return new Intl.DateTimeFormat("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    timeZone: "Asia/Kolkata",
-  }).format(date);
+  const date = dayStart(iso);
+  return date ? dayLong.format(date) : "—";
 }
 
 export function formatClock(iso: string): string {
-  return new Intl.DateTimeFormat("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: "Asia/Kolkata",
-  }).format(new Date(iso));
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "—" : clock.format(date);
 }
 
 export function formatDuration(ms: number): string {

@@ -19,6 +19,13 @@
 export type MimeChoice = { mimeType: string; extension: string };
 
 /**
+ * How long to wait for MediaRecorder to hand back the final blob before giving
+ * up on it. Generous — finalising a container is real work on a slow phone —
+ * but bounded, because the alternative is an await that never returns.
+ */
+const STOP_TIMEOUT_MS = 5_000;
+
+/**
  * Pick a container the browser will actually produce.
  *
  * Order matters and is the opposite of what most tutorials say. Safari before
@@ -143,6 +150,21 @@ export class VoiceRecorder {
 
     await resumed;
 
+    // Everything from here on can throw — `new MediaRecorder` rejects a mime the
+    // probe accepted on some engines — and by this point the microphone is
+    // already live. Without this the tracks stayed open on the failure path,
+    // leaving the OS recording indicator lit after an error the doctor was told
+    // was fatal. This file's own comment calls that "alarming… because it is".
+    try {
+      await this.buildGraph();
+    } catch (cause) {
+      this.teardown();
+      throw cause;
+    }
+  }
+
+  private async buildGraph(): Promise<void> {
+    if (!this.context || !this.stream) throw new Error("Recorder was not started");
     this.source = this.context.createMediaStreamSource(this.stream);
 
     // --- Branch 1: waveform ------------------------------------------------
@@ -204,10 +226,40 @@ export class VoiceRecorder {
     const durationMs = performance.now() - this.startedAt;
     const sampleRate = this.context?.sampleRate ?? 0;
 
+    // Three ways this promise can settle, and it must take one of them.
+    //
+    // It used to have only `onstop`. If MediaRecorder raised `error` instead of
+    // firing `onstop` — or fired neither — the promise never settled: the
+    // caller awaited it forever, the capture state machine stayed in
+    // `listening`, the elapsed timer kept counting past the hard limit, and the
+    // microphone stayed open with the OS recording indicator lit. That is the
+    // one unrecoverable hang in the pipeline, and it strands the doctor holding
+    // a phone that is still listening.
+    //
+    // Whatever the chunks amount to is still worth returning; the caller
+    // already rejects a blob under 1 KB with a clear message, which is a better
+    // outcome than an await that never returns.
     const blob = await new Promise<Blob>((resolve) => {
-      recorder.onstop = () => resolve(new Blob(this.chunks, { type: this.negotiatedMime }));
-      if (recorder.state !== "inactive") recorder.stop();
-      else resolve(new Blob(this.chunks, { type: this.negotiatedMime }));
+      const settle = () => {
+        clearTimeout(timer);
+        resolve(new Blob(this.chunks, { type: this.negotiatedMime }));
+      };
+      const timer = setTimeout(settle, STOP_TIMEOUT_MS);
+
+      recorder.onstop = settle;
+      recorder.onerror = settle;
+
+      if (recorder.state !== "inactive") {
+        try {
+          recorder.stop();
+        } catch {
+          // Already stopping, or in a state that refuses stop(). Either way the
+          // chunks are what they are.
+          settle();
+        }
+      } else {
+        settle();
+      }
     });
 
     this.teardown();
