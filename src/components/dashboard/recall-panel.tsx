@@ -1,12 +1,13 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ChevronRightIcon, Loader2, Quote, UserRoundIcon, X } from "lucide-react";
+import { ChevronRightIcon, Loader2, Quote, TriangleAlert, UserRoundIcon, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
 import { formatDayLong, formatINR } from "@/lib/format";
+import type { RecallQuery } from "@/lib/llm/schema";
 
 export interface RecallResult {
   answer: string;
@@ -22,6 +23,33 @@ export interface RecallResult {
   }[];
   candidates: { id: string; full_name: string }[];
   resolvedPatient: { id: string; full_name: string | null } | null;
+  /**
+   * How the question was read. Carried back to the client because `intent`
+   * decides whether the doctor gets a sentence or a chart — `open_record` means
+   * they asked for the record itself, and the caller opens it. Null only for a
+   * result this client built locally after the request failed.
+   */
+  query: RecallQuery | null;
+}
+
+/**
+ * The resolved patient, as the chart sheet wants it.
+ *
+ * Shared rather than built at each call site because two of them now open the
+ * same chart from the same result — the doctor tapping the card below, and the
+ * caller acting on `open_record` without a tap — and a chart that arrived by
+ * voice should be indistinguishable from one that arrived by finger.
+ */
+export function patientFromRecall(result: RecallResult): PatientMatch | null {
+  if (!result.resolvedPatient) return null;
+  return {
+    id: result.resolvedPatient.id,
+    full_name: result.resolvedPatient.full_name || "Patient",
+    phone: null,
+    age_years: null,
+    last_visit: result.encounters[0]?.occurred_at ?? null,
+    visit_count: result.encounters.length,
+  };
 }
 
 /**
@@ -47,6 +75,7 @@ export function RecallPanel({
   onDismiss,
   onPickPatient,
   onOpenPatient,
+  onRecordAsVisit,
 }: {
   question: string;
   result: RecallResult | null;
@@ -54,6 +83,12 @@ export function RecallPanel({
   onDismiss: () => void;
   onPickPatient: (patientId: string) => void;
   onOpenPatient: (patient: PatientMatch) => void;
+  /**
+   * File this utterance as a consultation after all. Passed only when the
+   * question was spoken, because a question the doctor typed into the box was
+   * never at risk of having been a dictation.
+   */
+  onRecordAsVisit?: () => void;
 }) {
   return (
     <motion.section
@@ -65,15 +100,41 @@ export function RecallPanel({
       aria-live="polite"
     >
       <header className="flex items-start justify-between gap-3">
+        {/* Wraps rather than truncates. Everything below this line is an
+            answer, and an answer can only be judged against the whole question
+            — "what did I give Sunita last time" and "what did I give Sunita
+            last time for her knee" have different right answers, and the second
+            one is where the ellipsis fell. */}
         <p className="well text-muted-foreground flex min-w-0 flex-1 items-start gap-2 px-3 py-2 text-sm">
           <Quote className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-          <span className="truncate">{question}</span>
+          <span className="min-w-0 break-words">{question}</span>
         </p>
         <Button variant="ghost" size="icon-sm" onClick={onDismiss} className="shrink-0">
           <X className="size-4" aria-hidden />
           <span className="sr-only">Dismiss answer</span>
         </Button>
       </header>
+
+      {/* Attached to the quoted utterance rather than to the answer, and
+          rendered before the answer arrives, because it is a correction about
+          what was said and not about what was found. A doctor who has just
+          dictated a consultation and been shown a search knows within a second
+          that the app misheard the *kind* of thing they said; making them wait
+          out the lookup to say so is the whole of the frustration.
+
+          Understated on purpose. This appears on every spoken question,
+          including the large majority the classifier reads correctly, so it has
+          to be findable without competing with the answer underneath it. */}
+      {onRecordAsVisit && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <p className="text-muted-foreground text-xs">
+            Meant to record a visit? Nothing was lost — the recording is saved.
+          </p>
+          <Button variant="outline" size="sm" onClick={onRecordAsVisit}>
+            Record as a visit instead
+          </Button>
+        </div>
+      )}
 
       {loading || !result ? (
         <p className="text-muted-foreground mt-4 flex items-center gap-2 text-sm">
@@ -86,23 +147,26 @@ export function RecallPanel({
             {result.answer}
           </p>
 
+          {/* Amber alone said "treat this carefully" to everyone who can see
+              amber and nothing at all to everyone who cannot — the same
+              colour-only encoding the confidence badge below refuses. The word
+              carries the meaning; the tint and the icon only reinforce it. */}
           {result.caveat && (
-            <p className="text-money mt-2 text-xs">{result.caveat}</p>
+            <p className="text-money mt-2 flex items-start gap-1.5 text-xs" role="note">
+              <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
+              <span>
+                <span className="font-medium">Caveat:</span> {result.caveat}
+              </span>
+            </p>
           )}
 
           {result.resolvedPatient && (
             <button
               type="button"
-              onClick={() =>
-                onOpenPatient({
-                  id: result.resolvedPatient!.id,
-                  full_name: result.resolvedPatient!.full_name || "Patient",
-                  phone: null,
-                  age_years: null,
-                  last_visit: result.encounters[0]?.occurred_at ?? null,
-                  visit_count: result.encounters.length,
-                })
-              }
+              onClick={() => {
+                const patient = patientFromRecall(result);
+                if (patient) onOpenPatient(patient);
+              }}
               className="mt-4 flex w-full items-center gap-3 rounded-xl border border-primary/20 bg-primary/8 px-3.5 py-3 text-left transition-colors hover:bg-primary/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/12 text-primary">

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { ApiError, withDoctor } from "@/lib/api/http";
 import { SARVAM_SYNC_LIMIT_MS, SttError, transcribeWithFailover } from "@/lib/stt";
+import { callWorkflow } from "@/lib/supabase/workflows";
 
 /**
  * POST /api/encounters/transcribe
@@ -110,10 +111,11 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
     });
   } catch (error) {
     if (error instanceof SttError) {
-      // The doctor gets `sttMessage`, which is deliberately vague — a provider's
-      // raw response can carry back fragments of the request. But something has
-      // to hold the real reason or a failure here is undiagnosable, so it goes
-      // to the server log with the audio's shape, which is usually the culprit.
+      // `withDoctor` turns the code into the doctor-facing message and status,
+      // which is deliberately vague — a provider's raw response can carry back
+      // fragments of the request. What the wrapper cannot know is the shape of
+      // the audio that failed, and that is usually the culprit, so it is logged
+      // here and the error re-thrown untouched.
       console.error("[transcribe] stt failed", {
         code: error.code,
         message: error.message,
@@ -122,35 +124,30 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
         durationMs,
         languageHint: languages[0] ?? doctor.dictation_langs?.[0] ?? "unknown",
       });
-      const status =
-        error.code === "auth" ? 502 : error.code === "rate_limited" ? 429 : 422;
-      throw new ApiError(sttMessage(error), status);
     }
     throw error;
   }
 
-  const { data, error } = await supabase
-    .from("transcripts")
-    .insert({
-      id: transcriptId,
-      clinic_id: doctor.clinic_id,
-      doctor_id: doctor.id,
-      // `raw_text` is the provider's output and is never overwritten by the
-      // LLM. It is the evidence behind every structured field downstream.
-      raw_text: result.text,
-      roman_text: result.romanText ?? null,
-      live_text: liveText,
-      audio_path: audioPath,
-      audio_mime: mimeType,
-      duration_ms: durationMs ?? result.durationMs ?? null,
-      language_code: result.detectedLanguage ?? null,
-      provider: result.provider,
-      model: result.model,
-      confidence: result.confidence ?? null,
-      degraded: result.degraded,
-    })
-    .select("id")
-    .single();
+  // Authenticated clients have no INSERT privilege on the transcript table.
+  // This workflow derives clinic_id and doctor_id from auth.uid(), validates
+  // the storage path, and leaves an audit row in the same transaction.
+  const { data, error } = await callWorkflow<string>(supabase, "create_transcript_workflow", {
+    p_id: transcriptId,
+    p_audio_path: audioPath,
+    p_audio_mime: mimeType,
+    p_duration_ms: durationMs ?? result.durationMs ?? null,
+    p_provider: result.provider,
+    p_model: result.model,
+    p_language_hint: languages[0] ?? doctor.dictation_langs?.[0] ?? null,
+    p_language_code: result.detectedLanguage ?? null,
+    p_confidence: result.confidence ?? null,
+    p_degraded: result.degraded,
+    // `raw_text` is the provider's output and is never overwritten by the
+    // LLM. It is the evidence behind every structured field downstream.
+    p_raw_text: result.text,
+    p_roman_text: result.romanText ?? null,
+    p_live_text: liveText,
+  });
 
   if (error) {
     console.error("[transcribe] insert failed", error);
@@ -158,7 +155,7 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
   }
 
   return NextResponse.json({
-    transcriptId: data.id,
+    transcriptId: data ?? transcriptId,
     text: result.text,
     romanText: result.romanText ?? null,
     languageCode: result.detectedLanguage ?? null,
@@ -167,20 +164,3 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
     durationMs: durationMs ?? null,
   });
 }, { rateLimit: "transcribe" });
-
-function sttMessage(error: SttError): string {
-  switch (error.code) {
-    case "too_long":
-      return "That recording was too long. Dictate one patient at a time.";
-    case "empty_audio":
-      return "No speech was detected in that recording.";
-    case "unsupported_format":
-      return "This device produced an audio format we cannot transcribe.";
-    case "rate_limited":
-      return "The transcription service is busy. Try again in a moment.";
-    case "auth":
-      return "Transcription is not configured. Check the server API key.";
-    default:
-      return "Transcription failed. Your recording was saved — try again.";
-  }
-}

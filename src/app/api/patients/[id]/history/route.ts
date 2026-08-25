@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { ApiError, withDoctor } from "@/lib/api/http";
+import { callWorkflow } from "@/lib/supabase/workflows";
 import type { PatientHistoryPayload } from "@/lib/types";
 
 interface PatientRow {
@@ -96,6 +97,17 @@ export const GET = withDoctor<{ id: string }>(async ({ doctor, supabase, params 
         })),
     })),
   };
+
+  const { error: auditError } = await callWorkflow<null>(supabase, "log_sensitive_access", {
+    p_action: "read",
+    p_entity: "patient",
+    p_entity_id: patientId,
+    p_detail: { surface: "patient_history" },
+  });
+  if (auditError) {
+    console.error("[patient-history] audit failed", auditError);
+    throw new ApiError("Could not open this patient chart.", 500);
+  }
 
   return NextResponse.json(payload);
 }, { rateLimit: "match" });

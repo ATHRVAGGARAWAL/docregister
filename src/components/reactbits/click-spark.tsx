@@ -41,6 +41,8 @@ export function ClickSpark({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sparksRef = useRef<{ x: number; y: number; angle: number; startTime: number }[]>([]);
   const rafRef = useRef<number | null>(null);
+  /** The stroke colour, already resolved to something canvas can parse. */
+  const inkRef = useRef(sparkColor);
 
   const easeFunc = useCallback(
     (t: number) => {
@@ -105,12 +107,11 @@ export function ClickSpark({
       const rect = canvas.getBoundingClientRect();
       ctx.clearRect(0, 0, rect.width, rect.height);
 
-      // The spark colour is resolved from the wrapper's computed `color`, so a
-      // caller sets it with a text utility and it tracks the theme.
-      ctx.strokeStyle =
-        sparkColor === "currentColor"
-          ? getComputedStyle(canvas.parentElement!).color
-          : sparkColor;
+      // Read, not resolved. Working out the colour means `getComputedStyle`,
+      // which forces a style recalculation — once per frame, in the component
+      // whose entire reason for existing is that it does not hold the
+      // compositor awake. It is resolved on the press instead.
+      ctx.strokeStyle = inkRef.current;
       ctx.lineWidth = 2;
       ctx.lineCap = "round";
 
@@ -139,13 +140,24 @@ export function ClickSpark({
     };
 
     if (rafRef.current === null) rafRef.current = requestAnimationFrame(draw);
-  }, [duration, easeFunc, extraScale, sparkColor, sparkRadius, sparkSize]);
+  }, [duration, easeFunc, extraScale, sparkRadius, sparkSize]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    // A press is the only moment the colour can have changed under us — the
+    // theme cannot flip mid-spark, and a spark lives 380ms. Resolving it here
+    // costs one style read per press instead of one per frame.
+    //
+    // It is resolved at all because canvas parses colours but not the
+    // cascade: assigning `strokeStyle = "var(--primary)"` is silently ignored
+    // and leaves the previous value standing, so the token the dock passes was
+    // painting default black rather than the key's own hue.
+    inkRef.current = resolveInk(event.currentTarget, sparkColor);
+
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -164,6 +176,24 @@ export function ClickSpark({
       {children}
     </div>
   );
+}
+
+/**
+ * `currentColor` and `var(--token)` are cascade values; canvas only speaks
+ * colours. Both are looked up against the element the caller actually styled,
+ * so a spark set with a text utility or with a theme token tracks the theme
+ * the same way the rest of the key does.
+ */
+function resolveInk(element: Element, value: string): string {
+  const wanted = value.trim();
+  if (wanted === "currentColor") return getComputedStyle(element).color;
+
+  const token = /^var\(\s*(--[\w-]+)\s*\)$/.exec(wanted);
+  if (!token) return wanted;
+
+  const resolved = getComputedStyle(element).getPropertyValue(token[1]).trim();
+  // An undefined token would otherwise leave `strokeStyle` at whatever it was.
+  return resolved || getComputedStyle(element).color;
 }
 
 export default ClickSpark;

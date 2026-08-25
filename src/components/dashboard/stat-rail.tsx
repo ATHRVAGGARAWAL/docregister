@@ -48,11 +48,18 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
       swatch: "var(--chart-2)",
     },
     {
-      label: "Average fee",
+      // The figure is today's revenue over today's visits, so the label and the
+      // hint both have to say today. This read "Average fee" over "N visits
+      // this period", which put two different windows in one tile and made the
+      // period count look like the denominator of the figure above it.
+      label: "Average fee today",
       value: averageFee,
       format: formatINR,
       money: true,
-      hint: `${formatCount(analytics.totals.patient_count)} visits this period`,
+      hint:
+        seen > 0
+          ? `across ${formatCount(seen)} visit${seen === 1 ? "" : "s"} today`
+          : "No visits recorded yet today",
     },
   ];
 

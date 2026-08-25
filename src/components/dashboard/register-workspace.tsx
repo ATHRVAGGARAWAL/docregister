@@ -1,8 +1,9 @@
 "use client";
 
-import { CalendarRangeIcon, LoaderCircleIcon, SearchIcon } from "lucide-react";
+import { ArrowLeftIcon, ArrowRightIcon, CalendarRangeIcon, LoaderCircleIcon, SearchIcon } from "lucide-react";
 
 import { RegisterTimeline } from "@/components/dashboard/register-timeline";
+import { Badge } from "@/components/ui/badge";
 import { formatINR } from "@/lib/format";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
 import { cn } from "@/lib/utils";
 import type { RegisterEntry } from "@/lib/types";
+import { registerPageRange } from "@/lib/register-pagination";
 
 const RANGES = [
   { label: "Today", days: 1 },
@@ -28,6 +30,13 @@ export function RegisterWorkspace({
   entries,
   totalCount,
   totalFees,
+  committedCount,
+  committedFees,
+  draftCount,
+  draftFees,
+  offset,
+  limit,
+  hasMore,
   loading,
   error,
   days,
@@ -37,11 +46,22 @@ export function RegisterWorkspace({
   onStatusChange,
   onQueryChange,
   onSearch,
+  onPageChange,
+  onReviewNext,
   onOpenPatient,
+  onOpenDraft,
+  onOpenVisit,
 }: {
   entries: RegisterEntry[];
   totalCount: number;
   totalFees: number;
+  committedCount: number;
+  committedFees: number;
+  draftCount: number;
+  draftFees: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
   loading: boolean;
   error: string | null;
   days: number;
@@ -51,12 +71,19 @@ export function RegisterWorkspace({
   onStatusChange: (status: "all" | "committed" | "draft") => void;
   onQueryChange: (query: string) => void;
   onSearch: () => void;
+  onPageChange: (offset: number) => void;
+  onReviewNext: () => void;
   onOpenPatient: (patient: PatientMatch) => void;
+  onOpenDraft: (entry: RegisterEntry) => void;
+  onOpenVisit: (entry: RegisterEntry) => void;
 }) {
   // Both figures come from the query, not from this page. Summing `entries`
   // here made the headline the total of the first 300 rows the server returned,
   // presented as the total for the period.
   const showingPartial = totalCount > entries.length;
+  const headlineFees = status === "draft" ? draftFees : status === "committed" ? committedFees : totalFees;
+  const headlineCount = status === "draft" ? draftCount : status === "committed" ? committedCount : totalCount;
+  const page = registerPageRange(totalCount, offset, entries.length || limit);
 
   return (
     <div className="space-y-6">
@@ -74,11 +101,17 @@ export function RegisterWorkspace({
           </p>
         </div>
         <div className="text-left sm:text-right">
-          <p className="tnum text-2xl font-semibold text-money">{formatINR(totalFees)}</p>
+          <p className="tnum text-2xl font-semibold text-money">{formatINR(headlineFees)}</p>
           <p className="text-xs text-muted-foreground">
-            across {totalCount} visit{totalCount === 1 ? "" : "s"}
+            {headlineCount} {status === "draft" ? "pending" : status === "committed" ? "confirmed" : "matching"} visit{headlineCount === 1 ? "" : "s"}
             {showingPartial ? ` · showing ${entries.length}` : ""}
           </p>
+          {draftCount > 0 && (
+            <p className="mt-1 flex items-center justify-end gap-2 text-xs text-money">
+              <Badge variant="money">{draftCount} pending</Badge>
+              {formatINR(draftFees)} excluded from totals
+            </p>
+          )}
         </div>
       </section>
 
@@ -144,6 +177,12 @@ export function RegisterWorkspace({
               </button>
             ))}
           </div>
+
+          {draftCount > 0 && (
+            <Button type="button" variant="outline" size="sm" onClick={onReviewNext}>
+              Review next <ArrowRightIcon aria-hidden />
+            </Button>
+          )}
         </div>
       </section>
 
@@ -163,9 +202,25 @@ export function RegisterWorkspace({
             </AlertDescription>
           </Alert>
         ) : (
-          <RegisterTimeline entries={entries} onOpenPatient={onOpenPatient} />
+          <RegisterTimeline entries={entries} onOpenPatient={onOpenPatient} onOpenDraft={onOpenDraft} onOpenVisit={onOpenVisit} />
         )}
       </section>
+
+      {!loading && !error && totalCount > 0 && (
+        <nav className="flex items-center justify-between" aria-label="Register pages">
+          <p className="text-xs text-muted-foreground">
+            Showing {page.from}–{page.to} of {totalCount}
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={offset === 0} onClick={() => onPageChange(Math.max(0, offset - limit))}>
+              <ArrowLeftIcon aria-hidden /> Previous
+            </Button>
+            <Button type="button" variant="outline" size="sm" disabled={!hasMore} onClick={() => onPageChange(offset + limit)}>
+              Next <ArrowRightIcon aria-hidden />
+            </Button>
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { ApiError, readBody, withDoctor } from "@/lib/api/http";
+import { callWorkflow } from "@/lib/supabase/workflows";
 
 /**
  * POST /api/encounters/[id]/commit
@@ -30,105 +31,68 @@ interface CommitBody {
   idempotencyKey?: string;
 }
 
-export const POST = withDoctor<Params>(async ({ doctor, supabase, request, params }) => {
+interface CommitResult {
+  encounter_id: string;
+  patient_id: string;
+  visit_number: number | null;
+  is_new_patient: boolean | null;
+  already_committed: boolean;
+}
+
+export const POST = withDoctor<Params>(async ({ supabase, request, params }) => {
   const body = await readBody<CommitBody>(request);
+  const idempotencyKey = body.idempotencyKey?.trim() || null;
 
-  const { data: encounter, error: loadError } = await supabase
-    .from("encounters")
-    .select("id, status, patient_id, patient_name_spoken, age_years, visit_number, is_new_patient")
-    .eq("id", params.id)
-    .single();
-
-  if (loadError || !encounter) throw new ApiError("Encounter not found.", 404);
-
-  // Committing twice is a no-op that returns the original result, not an error.
-  // On a phone in a clinic corridor, the second tap is almost always the same
-  // intent as the first.
-  if (encounter.status === "committed") {
-    return NextResponse.json({
-      encounterId: encounter.id,
-      patientId: encounter.patient_id,
-      visitNumber: encounter.visit_number,
-      isNewPatient: encounter.is_new_patient,
-      alreadyCommitted: true,
-    });
-  }
-
-  if (encounter.status === "discarded") {
-    throw new ApiError("This draft was discarded.", 409);
-  }
-
-  let patientId = body.patientId ?? null;
-
-  if (!patientId && body.newPatient) {
-    const fullName = body.newPatient.full_name?.trim() || encounter.patient_name_spoken?.trim();
-    if (!fullName) throw new ApiError("A patient name is required.");
-
-    const { data: created, error: patientError } = await supabase
-      .from("patients")
-      .insert({
-        clinic_id: doctor.clinic_id,
-        full_name: fullName,
-        phone: body.newPatient.phone?.trim() || null,
-        age_years: body.newPatient.age_years ?? encounter.age_years ?? null,
-        sex: body.newPatient.sex ?? null,
-        created_by: doctor.id,
-      })
-      .select("id")
-      .single();
-
-    if (patientError) {
-      // The unique index on (clinic_id, phone) is what fires here: the same
-      // number is already on file, so link to that patient rather than
-      // creating a second chart for one person.
-      if (patientError.code === "23505" && body.newPatient.phone) {
-        const { data: existing } = await supabase
-          .from("patients")
-          .select("id")
-          .eq("phone", body.newPatient.phone.trim())
-          .single();
-        patientId = existing?.id ?? null;
-      }
-      if (!patientId) {
-        console.error("[commit] patient insert failed", patientError);
-        throw new ApiError("Could not create the patient record.", 500);
-      }
-    } else {
-      patientId = created.id;
-    }
-  }
-
-  if (!patientId) {
+  if ((body.patientId == null) === (body.newPatient == null)) {
     throw new ApiError("Choose an existing patient or add a new one before saving.");
   }
 
-  if (body.idempotencyKey) {
-    await supabase
-      .from("encounters")
-      .update({ idempotency_key: body.idempotencyKey })
-      .eq("id", params.id);
-  }
-
-  // A database function, not three round trips. Assigning a visit number,
-  // deciding new-vs-returning, and flipping the status have to happen together
-  // — two concurrent commits for one patient must not both read "visit 1".
-  const { data, error } = await supabase.rpc("commit_encounter", {
-    p_encounter_id: params.id,
-    p_patient_id: patientId,
-  });
+  // Idempotency claim, optional patient creation, patient locking, visit-number
+  // assignment and the draft-to-committed transition all happen in this single
+  // transaction. A duplicate phone is deliberately a conflict: a number is a
+  // search hint, never enough evidence to silently attach a visit to a chart.
+  const { data, error } = await callWorkflow<CommitResult[]>(
+    supabase,
+    "commit_encounter_workflow",
+    {
+      p_encounter_id: params.id,
+      p_patient_id: body.patientId ?? null,
+      p_new_patient: body.newPatient ?? null,
+      p_idempotency_key: idempotencyKey,
+    },
+  );
 
   if (error) {
-    console.error("[commit] rpc failed", error);
+    console.error("[commit] workflow failed", error);
+    if (error.code === "P0002") throw new ApiError("Encounter or patient not found.", 404);
+    if (error.code === "23505" && error.details === "duplicate_phone_requires_confirmation") {
+      throw new ApiError(
+        "A patient with that phone already exists. Choose that chart explicitly or correct the number.",
+        409,
+      );
+    }
+    if (error.code === "23514") {
+      throw new ApiError(
+        error.message.includes("provisional")
+          ? "The final transcript is still being saved. Try again in a moment."
+          : "This draft can no longer be committed.",
+        409,
+      );
+    }
+    if (error.code === "40001") {
+      throw new ApiError("That visit is already being saved. Give it a moment.", 409);
+    }
     throw new ApiError("Could not save this visit to the register.", 500);
   }
 
-  const result = Array.isArray(data) ? data[0] : data;
+  const result = data?.[0];
+  if (!result) throw new ApiError("Could not save this visit to the register.", 500);
 
   return NextResponse.json({
-    encounterId: params.id,
-    patientId,
-    visitNumber: result?.visit_number ?? null,
-    isNewPatient: result?.is_new_patient ?? null,
-    alreadyCommitted: false,
+    encounterId: result.encounter_id,
+    patientId: result.patient_id,
+    visitNumber: result.visit_number,
+    isNewPatient: result.is_new_patient,
+    alreadyCommitted: result.already_committed,
   });
 }, { rateLimit: "commit" });

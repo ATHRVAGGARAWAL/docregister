@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
@@ -8,9 +8,7 @@ import {
   ChevronRight,
   FileClock,
   Loader2,
-  Plus,
   ShieldCheck,
-  Trash2,
   UserPlus,
 } from "lucide-react";
 
@@ -28,10 +26,17 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import type { CaptureDraft, PatientMatch } from "@/hooks/use-voice-capture";
-import type { PrescriptionItem } from "@/lib/llm/schema";
+import type { PatientMatch, ReviewDraft, ReviewMedication, PatientSex } from "@/lib/encounters/review";
+import {
+  buildReviewChecklist,
+  normalisePatientPhone,
+  patientPhoneError,
+  reviewFieldId,
+} from "@/lib/encounters/review";
+import { PATIENT_SEX_OPTIONS } from "@/lib/encounters/review";
 import { formatVisitDay, maskPhone } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { MedicationEditor } from "@/components/voice/medication-editor";
 
 /**
  * The confirmation step — the only place a dictated visit becomes a record.
@@ -53,7 +58,7 @@ export function ReviewSheet({
   onCommitted,
   onDiscard,
 }: {
-  draft: CaptureDraft;
+  draft: ReviewDraft;
   onCommitted: () => void;
   onDiscard: () => void;
 }) {
@@ -62,14 +67,25 @@ export function ReviewSheet({
   const [diagnosis, setDiagnosis] = useState(draft.extraction.diagnosis ?? "");
   const [treatment, setTreatment] = useState(draft.extraction.treatment ?? "");
   const [fees, setFees] = useState(draft.extraction.fees_inr?.toString() ?? "");
-  const [drugs, setDrugs] = useState<PrescriptionItem[]>(draft.extraction.prescription);
+  const [phone, setPhone] = useState(draft.patientIdentity?.phone ?? "");
+  const [sex, setSex] = useState<PatientSex | "">(draft.patientIdentity?.sex ?? "");
+  const [drugs, setDrugs] = useState<ReviewMedication[]>(draft.extraction.prescription);
   const [patient, setPatient] = useState<PatientMatch | null>(null);
   const [patientCandidates, setPatientCandidates] = useState(draft.suggestedPatients);
+  const [matching, setMatching] = useState(false);
   const [historyPatient, setHistoryPatient] = useState<PatientMatch | null>(null);
   const [asNew, setAsNew] = useState(draft.suggestedPatients.length === 0);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [draftVersion, setDraftVersion] = useState<number>(() => {
+    const version = (draft as ReviewDraft & { version?: number }).version;
+    return Number.isInteger(version) && version! > 0 ? version! : 1;
+  });
+  const [autosaveState, setAutosaveState] = useState<"saved" | "saving" | "error" | "conflict">("saved");
+  const autosaveStateRef = useRef<"saved" | "saving" | "error" | "conflict">("saved");
+  const skipNextAutosaveRef = useRef(false);
+  const firstAutosave = useRef(true);
 
   // Stable across retries so a double-tap on a slow connection commits once.
   //
@@ -82,10 +98,20 @@ export function ReviewSheet({
   // unguessable, so a non-crypto fallback is the right trade against losing the
   // consultation.
   const [idempotencyKey] = useState(newIdempotencyKey);
-  const uncertain = useMemo(
-    () => new Set(draft.extraction.uncertain_fields),
-    [draft.extraction.uncertain_fields],
+  const [uncertain, setUncertain] = useState(() =>
+    new Set(buildReviewChecklist(draft.extraction).map((item) => item.key)),
   );
+  const [reviewedKeys, setReviewedKeys] = useState<Set<string>>(new Set());
+  const checklist = useMemo(
+    () => buildReviewChecklist({ ...draft.extraction, uncertain_fields: [...uncertain] }),
+    [draft.extraction, uncertain],
+  );
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [rawText, setRawText] = useState(draft.rawText);
+  const [romanText, setRomanText] = useState(draft.romanText);
+  const [degraded, setDegraded] = useState(draft.degraded);
 
   // Has the doctor put anything of their own into this sheet? Only used to
   // decide whether an accidental dismissal is allowed to throw the visit away
@@ -98,7 +124,154 @@ export function ReviewSheet({
     treatment !== (draft.extraction.treatment ?? "") ||
     fees !== (draft.extraction.fees_inr?.toString() ?? "") ||
     drugs !== draft.extraction.prescription ||
+    phone !== (draft.patientIdentity?.phone ?? "") ||
+    sex !== (draft.patientIdentity?.sex ?? "") ||
     patient !== null;
+
+  // Re-run matching whenever the doctor changes the identity evidence. A
+  // selected chart is cleared if the new shortlist no longer contains it;
+  // this prevents a stale selection surviving a phone/name correction.
+  useEffect(() => {
+    const query = name.trim();
+    const normalisedPhone = normalisePatientPhone(phone);
+    if (!query && !normalisedPhone) {
+      const timer = setTimeout(() => {
+        setPatientCandidates([]);
+        setPatient(null);
+        setAsNew(true);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+    const timer = setTimeout(async () => {
+      setMatching(true);
+      try {
+        const params = new URLSearchParams();
+        if (query) params.set("name", query);
+        if (normalisedPhone) params.set("phone", normalisedPhone);
+        const response = await fetch(`/api/patients/match?${params.toString()}`);
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body?.error ?? "Could not search patient charts.");
+        const next = Array.isArray(body.matches) ? (body.matches as PatientMatch[]) : [];
+        setPatientCandidates(next);
+        // Identity evidence changed, so require an explicit re-selection even
+        // when the old chart remains in the new shortlist.
+        setPatient(null);
+        setAsNew(next.length === 0);
+      } catch {
+        // Keep the last shortlist visible; save still requires an explicit
+        // choice, so a failed lookup cannot silently link a chart.
+      } finally {
+        setMatching(false);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [name, phone]);
+
+  function markReviewed(key: string) {
+    if (!uncertain.has(key)) return;
+    setReviewedKeys((current) => new Set(current).add(key));
+  }
+
+  function focusReviewItem(index: number) {
+    const item = checklist[index];
+    if (!item) return;
+    setReviewIndex(index);
+    markReviewed(item.key);
+    requestAnimationFrame(() => document.getElementById(item.targetId)?.focus());
+  }
+
+  async function retryFromAudio() {
+    if (!draft.transcriptId || retrying) return;
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      const response = await fetch(`/api/drafts/${draft.encounterId}/retry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.error ?? "Could not retry transcription.");
+      setRawText(body.rawText ?? rawText);
+      setRomanText(body.romanText ?? null);
+      setDegraded(Boolean(body.degraded));
+      if (body.extraction) {
+        setName(body.extraction.patient_name ?? "");
+        setAge(body.extraction.age_years?.toString() ?? "");
+        setDiagnosis(body.extraction.diagnosis ?? "");
+        setTreatment(body.extraction.treatment ?? "");
+        setFees(body.extraction.fees_inr?.toString() ?? "");
+        setDrugs(body.extraction.prescription ?? []);
+        const nextUncertain = new Set(
+          buildReviewChecklist(body.extraction).map((item) => item.key),
+        );
+        setUncertain(nextUncertain);
+        setReviewedKeys(new Set());
+        setReviewIndex(0);
+      }
+    } catch (error) {
+      setRetryError(error instanceof Error ? error.message : "Could not retry transcription.");
+    } finally {
+      setRetrying(false);
+    }
+  }
+
+  const draftPayload = useMemo(
+    () => ({
+      expectedVersion: draftVersion,
+      patient_name_spoken: name.trim(),
+      age_years: parseNumber(age),
+      diagnosis: diagnosis.trim() || null,
+      treatment: treatment.trim() || null,
+      fees_inr: parseNumber(fees),
+      prescription: drugs,
+    }),
+    [age, diagnosis, draftVersion, drugs, fees, name, treatment],
+  );
+
+  // Voice capture already creates the draft server-side. Once a doctor starts
+  // correcting it, keep a recoverable copy every 600ms; a phone call or tab
+  // switch should not erase ten careful field edits.
+  useEffect(() => {
+    if (firstAutosave.current) {
+      firstAutosave.current = false;
+      return;
+    }
+    if (skipNextAutosaveRef.current) {
+      skipNextAutosaveRef.current = false;
+      return;
+    }
+    if (!isDirty || autosaveStateRef.current === "conflict") return;
+    const timer = setTimeout(async () => {
+      autosaveStateRef.current = "saving";
+      setAutosaveState("saving");
+      try {
+        const response = await fetch(`/api/drafts/${draft.encounterId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(draftPayload),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (response.status === 409) {
+            autosaveStateRef.current = "conflict";
+            setAutosaveState("conflict");
+          }
+          throw new Error(body?.error ?? "Could not autosave this draft.");
+        }
+        skipNextAutosaveRef.current = true;
+        setDraftVersion(Number(body.version ?? draftVersion + 1));
+        autosaveStateRef.current = "saved";
+        setAutosaveState("saved");
+      } catch {
+        if (autosaveStateRef.current !== "conflict") {
+          autosaveStateRef.current = "error";
+          setAutosaveState("error");
+        }
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [draft.encounterId, draftPayload, draftVersion, isDirty]);
 
   async function save() {
     if (!name.trim()) {
@@ -122,24 +295,25 @@ export function ReviewSheet({
       setFailure("Age must be a number, or left blank.");
       return;
     }
+    const phoneIssue = patientPhoneError(phone);
+    if (phoneIssue) {
+      setFailure(phoneIssue);
+      return;
+    }
 
     setSaving(true);
     setFailure(null);
 
     try {
-      const patch = await fetch(`/api/encounters/${draft.encounterId}`, {
+      const patch = await fetch(`/api/drafts/${draft.encounterId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patient_name_spoken: name.trim(),
-          age_years: parseNumber(age),
-          diagnosis: diagnosis.trim() || null,
-          treatment: treatment.trim() || null,
-          fees_inr: parseNumber(fees),
-          prescription: drugs,
-        }),
+        body: JSON.stringify(draftPayload),
       });
       if (!patch.ok) throw new Error(await errorMessage(patch, "Could not save edits."));
+      const saved = await patch.json().catch(() => ({}));
+      skipNextAutosaveRef.current = true;
+      setDraftVersion(Number(saved.version ?? draftVersion + 1));
 
       const commit = await fetch(`/api/encounters/${draft.encounterId}/commit`, {
         method: "POST",
@@ -148,7 +322,12 @@ export function ReviewSheet({
           patientId: patient?.id,
           newPatient: patient
             ? undefined
-            : { full_name: name.trim(), age_years: parseNumber(age) },
+            : {
+                full_name: name.trim(),
+                phone: normalisePatientPhone(phone),
+                age_years: parseNumber(age),
+                sex: sex || null,
+              },
           idempotencyKey,
         }),
       });
@@ -206,14 +385,14 @@ export function ReviewSheet({
           </AlertDescription>
         </Alert>
 
-        {(draft.warnings.length > 0 || draft.degraded) && (
+        {(draft.warnings.length > 0 || degraded || retryError) && (
           /* Warning stock: solid tinted card, full-strength border, and an icon.
              The three cues are redundant on purpose — this banner is the only
              thing standing between a bad transcription and a medical record. */
           <div className="border-money/35 bg-money/10 mx-5 mb-3 flex shrink-0 gap-2.5 rounded-lg border px-3.5 py-2.5">
             <AlertTriangle className="text-money mt-0.5 size-4 shrink-0" aria-hidden />
             <ul className="text-foreground space-y-0.5 text-xs">
-              {draft.degraded && (
+              {degraded && (
                 <li>
                   Transcribed by the backup engine — accuracy on mixed-language speech
                   is lower than usual.
@@ -222,21 +401,47 @@ export function ReviewSheet({
               {draft.warnings.map((warning) => (
                 <li key={warning}>{warning}</li>
               ))}
+              {retryError && <li>{retryError}</li>}
             </ul>
           </div>
+        )}
+
+        {draft.transcriptId && (
+          <div className="mx-5 mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              Audio is retained temporarily if the transcription needs another pass.
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={retryFromAudio} disabled={retrying}>
+              {retrying ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+              {retrying ? "Retrying…" : "Retry from audio"}
+            </Button>
+          </div>
+        )}
+
+        {checklist.length > 0 && (
+          <ReviewNavigator
+            items={checklist}
+            activeIndex={reviewIndex}
+            reviewedKeys={reviewedKeys}
+            onFocus={focusReviewItem}
+          />
         )}
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-4">
           {/* ---- Patient ---------------------------------------------------- */}
           <Field label="Patient" flagged={uncertain.has("patient_name")}>
             <Input
+              id={reviewFieldId("patient_name")}
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value);
+                markReviewed("patient_name");
+              }}
               autoComplete="off"
             />
           </Field>
 
-          {draft.suggestedPatients.length > 0 && (
+          {(patientCandidates.length > 0 || asNew || matching) && (
             <PatientPicker
               candidates={patientCandidates}
               selectedId={patient?.id ?? null}
@@ -254,22 +459,59 @@ export function ReviewSheet({
                 setAsNew(false);
                 setHistoryPatient(match);
               }}
+              matching={matching}
             />
+          )}
+
+          {asNew && (
+            <div className="grid gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 sm:grid-cols-2">
+              <Field label="New chart phone">
+                <Input
+                  id="review-new-patient-phone"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="Optional, helps avoid duplicate charts"
+                />
+              </Field>
+              <Field label="Sex">
+                <select
+                  id="review-new-patient-sex"
+                  value={sex}
+                  onChange={(event) => setSex(event.target.value as PatientSex | "")}
+                  className="well text-foreground h-10 w-full px-3 text-sm outline-none"
+                >
+                  <option value="">Not stated</option>
+                  {PATIENT_SEX_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Age" flagged={uncertain.has("age_years")}>
               <Input
+                id={reviewFieldId("age_years")}
                 value={age}
-                onChange={(event) => setAge(event.target.value)}
+                onChange={(event) => {
+                  setAge(event.target.value);
+                  markReviewed("age_years");
+                }}
                 inputMode="numeric"
                 className="tnum"
               />
             </Field>
             <Field label="Fees (₹)" flagged={uncertain.has("fees_inr")}>
               <Input
+                id={reviewFieldId("fees_inr")}
                 value={fees}
-                onChange={(event) => setFees(event.target.value)}
+                onChange={(event) => {
+                  setFees(event.target.value);
+                  markReviewed("fees_inr");
+                }}
                 inputMode="numeric"
                 className="text-money tnum"
               />
@@ -283,8 +525,12 @@ export function ReviewSheet({
               off on text they cannot see. It grows instead of scrolling. */}
           <Field label="Diagnosis" flagged={uncertain.has("diagnosis")}>
             <Textarea
+              id={reviewFieldId("diagnosis")}
               value={diagnosis}
-              onChange={(event) => setDiagnosis(event.target.value)}
+              onChange={(event) => {
+                setDiagnosis(event.target.value);
+                markReviewed("diagnosis");
+              }}
               rows={2}
               className="resize-none"
             />
@@ -292,104 +538,25 @@ export function ReviewSheet({
 
           <Field label="Treatment" flagged={uncertain.has("treatment")}>
             <Textarea
+              id={reviewFieldId("treatment")}
               value={treatment}
-              onChange={(event) => setTreatment(event.target.value)}
+              onChange={(event) => {
+                setTreatment(event.target.value);
+                markReviewed("treatment");
+              }}
               rows={2}
               className="resize-none"
             />
           </Field>
 
           {/* ---- Prescription ------------------------------------------------ */}
-          <div>
-            <div className="flex items-center justify-between">
-              <p className="text-muted-foreground text-[11px] tracking-[0.12em] uppercase">
-                Prescription
-              </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  setDrugs((items) => [
-                    ...items,
-                    {
-                      drug_name: "",
-                      strength: null,
-                      form: null,
-                      frequency_spoken: null,
-                      duration: null,
-                      instructions: null,
-                    },
-                  ])
-                }
-              >
-                <Plus className="size-3" aria-hidden /> Add
-              </Button>
-            </div>
-
-            <ul className="mt-2 space-y-2">
-              {drugs.map((drug, index) => (
-                /* Sized from the longest realistic value, not the shortest.
-                   `frequency_spoken` holds what the doctor actually said —
-                   "once daily", "ਦੋ ਵਾਰ", "1-0-1" — not just the BD/SOS
-                   abbreviations, and a box cut to fit "BD" renders "once daily"
-                   as "once dai". A silently clipped frequency is the one
-                   truncation in this sheet that can change a dose, so the
-                   fields flex and the row wraps rather than trimming. */
-                <li key={index} className="slip-flat flex flex-wrap items-center gap-2 p-2">
-                  <input
-                    value={drug.drug_name}
-                    onChange={(event) =>
-                      setDrugs((items) =>
-                        items.map((item, i) =>
-                          i === index ? { ...item, drug_name: event.target.value } : item,
-                        ),
-                      )
-                    }
-                    placeholder="Drug"
-                    aria-label={`Drug ${index + 1} name`}
-                    className="text-foreground placeholder:text-muted-foreground min-w-0 flex-[3] basis-30 bg-transparent px-1 text-sm outline-none"
-                  />
-                  <input
-                    value={drug.strength ?? ""}
-                    onChange={(event) =>
-                      setDrugs((items) =>
-                        items.map((item, i) =>
-                          i === index ? { ...item, strength: event.target.value } : item,
-                        ),
-                      )
-                    }
-                    placeholder="650 mg"
-                    aria-label={`Drug ${index + 1} strength`}
-                    className="text-muted-foreground placeholder:text-muted-foreground min-w-0 flex-1 basis-14 bg-transparent px-1 text-sm outline-none"
-                  />
-                  <input
-                    value={drug.frequency_spoken ?? ""}
-                    onChange={(event) =>
-                      setDrugs((items) =>
-                        items.map((item, i) =>
-                          i === index
-                            ? { ...item, frequency_spoken: event.target.value }
-                            : item,
-                        ),
-                      )
-                    }
-                    placeholder="BD"
-                    aria-label={`Drug ${index + 1} frequency`}
-                    className="text-muted-foreground placeholder:text-muted-foreground min-w-0 flex-1 basis-20 bg-transparent px-1 text-sm outline-none"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => setDrugs((items) => items.filter((_, i) => i !== index))}
-                    className="hover:text-destructive shrink-0"
-                  >
-                    <Trash2 className="size-3.5" aria-hidden />
-                    <span className="sr-only">Remove {drug.drug_name || "drug"}</span>
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <MedicationEditor
+            value={drugs}
+            onChange={setDrugs}
+            flaggedKeys={uncertain}
+            reviewedKeys={reviewedKeys}
+            onFieldChange={markReviewed}
+          />
 
           {/* The evidence behind every field above. Provider output, never
               rewritten by the model that produced the structure. */}
@@ -411,9 +578,9 @@ export function ReviewSheet({
                   className="overflow-hidden"
                 >
                   <p className="well text-foreground mt-2 p-3 text-xs leading-relaxed">
-                    {draft.rawText}
-                    {draft.romanText && draft.romanText !== draft.rawText && (
-                      <span className="text-muted-foreground mt-2 block">{draft.romanText}</span>
+                    {rawText}
+                    {romanText && romanText !== rawText && (
+                      <span className="text-muted-foreground mt-2 block">{romanText}</span>
                     )}
                   </p>
                 </motion.div>
@@ -423,6 +590,12 @@ export function ReviewSheet({
         </div>
 
         <SheetFooter className="flex-col items-stretch gap-2">
+          <p className="text-muted-foreground text-[11px]" aria-live="polite">
+            {autosaveState === "saving" && "Saving draft…"}
+            {autosaveState === "saved" && "Draft saved for recovery"}
+            {autosaveState === "error" && "Autosave failed — your edits remain on screen"}
+            {autosaveState === "conflict" && "This draft changed elsewhere — reload before saving"}
+          </p>
           {failure && (
             <p role="alert" className="text-destructive text-xs">
               {failure}
@@ -506,6 +679,7 @@ function PatientPicker({
   onSelect,
   onSelectNew,
   onViewHistory,
+  matching,
 }: {
   candidates: PatientMatch[];
   selectedId: string | null;
@@ -513,6 +687,7 @@ function PatientPicker({
   onSelect: (match: PatientMatch) => void;
   onSelectNew: () => void;
   onViewHistory: (match: PatientMatch) => void;
+  matching?: boolean;
 }) {
   // Names that appear more than once in this shortlist. These are the rows
   // where a wrong pick is most likely and least visible.
@@ -547,6 +722,7 @@ function PatientPicker({
       </legend>
       <p className="mt-1 text-[11px] text-muted-foreground">
         Open a chart to review the patient&rsquo;s complete recorded history before linking this visit.
+        {matching && <span className="ml-2">Searching…</span>}
       </p>
 
       {indistinguishable && (
@@ -586,6 +762,54 @@ function PatientPicker({
         </li>
       </ul>
     </fieldset>
+  );
+}
+
+function ReviewNavigator({
+  items,
+  activeIndex,
+  reviewedKeys,
+  onFocus,
+}: {
+  items: { key: string; label: string }[];
+  activeIndex: number;
+  reviewedKeys: ReadonlySet<string>;
+  onFocus: (index: number) => void;
+}) {
+  const nextIndex = items.findIndex((item) => !reviewedKeys.has(item.key));
+  const targetIndex = nextIndex >= 0 ? nextIndex : Math.min(activeIndex, items.length - 1);
+  return (
+    <section aria-label="Fields to review" className="mx-5 mb-3 rounded-lg border border-money/35 bg-money/10 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium">Review flagged details</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {reviewedKeys.size} of {items.length} checked
+          </p>
+        </div>
+        <Button type="button" size="sm" variant="outline" onClick={() => onFocus(targetIndex)}>
+          {nextIndex >= 0 ? "Review next" : "Review again"}
+        </Button>
+      </div>
+      <ol className="mt-2 flex flex-wrap gap-1.5">
+        {items.map((item, index) => (
+          <li key={item.key}>
+            <button
+              type="button"
+              onClick={() => onFocus(index)}
+              className={cn(
+                "rounded-full border px-2 py-1 text-[11px]",
+                reviewedKeys.has(item.key)
+                  ? "border-primary/30 text-primary"
+                  : "border-money/45 text-money",
+              )}
+            >
+              {reviewedKeys.has(item.key) ? "✓ " : ""}{item.label}
+            </button>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

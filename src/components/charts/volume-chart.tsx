@@ -56,10 +56,14 @@ export function VolumeChart({
         { key: "day", label: "Day" },
         { key: "patients", label: "Patients", numeric: true },
       ]}
-      rows={data.map((point) => ({
-        day: formatDayLong(point.day),
-        patients: formatCount(point.patient_count),
-      }))}
+      // Passed unbuilt: this window is up to ninety days, and the table view
+      // stays closed for all but the reader who explicitly wants the numbers.
+      buildRows={() =>
+        data.map((point) => ({
+          day: formatDayLong(point.day),
+          patients: formatCount(point.patient_count),
+        }))
+      }
     >
       <div className="h-44 w-full sm:h-56">
         <ResponsiveContainer width="100%" height="100%">

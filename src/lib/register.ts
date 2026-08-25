@@ -86,6 +86,12 @@ export interface RegisterSearchResult {
   totalCount: number;
   /** Fees across every match, not just this page. */
   totalFees: number;
+  committedCount: number;
+  committedFees: number;
+  draftCount: number;
+  draftFees: number;
+  limit: number;
+  offset: number;
 }
 
 interface RegisterSearchRow {
@@ -103,6 +109,10 @@ interface RegisterSearchRow {
   drugs: string[] | null;
   total_count: number | string;
   total_fees: number | string | null;
+  committed_count?: number | string;
+  committed_fees?: number | string | null;
+  draft_count?: number | string;
+  draft_fees?: number | string | null;
 }
 
 /**
@@ -120,23 +130,39 @@ export async function searchRegister(
 ): Promise<RegisterSearchResult> {
   const days = Math.min(Math.max(options.days ?? 30, 1), 365);
   const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
+  const offset = Math.max(options.offset ?? 0, 0);
   const from = shiftDays(todayInIndia(), -(days - 1));
 
-  const { data, error } = await supabase.rpc("register_search", {
-    p_doctor_id: doctorId,
-    p_from: startOfDayInIndia(from),
-    p_query: options.query?.trim() || null,
-    p_status: options.status ?? null,
-    p_limit: limit,
-    p_offset: Math.max(options.offset ?? 0, 0),
-  });
+  // The generated Supabase types predate migration 0012. Keep the runtime
+  // call typed at this boundary so the checked-in generated schema is not
+  // edited by hand (and can still be regenerated from the project).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- register_search is extended by migration 0012; generated types are intentionally not hand-edited.
+  const db = supabase as any;
+  const [{ data, error }, { data: totals, error: totalsError }] = await Promise.all([
+    db.rpc("register_search", {
+      p_doctor_id: doctorId,
+      p_from: startOfDayInIndia(from),
+      p_query: options.query?.trim() || null,
+      p_status: options.status ?? null,
+      p_limit: limit,
+      p_offset: offset,
+    }),
+    db.rpc("register_totals", {
+      p_doctor_id: doctorId,
+      p_from: startOfDayInIndia(from),
+      p_query: options.query?.trim() || null,
+    }),
+  ]);
 
   if (error) {
     console.error("[register] search failed", error.code);
     throw error;
   }
 
+  if (totalsError) console.warn("[register] totals unavailable", totalsError.code);
+
   const rows = (data ?? []) as RegisterSearchRow[];
+  const summary = (totals?.[0] ?? rows[0]) as RegisterSearchRow | undefined;
   return {
     entries: rows.map((row) => ({
       id: row.id,
@@ -155,6 +181,12 @@ export async function searchRegister(
     })),
     totalCount: Number(rows[0]?.total_count ?? 0),
     totalFees: Number(rows[0]?.total_fees ?? 0),
+    committedCount: Number(summary?.committed_count ?? 0),
+    committedFees: Number(summary?.committed_fees ?? 0),
+    draftCount: Number(summary?.draft_count ?? 0),
+    draftFees: Number(summary?.draft_fees ?? 0),
+    limit,
+    offset,
   };
 }
 

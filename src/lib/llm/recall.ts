@@ -46,10 +46,22 @@ The doctor is mid-clinic and asks in natural language, frequently code-mixed acr
 - "Show me Anil Sharma's visits this month"
 - "ਪਿਛਲੇ ਮਹੀਨੇ ਕਿੰਨੇ ਮਰੀਜ਼ ਆਏ?"
 - "How much did I earn from Mrs Gupta this year?"
+- "Pull up Sunita Devi's records"
 
 Your job is only to identify: which patient (if any), what kind of information is being asked for, how far back to look, and how many past encounters are needed. You do not answer the question — a later step does that with the actual records.
 
 Extract the patient name into Latin script, transliterating from Devanagari or Gurmukhi where necessary. Include an honorific only if it is part of how the name would be stored; strip "Mr", "Mrs", "Dr" and similar. If the question is about the practice as a whole rather than one patient, set patient_name to null.
+
+## open_record is different from the rest
+
+Every other intent is a question that wants a sentence back. \`open_record\` is a request to put a patient's chart on screen, and it changes what the app does rather than what it says, so the line matters:
+
+- "pull up Sunita's records", "open Anil Sharma's chart", "show me Rajesh's file", "Simran ki file kholo", "ਸਿਮਰਨ ਦਾ ਰਿਕਾਰਡ ਦਿਖਾਓ" — the doctor wants the chart itself. That is \`open_record\`.
+- "what did I prescribe Sunita?", "when did I last see Rajesh?", "Simran ko pichli baar kya diya tha?" — the doctor wants a specific fact read back to them. Those stay \`last_prescription\`, \`visit_history\`, \`diagnosis_history\` or \`fees_history\`.
+
+The distinguishing thing is the object of the request: a whole record, file, chart or history means \`open_record\`; a particular fact out of it does not. "Show me Anil Sharma's visits this month" is asking for a list of visits, not for his chart, so it is \`visit_history\`.
+
+\`open_record\` needs a patient. If no name was spoken, it is not a chart request — use \`general\`. Set limit to about 5 for \`open_record\`: the chart loads its own history, and those few encounters are only there to be shown as the working underneath.
 
 Map relative time expressions to a day count: "last time" implies no time limit but a limit of 1 encounter; "this month" is 30; "pichle hafte" / "last week" is 7; "is saal" / "this year" is 365. If no time frame is implied, leave time_range_days null.
 
@@ -88,9 +100,43 @@ export interface EncounterRecord {
   }[];
 }
 
+/**
+ * A chart request, as the offline demo asks one.
+ *
+ * The discriminator is the noun, not the verb. "Pull up Sunita Devi's records",
+ * "Simran ki file kholo" and "Sunita ke records dikhao" all name the whole
+ * record; "Show me Anil Sharma's visits this month" names a list of visits and
+ * must stay a question, because answering it by throwing a chart on screen
+ * instead of a sentence is the wrong behaviour to demonstrate. So this asks for
+ * a name followed by a word meaning the record entire, with the English
+ * possessive or a Hindi postposition in between.
+ *
+ * Case-sensitive for the same reason the prescription pattern below is: the
+ * name is found by its capitalisation, and an /i flag would happily return a
+ * patient called Pull.
+ */
+const MOCK_CHART_REQUEST =
+  /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:['’]s)?\s+(?:ki\s+|ka\s+|ke\s+)?(?:records?|chart|file|history)\b/;
+
 /** Step 1 — free text to a structured filter. */
 export async function parseRecallQuery(question: string): Promise<RecallQuery> {
   if (llmMockEnabled()) {
+    // Tested before the prescription pattern because the two overlap: "show me
+    // Rajesh's file" would otherwise fall through to a last_prescription lookup
+    // and answer with a sentence, which is the behaviour `open_record` exists
+    // to replace.
+    const chartName = question.match(MOCK_CHART_REQUEST)?.[1];
+    if (chartName) {
+      return {
+        patient_name: chartName,
+        intent: "open_record",
+        // The chart loads its own history once it is open; these few encounters
+        // are only the working shown underneath the answer in the panel behind.
+        time_range_days: null,
+        limit: 5,
+      };
+    }
+
     // Deliberately not case-insensitive as a whole: the name is found by its
     // capitalisation, so an /i flag would make `[A-Z][a-z]+` match "last time"
     // and hand back a patient called Last. Only the verb phrase varies in case

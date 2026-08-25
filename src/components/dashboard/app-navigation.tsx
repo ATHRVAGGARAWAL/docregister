@@ -7,16 +7,21 @@ import {
   LayoutDashboardIcon,
   Settings2Icon,
   ShieldCheckIcon,
+  UsersRoundIcon,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-export type AppView = "overview" | "register" | "recall" | "settings";
+export type AppView = "overview" | "register" | "patients" | "recall" | "settings";
 
 const items = [
   { id: "overview", label: "Overview", icon: LayoutDashboardIcon },
   { id: "register", label: "Register", icon: ClipboardListIcon },
+  // Next to the register on purpose: the register is one day's visits, the
+  // directory is the people those visits belong to, and a doctor moves between
+  // the two constantly.
+  { id: "patients", label: "Patients", icon: UsersRoundIcon },
   { id: "recall", label: "Recall", icon: HistoryIcon },
   { id: "settings", label: "Settings", icon: Settings2Icon },
 ] as const;
@@ -106,8 +111,12 @@ export function AppNavigation({
         </div>
       </aside>
 
+      {/* The column count tracks `items`. Leaving it at four when a fifth
+          workspace was added would not have dropped the tab — it would have
+          wrapped it onto a second row, half off the bottom of the screen and
+          under the voice dock. */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-border bg-card/95 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_-18px_rgba(0,0,0,0.35)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-border bg-card/95 px-1.5 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_-18px_rgba(0,0,0,0.35)] lg:hidden"
         aria-label="Primary navigation"
       >
         {items.map((item) => {

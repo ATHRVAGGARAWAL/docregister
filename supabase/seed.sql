@@ -180,12 +180,12 @@ begin
       v_dx_idx := 1 + floor(random() * array_length(v_dx, 1))::int;
 
       insert into encounters (
-        clinic_id, doctor_id, patient_id, status, occurred_at,
+        clinic_id, doctor_id, patient_id, capture_source, status, occurred_at,
         patient_name_spoken, age_years, diagnosis, treatment, fees_inr,
         extraction_model, extracted_raw, committed_at
       )
       values (
-        v_clinic, v_doctor.id, v_patient, 'committed',
+        v_clinic, v_doctor.id, v_patient, 'manual', 'committed',
         -- Clinic hours, 9am–8pm IST.
         ((v_day + time '09:00') at time zone 'Asia/Kolkata')
           + (interval '1 minute' * floor(random() * 660)::int),

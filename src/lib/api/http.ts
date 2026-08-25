@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 import { LlmError } from "@/lib/llm/types";
+import { SttError } from "@/lib/stt/types";
 import { getCurrentDoctor, getSupabaseServerClient, type CurrentDoctor } from "@/lib/supabase/server";
 
 /**
@@ -41,6 +42,17 @@ export class ApiError extends Error {
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
+
+/**
+ * PostgREST's code for "`.single()` wanted exactly one row and got none".
+ *
+ * Worth naming because it is the one error in a query result that is not a
+ * failure. `.single()` reports a miss and a broken query through the same null
+ * `data`, and a route that answers both with 404 tells a doctor their draft is
+ * gone when the truth is that the database is unreachable — which sends them
+ * to re-dictate a consultation that was never lost.
+ */
+export const PGRST_NO_ROWS = "PGRST116";
 
 /**
  * A key in `rate_limit_policies`. The ceiling itself lives in the database, so
@@ -99,6 +111,19 @@ export function withDoctor<T = Record<string, never>>(
       if (error instanceof LlmError) {
         console.error("[api]", request.method, path, error.code, error.message);
         return jsonError(...llmResponse(error));
+      }
+
+      // The recogniser fails in the same shape and for the same reasons, and
+      // the doctor can act differently on each one — a busy provider is worth
+      // retrying, an unusable recording is not. It lives here rather than in
+      // the transcribe route so that provider codes turn into doctor-facing
+      // sentences in one place; a route that reaches a provider only adds the
+      // context it alone has (the audio's size and type, say) to the log and
+      // re-throws. As with the model, the provider's own text stays on the
+      // server — it can quote the request back.
+      if (error instanceof SttError) {
+        console.error("[api]", request.method, path, error.code, error.message);
+        return jsonError(...sttResponse(error));
       }
 
       // Log the detail server-side; return something safe to the browser.
@@ -167,6 +192,28 @@ function llmResponse(error: LlmError): [message: string, status: number] {
       return ["That dictation was too long for the assistant to finish.", 422];
     default:
       return ["The assistant could not read that dictation. Try again.", 502];
+  }
+}
+
+function sttResponse(error: SttError): [message: string, status: number] {
+  switch (error.code) {
+    case "too_long":
+      return ["That recording was too long. Dictate one patient at a time.", 413];
+    case "empty_audio":
+      // 422 rather than 500: the request was fine, the recording had nothing in
+      // it. Usually a muted mic or a key released too early.
+      return ["No speech was detected in that recording.", 422];
+    case "unsupported_format":
+      return ["This device produced an audio format we cannot transcribe.", 422];
+    case "rate_limited":
+      return ["The transcription service is busy. Try again in a moment.", 429];
+    case "auth":
+      return ["Transcription is not configured. Check the server API key.", 502];
+    default:
+      // "Try again" is a real instruction, not a platitude: the transcribe
+      // route stores the audio before it calls a provider, so a retry costs the
+      // doctor a tap rather than the whole consultation.
+      return ["Transcription failed. Your recording was saved — try again.", 502];
   }
 }
 

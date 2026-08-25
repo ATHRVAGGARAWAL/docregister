@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { ApiError, readBody, requireString, withDoctor } from "@/lib/api/http";
+import { callWorkflow } from "@/lib/supabase/workflows";
 
 const ALLOWED_LANGUAGES = new Set(["en-IN", "hi-IN", "pa-IN"]);
 
@@ -11,7 +12,7 @@ interface ProfileBody {
   dictationLangs?: unknown;
 }
 
-export const PATCH = withDoctor(async ({ doctor, supabase, request }) => {
+export const PATCH = withDoctor(async ({ supabase, request }) => {
   const body = await readBody<ProfileBody>(request);
   const fullName = requireString(body.fullName, "fullName");
   const registrationNo = optionalText(body.registrationNo, "registrationNo", 80);
@@ -29,17 +30,18 @@ export const PATCH = withDoctor(async ({ doctor, supabase, request }) => {
     throw new ApiError("One or more dictation languages are not supported.");
   }
 
-  const { data, error } = await supabase
-    .from("doctors")
-    .update({
-      full_name: fullName.slice(0, 120),
-      registration_no: registrationNo,
-      speciality,
-      dictation_langs: dictationLangs,
-    })
-    .eq("id", doctor.id)
-    .select("full_name, registration_no, speciality, role, dictation_langs")
-    .single();
+  const { data, error } = await callWorkflow<{
+    full_name: string;
+    registration_no: string | null;
+    speciality: string | null;
+    role: "owner" | "doctor" | "staff";
+    dictation_langs: string[];
+  }>(supabase, "update_doctor_profile_workflow", {
+    p_full_name: fullName.slice(0, 120),
+    p_registration_no: registrationNo,
+    p_speciality: speciality,
+    p_dictation_langs: dictationLangs,
+  });
 
   if (error || !data) throw new ApiError("Could not update your profile.", 500);
 

@@ -108,11 +108,13 @@ export function MixChart({
         { key: "fresh", label: "New", numeric: true },
         { key: "repeat", label: "Returning", numeric: true },
       ]}
-      rows={data.map((point) => ({
-        day: formatDayLong(point.day),
-        fresh: formatCount(point.new_patients),
-        repeat: formatCount(point.returning_patients),
-      }))}
+      buildRows={() =>
+        data.map((point) => ({
+          day: formatDayLong(point.day),
+          fresh: formatCount(point.new_patients),
+          repeat: formatCount(point.returning_patients),
+        }))
+      }
     >
       <div className="h-44 w-full sm:h-56">
         <ResponsiveContainer width="100%" height="100%">

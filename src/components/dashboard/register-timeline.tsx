@@ -19,10 +19,14 @@ export function RegisterTimeline({
   entries,
   compact = false,
   onOpenPatient,
+  onOpenDraft,
+  onOpenVisit,
 }: {
   entries: RegisterEntry[];
   compact?: boolean;
   onOpenPatient?: (patient: PatientMatch) => void;
+  onOpenDraft?: (entry: RegisterEntry) => void;
+  onOpenVisit?: (entry: RegisterEntry) => void;
 }) {
   if (entries.length === 0) {
     return (
@@ -52,7 +56,18 @@ export function RegisterTimeline({
                 {formatDayLong(day)}
               </p>
             )}
-            <article className="group rounded-xl border border-border bg-card p-4 shadow-flat transition-colors hover:border-primary/20 sm:p-5">
+            <article
+              className="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-flat transition-colors hover:border-primary/20 sm:p-5"
+              role={onOpenVisit ? "button" : undefined}
+              tabIndex={onOpenVisit ? 0 : undefined}
+              onClick={() => onOpenVisit?.(entry)}
+              onKeyDown={(event) => {
+                if (onOpenVisit && (event.key === "Enter" || event.key === " ")) {
+                  event.preventDefault();
+                  onOpenVisit(entry);
+                }
+              }}
+            >
               <div className="flex items-start gap-3 sm:gap-4">
                 <div className="hidden w-16 shrink-0 pt-0.5 sm:block">
                   <p className="tnum text-xs font-medium text-muted-foreground">
@@ -81,16 +96,17 @@ export function RegisterTimeline({
                         {entry.patient_id && onOpenPatient ? (
                           <button
                             type="button"
-                            onClick={() =>
-                              onOpenPatient({
-                                id: entry.patient_id!,
-                                full_name: entry.patient_name,
-                                phone: null,
-                                age_years: entry.age_years,
-                                last_visit: entry.occurred_at,
-                                visit_count: entry.visit_number,
-                              })
-                            }
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                onOpenPatient({
+                                  id: entry.patient_id!,
+                                  full_name: entry.patient_name,
+                                  phone: null,
+                                  age_years: entry.age_years,
+                                  last_visit: entry.occurred_at,
+                                  visit_count: entry.visit_number,
+                                });
+                            }}
                             className="rounded-sm text-left font-semibold tracking-tight underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
                             {entry.patient_name}
@@ -121,6 +137,19 @@ export function RegisterTimeline({
                       {entry.fees_inr !== null ? formatINR(entry.fees_inr) : "—"}
                     </p>
                   </div>
+
+                  {entry.status === "draft" && onOpenDraft && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onOpenDraft(entry);
+                      }}
+                      className="mt-3 inline-flex items-center rounded-md border border-money/35 bg-money/10 px-2.5 py-1.5 text-xs font-medium text-money transition-colors hover:bg-money/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      Review this draft
+                    </button>
+                  )}
 
                   <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                     <p className="flex min-w-0 items-start gap-2 text-muted-foreground">

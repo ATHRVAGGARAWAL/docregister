@@ -67,8 +67,7 @@ export function PatientHistorySheet({
       signal: controller.signal,
     })
       .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error ?? "Could not open this patient chart.");
+        const payload = await readBody(response, "Could not open this patient chart.");
         setRequest({ patientId, history: payload as PatientHistoryPayload, error: null });
       })
       .catch((cause: unknown) => {
@@ -135,8 +134,7 @@ export function PatientHistorySheet({
           notes: editForm.notes,
         }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error ?? "Could not update this patient chart.");
+      const payload = await readBody(response, "Could not update this patient chart.");
 
       const updatedPatient = payload as PatientHistoryPayload["patient"];
       setRequest((current) =>
@@ -539,4 +537,26 @@ function formatPatientDate(iso: string): string {
     year: "numeric",
     timeZone: "Asia/Kolkata",
   }).format(new Date(iso));
+}
+
+/**
+ * Read a JSON body, but only once the response is known to be one.
+ *
+ * Calling `.json()` before checking `ok` means a non-JSON failure — a proxy's
+ * HTML 502, a 504, an empty body — rejects in the parser and the `!ok` branch
+ * never runs, so the doctor is shown "Unexpected token '<'" instead of the
+ * message written for them. This is now the directory's primary tap path.
+ */
+async function readBody(response: Response, fallback: string): Promise<unknown> {
+  let payload: unknown = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+  if (!response.ok) {
+    const error = (payload as { error?: unknown } | null)?.error;
+    throw new Error(typeof error === "string" ? error : fallback);
+  }
+  return payload;
 }

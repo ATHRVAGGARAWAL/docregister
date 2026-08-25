@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { ApiError, readBody, requireString, withDoctor } from "@/lib/api/http";
 import { answerFromRecords, parseRecallQuery, type EncounterRecord } from "@/lib/llm/recall";
+import { callWorkflow } from "@/lib/supabase/workflows";
 
 /**
  * POST /api/recall  { question }
@@ -175,6 +176,17 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
   }));
 
   const answer = await answerFromRecords(question, records);
+
+  const { error: auditError } = await callWorkflow<null>(supabase, "log_sensitive_access", {
+    p_action: "read",
+    p_entity: patientId ? "patient" : "register",
+    p_entity_id: patientId,
+    p_detail: { surface: "recall", encounter_count: records.length },
+  });
+  if (auditError) {
+    console.error("[recall] audit failed", auditError);
+    throw new ApiError("Could not complete the audited record lookup.", 500);
+  }
 
   return NextResponse.json({
     ...answer,

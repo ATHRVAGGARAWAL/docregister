@@ -17,8 +17,9 @@ import { buildCsp, securityHeaders } from "@/lib/security/headers";
  *     server-rendering and stamps it onto every script tag it emits.
  *  2. Refresh the Supabase session. Access tokens are short-lived; without a
  *     refresh on each navigation a doctor gets signed out mid-clinic.
- *  3. Bounce unauthenticated requests to /login before a Server Component can
- *     start rendering patient data.
+ *  3. Bounce unauthenticated *document* requests to /login before a Server
+ *     Component can start rendering patient data. Data requests are left alone
+ *     — see the `isApi` note below.
  */
 export async function proxy(request: NextRequest) {
   const dev = process.env.NODE_ENV === "development";
@@ -74,7 +75,19 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico";
 
-  if (!user && !isPublic) {
+  // /api is not public — every route under it goes through `withDoctor`, which
+  // answers an unauthenticated call with 401 `{"error":"Sign in to continue."}`
+  // — but it must never be *redirected*. `fetch` follows a 307 silently, so an
+  // expired session turned `fetch("/api/encounters/transcribe")` into a 200
+  // carrying the login page's HTML; the client's `readJson` then parsed nothing
+  // out of it and carried on with an empty transcript instead of telling the
+  // doctor to sign in. Letting the request reach its route means the browser
+  // gets the failure shape every client handler here is written against. The
+  // session refresh above still runs for these requests, which is what keeps a
+  // long dictation from expiring mid-upload.
+  const isApi = pathname.startsWith("/api");
+
+  if (!user && !isPublic && !isApi) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     // Send them back where they were headed once they sign in.

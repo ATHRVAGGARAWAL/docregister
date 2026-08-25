@@ -145,6 +145,25 @@ export function validateExtraction(value: Extraction): ValidationIssue[] {
   return issues;
 }
 
+/**
+ * What the doctor just said into the microphone.
+ *
+ * There is one microphone key and two things a doctor does with it, so this is
+ * the fork between the two: a consultation goes on to extraction and a review
+ * sheet, a question goes to recall and never touches the register. Deliberately
+ * a single field — the classifier is asked for a decision, not for a rationale
+ * nobody reads, and every extra field is latency on the dictation path.
+ */
+export const UtteranceKindSchema = z.object({
+  kind: z
+    .enum(["dictation", "question"])
+    .describe(
+      "`dictation` when the doctor is recording a consultation that has just happened. `question` when they are asking for something already in the register — including 'pull up her records', which is a request for a chart rather than for a sentence.",
+    ),
+});
+
+export type UtteranceKind = z.infer<typeof UtteranceKindSchema>["kind"];
+
 /** Natural-language recall answer. */
 export const RecallAnswerSchema = z.object({
   answer: z
@@ -175,8 +194,17 @@ export const RecallQuerySchema = z.object({
     .nullable()
     .describe("Patient the question is about, in Latin script. Null if the question is not about a specific patient."),
   intent: z
-    .enum(["last_prescription", "visit_history", "diagnosis_history", "fees_history", "general"])
-    .describe("What the doctor is actually asking for."),
+    .enum([
+      "last_prescription",
+      "visit_history",
+      "diagnosis_history",
+      "fees_history",
+      "general",
+      "open_record",
+    ])
+    .describe(
+      "What the doctor is actually asking for. `open_record` is the odd one out: it is a request for the patient's chart to be put on screen rather than a question expecting a sentence back.",
+    ),
   time_range_days: z
     .number()
     .int()

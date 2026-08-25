@@ -69,3 +69,76 @@ export interface PatientHistoryPayload {
   };
   encounters: PatientHistoryEncounter[];
 }
+
+export interface VisitPrescriptionItem {
+  id?: string;
+  drug_name: string;
+  strength: string | null;
+  form: string | null;
+  frequency_spoken: string | null;
+  frequency_code?: string | null;
+  frequency_label: string | null;
+  needs_review?: boolean;
+  duration: string | null;
+  route?: string | null;
+  instructions: string | null;
+  corrected?: boolean;
+  position: number;
+}
+
+export interface VisitAmendment {
+  id: string;
+  revision: number;
+  reason: string;
+  before_values: Record<string, unknown>;
+  after_values: Record<string, unknown>;
+  author: { id: string; full_name: string | null };
+  created_at: string;
+}
+
+export interface VisitDetailsPayload {
+  encounter: {
+    id: string;
+    status: "draft" | "committed" | "discarded";
+    occurred_at: string;
+    patient_id: string | null;
+    patient: {
+      id: string;
+      full_name: string;
+      phone: string | null;
+      age_years: number | null;
+      sex: string | null;
+    } | null;
+    clinician: { id: string; full_name: string; speciality: string | null } | null;
+    patient_name_spoken: string | null;
+    age_years: number | null;
+    diagnosis: string | null;
+    treatment: string | null;
+    fees_inr: number | null;
+    visit_number: number | null;
+    is_new_patient: boolean | null;
+    prescription: VisitPrescriptionItem[];
+    transcript: {
+      id: string;
+      raw_text: string;
+      roman_text: string | null;
+      live_text: string | null;
+      provider: string;
+      model: string | null;
+      language_code: string | null;
+      confidence: number | null;
+      degraded: boolean;
+      duration_ms: number | null;
+      created_at: string;
+    } | null;
+    effective: {
+      patient_name_spoken: string | null;
+      age_years: number | null;
+      diagnosis: string | null;
+      treatment: string | null;
+      fees_inr: number | null;
+      prescription: VisitPrescriptionItem[];
+    };
+  };
+  amendments: VisitAmendment[];
+}

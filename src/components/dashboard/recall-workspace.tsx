@@ -24,6 +24,7 @@ export function RecallWorkspace({
   onDismiss,
   onPickPatient,
   onOpenPatient,
+  onRecordAsVisit,
 }: {
   question: string | null;
   result: RecallResult | null;
@@ -32,6 +33,8 @@ export function RecallWorkspace({
   onDismiss: () => void;
   onPickPatient: (patientId: string) => void;
   onOpenPatient: (patient: PatientMatch) => void;
+  /** Set only while the question on screen was spoken rather than typed. */
+  onRecordAsVisit?: () => void;
 }) {
   const [draft, setDraft] = useState("");
 
@@ -100,6 +103,7 @@ export function RecallWorkspace({
           onDismiss={onDismiss}
           onPickPatient={onPickPatient}
           onOpenPatient={onOpenPatient}
+          onRecordAsVisit={onRecordAsVisit}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">

@@ -72,11 +72,12 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
   const query = use(searchParams);
   const callbackError = Array.isArray(query.error) ? query.error[0] : query.error;
   const nextPath = Array.isArray(query.next) ? query.next[0] : (query.next ?? "/");
+  const inviteToken = Array.isArray(query.invite) ? query.invite[0] : query.invite;
   const callbackMessage = callbackError
     ? (CALLBACK_ERRORS[callbackError] ?? "We could not complete sign-in. Please try again.")
     : "";
 
-  const [mode, setMode] = useState<AuthMode>("signin");
+  const [mode, setMode] = useState<AuthMode>(inviteToken ? "signup" : "signin");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>(callbackError ? "error" : "idle");
@@ -111,7 +112,14 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
         options: {
           shouldCreateUser: mode === "signup",
           emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
-          ...(mode === "signup" ? { data: { full_name: normalizedName } } : {}),
+          ...(mode === "signup"
+            ? {
+                data: {
+                  full_name: normalizedName,
+                  ...(inviteToken ? { invite_token: inviteToken } : {}),
+                },
+              }
+            : {}),
         },
       });
 

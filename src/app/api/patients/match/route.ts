@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { withDoctor } from "@/lib/api/http";
+import { ApiError, withDoctor } from "@/lib/api/http";
 
 /**
  * GET /api/patients/match?name=…&phone=…&limit=…
@@ -31,7 +31,13 @@ export const GET = withDoctor(async ({ supabase, request }) => {
 
   if (error) {
     console.error("[patients/match]", error);
-    return NextResponse.json({ matches: [] });
+    // An empty list is a real answer here — "nobody by that name is on file" —
+    // and it is the answer the caller acts on by starting a new chart. Handing
+    // it back for a search that never ran means a failed lookup ends as a
+    // duplicate chart for a patient the clinic already has, with the visit
+    // history split across two records. A caller cannot recover from what it
+    // cannot see, so the failure is reported as one.
+    throw new ApiError("Could not search the patient list. Try again.", 500);
   }
 
   return NextResponse.json({ matches: data ?? [] });
