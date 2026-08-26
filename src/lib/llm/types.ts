@@ -9,9 +9,9 @@ import type * as z from "zod/v4";
  * tables, the "never invent a value" instruction — lives in `extract.ts` and
  * `recall.ts` and is written once, provider-agnostically. A provider adapter
  * is only responsible for three mechanical things: getting a system prompt and
- * a user turn to the model, forcing the response to match a Zod schema, and
- * turning that vendor's failures into a `LlmError` this app already knows how
- * to show a doctor.
+ * a user turn to the model within the deadline it is handed, forcing the
+ * response to match a Zod schema, and turning that vendor's failures into a
+ * `LlmError` this app already knows how to show a doctor.
  *
  * That split is what makes swapping the LLM a contained change. It matters
  * more here than in most apps: PHI must stay in India (ABDM's Health Data
@@ -29,6 +29,17 @@ export type LlmErrorCode =
   | "invalid_output"
   /** The model ran out of output budget mid-answer. */
   | "truncated"
+  /**
+   * The call passed the deadline `generateStructured` gave it.
+   *
+   * Reaches the doctor through the `default` branch of `llmResponse` in
+   * `lib/api/http.ts` — the same sentence as any other provider failure, which
+   * is honest enough for someone who only needs to know whether to try again.
+   * The separate code earns its keep on the server, where `withDoctor` logs
+   * `error.code`: a provider that stalled and one that answered badly are then
+   * different lines in the log rather than the same one.
+   */
+  | "timeout"
   | "provider_error";
 
 export class LlmError extends Error {
@@ -90,14 +101,30 @@ export interface StructuredResult<T> {
   usage?: LlmUsage;
 }
 
-export interface LlmProvider {
-  readonly name: string;
-  generate<T>(request: StructuredRequest<T>): Promise<StructuredResult<T>>;
+/**
+ * Transport policy for one attempt, decided by `generateStructured` and handed
+ * down.
+ *
+ * Deliberately not part of `StructuredRequest`: a prompt module says what it is
+ * asking the model for, and how long the app is willing to wait for it belongs
+ * to the route's budget, which the prompt knows nothing about.
+ */
+export interface LlmCallOptions {
+  /**
+   * Abandon this attempt after this many milliseconds.
+   *
+   * An adapter has two jobs with this number. Express it in the vendor's own
+   * idiom, and make sure the vendor does not retry *inside* it — an SDK-level
+   * retry loop spends this budget once per hidden attempt and reports the whole
+   * thing as one slow failure, which is invisible to the policy above.
+   */
+  timeoutMs: number;
 }
 
-/**
- * How long one model call may take. The API routes cap at `maxDuration = 60`,
- * so anything beyond this is time the doctor spends watching a spinner in front
- * of a failure that has already happened.
- */
-export const LLM_TIMEOUT_MS = 25_000;
+export interface LlmProvider {
+  readonly name: string;
+  generate<T>(
+    request: StructuredRequest<T>,
+    options: LlmCallOptions,
+  ): Promise<StructuredResult<T>>;
+}

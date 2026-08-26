@@ -117,27 +117,31 @@ export function RegisterWorkspace({
             </p>
           </div>
 
+          {/* Equal thirds leave little room on a phone: at 393px "Confirmed" and its
+              icon overran the divider into the next column. Below sm the decorative
+              icons stand down and the tracking tightens — the words alone still say
+              which number is which. */}
           <dl className="surface-inset grid grid-cols-3 divide-x divide-border/60 rounded-2xl px-1 py-3 sm:min-w-[22rem]">
-            <div className="px-3 sm:px-5">
-              <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <div className="px-2 sm:px-5">
+              <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:tracking-[0.14em]">
                 Matching
               </dt>
               <dd className="tnum mt-1 text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
                 {headlineCount}
               </dd>
             </div>
-            <div className="px-3 sm:px-5">
-              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                <CircleCheckBigIcon className="size-3 text-primary" aria-hidden />
+            <div className="px-2 sm:px-5">
+              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:tracking-[0.14em]">
+                <CircleCheckBigIcon className="hidden size-3 text-primary sm:block" aria-hidden />
                 Confirmed
               </dt>
               <dd className="tnum mt-1 text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
                 {committedCount}
               </dd>
             </div>
-            <div className="px-3 sm:px-5">
-              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                <ClipboardClockIcon className="size-3 text-warning" aria-hidden />
+            <div className="px-2 sm:px-5">
+              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:tracking-[0.14em]">
+                <ClipboardClockIcon className="hidden size-3 text-warning sm:block" aria-hidden />
                 Review
               </dt>
               <dd className="tnum mt-1 text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
@@ -178,6 +182,8 @@ export function RegisterWorkspace({
         </form>
 
         <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 lg:flex-row lg:items-center lg:justify-between">
+          {/* Both axes need the 44px touch floor, not just the height: "All" is short
+              enough that padding alone left it a 41px-wide target. */}
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
             <div className="no-scrollbar surface-inset flex max-w-full gap-1 overflow-x-auto rounded-xl p-1" role="group" aria-label="Register date range">
               {RANGES.map((option) => (
@@ -187,7 +193,7 @@ export function RegisterWorkspace({
                   onClick={() => onDaysChange(option.days)}
                   aria-pressed={days === option.days}
                   className={cn(
-                    "min-h-9 shrink-0 touch-manipulation rounded-lg px-3 text-xs font-medium transition-all duration-200 [@media(pointer:coarse)]:min-h-11",
+                    "min-h-9 shrink-0 touch-manipulation rounded-lg px-3 text-xs font-medium transition-all duration-200 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11",
                     days === option.days
                       ? "bg-foreground text-background shadow-sm"
                       : "text-muted-foreground hover:bg-secondary hover:text-foreground",
@@ -206,7 +212,7 @@ export function RegisterWorkspace({
                   onClick={() => onStatusChange(option.value)}
                   aria-pressed={status === option.value}
                   className={cn(
-                    "min-h-9 shrink-0 touch-manipulation rounded-lg border px-3 text-xs font-medium transition-all duration-200 [@media(pointer:coarse)]:min-h-11",
+                    "min-h-9 shrink-0 touch-manipulation rounded-lg border px-3 text-xs font-medium transition-all duration-200 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11",
                     status === option.value
                       ? "border-primary/25 bg-primary-soft text-primary"
                       : "border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground",
@@ -262,6 +268,8 @@ export function RegisterWorkspace({
         ) : (
           <RegisterTimeline
             entries={entries}
+            emptyTitle="No visits match these filters"
+            emptyHint="Widen the date range, choose a different status, or clear the search."
             onOpenPatient={onOpenPatient}
             onOpenDraft={onOpenDraft}
             onRestoreDraft={onRestoreDraft}

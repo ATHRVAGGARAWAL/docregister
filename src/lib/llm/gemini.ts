@@ -13,9 +13,9 @@ import {
 import * as z from "zod/v4";
 
 import { env } from "@/lib/env";
-import { LLM_TIMEOUT_MS } from "./types";
 import {
   LlmError,
+  type LlmCallOptions,
   type LlmProvider,
   type StructuredRequest,
   type StructuredResult,
@@ -94,14 +94,9 @@ let client: GoogleGenAI | undefined;
 
 function getClient(): GoogleGenAI {
   if (!client) {
-    client = new GoogleGenAI({
-      apiKey: env.geminiApiKey,
-      // Bounded for the same reason as the Anthropic client: this file's own
-      // notes record a model that "hung past 90 seconds" on repeat calls, and
-      // the mitigation at the time was to avoid the model. A timeout is the
-      // mitigation that generalises.
-      httpOptions: { timeout: LLM_TIMEOUT_MS },
-    });
+    // No `httpOptions` here on purpose: the deadline differs per tier and per
+    // attempt, so it belongs on the request rather than on the shared client.
+    client = new GoogleGenAI({ apiKey: env.geminiApiKey });
   }
   return client;
 }
@@ -209,7 +204,10 @@ function thinkingFor(model: string, tier: Tier): ThinkingConfig {
 export class GeminiProvider implements LlmProvider {
   readonly name = "gemini";
 
-  async generate<T>(request: StructuredRequest<T>): Promise<StructuredResult<T>> {
+  async generate<T>(
+    request: StructuredRequest<T>,
+    options: LlmCallOptions,
+  ): Promise<StructuredResult<T>> {
     const model = modelFor(request.tier);
 
     let response: GenerateContentResponse;
@@ -227,10 +225,26 @@ export class GeminiProvider implements LlmProvider {
           responseJsonSchema: jsonSchemaFor(request.schema),
           thinkingConfig: thinkingFor(model, request.tier),
           safetySettings: SAFETY,
+          httpOptions: {
+            // This file's own notes record a model that "hung past 90 seconds"
+            // on repeat calls, and the mitigation at the time was to stop using
+            // that model. A deadline is the mitigation that generalises to the
+            // next one.
+            timeout: options.timeoutMs,
+            // Left alone, this SDK retries 408/429/5xx up to five times with
+            // its own exponential backoff — and `timeout` above bounds each of
+            // those attempts rather than the sequence. One stalled call would
+            // then burn five deadlines plus ~15s of sleeping, several times the
+            // route's whole `maxDuration`, and arrive back here as a single
+            // slow failure with no sign that it was ever retried. Retrying is
+            // `generateStructured`'s job, where it is capped, budgeted, and
+            // skipped for the errors a second call cannot change.
+            retryOptions: { attempts: 1 },
+          },
         },
       });
     } catch (error) {
-      throw translate(error);
+      throw translate(error, model, options.timeoutMs);
     }
 
     // A prompt-level block never reaches `candidates` at all, so it has to be
@@ -298,7 +312,17 @@ export class GeminiProvider implements LlmProvider {
   }
 }
 
-function translate(error: unknown): LlmError {
+function translate(error: unknown, model: string, timeoutMs: number): LlmError {
+  // The deadline is enforced by aborting the fetch, so it comes back as
+  // undici's bare `AbortError` and never as an `ApiError` — without this it
+  // would be logged as a provider error reading "This operation was aborted",
+  // which tells whoever is on call nothing. Retryable: a connection that goes
+  // quiet says nothing about the request, and the next attempt usually lands on
+  // a different edge node.
+  if (error instanceof Error && error.name === "AbortError") {
+    return new LlmError(`${model} did not answer within ${timeoutMs}ms.`, "timeout", true);
+  }
+
   if (error instanceof ApiError) {
     const status = error.status;
     if (status === 401 || status === 403) {

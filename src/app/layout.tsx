@@ -27,6 +27,9 @@ export const metadata: Metadata = {
   description:
     "Dictate a consultation in Hindi, Punjabi or English and it becomes a structured register entry, with patient history from your phone.",
   applicationName: "docregister",
+  // Installed to the home screen, the register runs without the URL bar — which
+  // is the band the bottom-fixed voice dock was competing with on a handset.
+  manifest: "/manifest.webmanifest",
   // A doctor's register is not something to hand to a crawler.
   robots: { index: false, follow: false },
   appleWebApp: { capable: true, title: "docregister", statusBarStyle: "black" },
@@ -35,6 +38,12 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   // Keep browser chrome aligned with the exact page background in either mode.
+  // This pair, not the manifest's `theme_color`, is what colours the installed
+  // standalone window: a manifest holds one static colour and has no media form,
+  // so it can only stand in for the splash screen shown before this document
+  // paints. Both follow the OS, which THEME_SCRIPT does not have to — a stored
+  // light/dark override still leaves the status bar on the system scheme until
+  // that script also rewrites this tag.
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
     { media: "(prefers-color-scheme: dark)", color: "#000000" },

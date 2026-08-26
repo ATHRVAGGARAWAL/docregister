@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BadgeCheckIcon,
   Building2Icon,
@@ -43,10 +43,13 @@ export function SettingsWorkspace({
   profile,
   onProfileChange,
   onSignOut,
+  onDirtyChange,
 }: {
   profile: DoctorProfile;
   onProfileChange: (profile: DoctorProfile) => void;
   onSignOut: () => void;
+  /** Raised while the form holds edits that have not been saved. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [fullName, setFullName] = useState(profile.fullName);
   const [speciality, setSpeciality] = useState(profile.speciality ?? "");
@@ -54,6 +57,34 @@ export function SettingsWorkspace({
   const [languages, setLanguages] = useState(profile.dictationLangs);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+
+  // Every edit here lives in local state until `save()` succeeds, and switching
+  // workspace unmounts this component — so an interrupted edit used to vanish
+  // with nothing said. A doctor changing their registration number between
+  // patients is exactly the person who gets interrupted.
+  const dirty =
+    fullName !== profile.fullName ||
+    speciality !== (profile.speciality ?? "") ||
+    registrationNo !== (profile.registrationNo ?? "") ||
+    languages.length !== profile.dictationLangs.length ||
+    languages.some((code, index) => code !== profile.dictationLangs[index]);
+
+  // Covers the tab being closed or reloaded. Leaving for another workspace is a
+  // client-side transition the browser never sees, so the dashboard asks about
+  // that case separately via `onDirtyChange`.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    // Clearing on unmount matters: without it the dashboard keeps warning about
+    // a form that is no longer mounted, and every later view change is blocked.
+    return () => onDirtyChange?.(false);
+  }, [dirty, onDirtyChange]);
 
   async function save() {
     setSaving(true);
@@ -69,7 +100,16 @@ export function SettingsWorkspace({
           dictationLangs: languages,
         }),
       });
-      const payload = await response.json();
+      // Parsed only once the response is known to be JSON. A proxy's HTML 502 or
+      // an empty body rejects inside `.json()`, and the `!ok` branch below would
+      // never run — the doctor would be told "Unexpected token '<'" instead of
+      // that the save failed.
+      let payload: { error?: string } | null = null;
+      try {
+        payload = (await response.json()) as { error?: string };
+      } catch {
+        payload = null;
+      }
       if (!response.ok) throw new Error(payload?.error ?? "Could not update your profile.");
 
       onProfileChange({ ...profile, ...payload, email: profile.email });

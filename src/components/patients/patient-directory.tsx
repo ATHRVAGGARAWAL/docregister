@@ -31,6 +31,7 @@ export function PatientDirectory({
   patients,
   totalCount,
   loading,
+  hasLoaded,
   error,
   query,
   onSearch,
@@ -40,6 +41,8 @@ export function PatientDirectory({
   /** Charts matching the search. Not `patients.length`. */
   totalCount: number;
   loading: boolean;
+  /** False until the first request has settled, however it settled. */
+  hasLoaded: boolean;
   error: string | null;
   /** The search the rows currently on screen are the answer to. */
   query: string;
@@ -126,7 +129,7 @@ export function PatientDirectory({
         </form>
       </section>
 
-      <section aria-busy={loading} className="space-y-4">
+      <section aria-busy={loading || !hasLoaded} className="space-y-4">
         {error && (
           <Alert variant="destructive" role="alert">
             <AlertTitle>Could not load the patient list</AlertTitle>

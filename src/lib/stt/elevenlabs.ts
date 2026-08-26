@@ -93,11 +93,26 @@ export class ElevenLabsProvider implements SttProvider {
       );
     }
 
-    const json = (await response.json()) as {
+    // Same reason as the guard in `sarvam.ts`: `fetch` resolves on headers, so a
+    // provider that answers 200 and then stalls its body fails at this line, not
+    // in the catch above. Unguarded it threw a raw DOMException/SyntaxError past
+    // every `SttError` handler — which `transcribeWithFailover` cannot read as
+    // retryable, so a stalled body ended the encounter instead of failing over
+    // to the other engine.
+    let json: {
       text?: string;
       language_code?: string;
       language_probability?: number;
     };
+    try {
+      json = await response.json();
+    } catch (cause) {
+      throw new SttError(
+        `ElevenLabs' response did not complete: ${String(cause)}`,
+        "provider_error",
+        true,
+      );
+    }
 
     const text = (json.text ?? "").trim();
     if (!text) throw new SttError("ElevenLabs returned no text", "empty_audio");

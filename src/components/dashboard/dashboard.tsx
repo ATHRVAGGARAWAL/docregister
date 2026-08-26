@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { CalendarDaysIcon, CircleAlertIcon, ClipboardPenLineIcon } from "@/components/icons";
@@ -102,6 +102,28 @@ export function Dashboard({
   const [registerQuery, setRegisterQuery] = useState(initialUrlState.query);
   const [registerOffset, setRegisterOffset] = useState(initialUrlState.offset);
   const registerLimit = 50;
+  // Raised by the settings form while it holds unsaved edits, so `changeView`
+  // can ask before throwing them away.
+  const settingsDirty = useRef(false);
+  // Stable identity on purpose: the settings form reports through this from an
+  // effect, and a new function each render would re-run that effect on every
+  // keystroke in the dashboard.
+  const handleSettingsDirty = useCallback((dirty: boolean) => {
+    settingsDirty.current = dirty;
+  }, []);
+
+  // Distinct names off the register, newest first, for the recall prompts. Two
+  // is enough — this is a nudge, not a directory — and `useMemo` keeps it from
+  // rebuilding the list on every keystroke elsewhere in the dashboard.
+  const recentPatientNames = useMemo(() => {
+    const seen = new Set<string>();
+    for (const entry of registerEntries) {
+      const name = entry.patient_name?.trim();
+      if (name) seen.add(name);
+      if (seen.size === 2) break;
+    }
+    return [...seen];
+  }, [registerEntries]);
   const [registerLoading, setRegisterLoading] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [registerTotals, setRegisterTotals] = useState({
@@ -124,6 +146,12 @@ export function Dashboard({
   const [patientsTotal, setPatientsTotal] = useState(0);
   const [patientsQuery, setPatientsQuery] = useState("");
   const [patientsLoading, setPatientsLoading] = useState(false);
+  // Distinct from `patientsLoading`, which is false before the first request is
+  // even issued. Without this the directory announces `aria-busy="false"` over
+  // an empty list it has never tried to fill — telling a screen-reader user the
+  // list is ready and the clinic has no charts, which is the same confident
+  // zero the visible count was fixed for.
+  const [patientsHasLoaded, setPatientsHasLoaded] = useState(false);
   const [patientsError, setPatientsError] = useState<string | null>(null);
 
   const capture = useVoiceCapture({
@@ -291,7 +319,10 @@ export function Dashboard({
       // says the search failed and keeps whatever it last had, labelled.
       setPatientsError(messageFor(error, "Could not load the patient list."));
     } finally {
-      if (ticket === patientsTicket.current) setPatientsLoading(false);
+      if (ticket === patientsTicket.current) {
+        setPatientsLoading(false);
+        setPatientsHasLoaded(true);
+      }
     }
   }, []);
 
@@ -415,6 +446,27 @@ export function Dashboard({
   }, [capture, spokenQuestion]);
 
   function changeView(next: AppView) {
+
+    // Leaving settings mid-edit is a client-side transition, so nothing warns
+
+    // by default and the edits are simply gone. Ask instead — and only when
+
+    // there is genuinely something to lose, so this never nags.
+
+    if (view === "settings" && next !== "settings" && settingsDirty.current) {
+
+      const leave = window.confirm(
+
+        "You have unsaved changes to your profile. Leave without saving?",
+
+      );
+
+      if (!leave) return;
+
+      settingsDirty.current = false;
+
+    }
+
     setView(next);
     // An explicit "has this been fetched" flag rather than `registerDays === 1`
     // standing in for it. Using the value as its own sentinel meant a doctor who
@@ -670,6 +722,7 @@ export function Dashboard({
                   patients={patients}
                   totalCount={patientsTotal}
                   loading={patientsLoading}
+                  hasLoaded={patientsHasLoaded}
                   error={patientsError}
                   query={patientsQuery}
                   onSearch={searchPatients}
@@ -681,6 +734,7 @@ export function Dashboard({
                   question={question}
                   result={recall}
                   loading={recallLoading}
+                  recentPatientNames={recentPatientNames}
                   onAsk={(text) => {
                     // Typed, so there is no recording behind it and nothing to
                     // recover to a visit. Clearing this is what takes the
@@ -720,6 +774,7 @@ export function Dashboard({
               {view === "accounts" && <AccountsWorkspace refreshKey={accountsRefreshKey} />}
               {view === "settings" && (
                 <SettingsWorkspace
+                  onDirtyChange={handleSettingsDirty}
                   profile={profile}
                   onProfileChange={setProfile}
                   onSignOut={() => void signOut()}

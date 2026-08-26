@@ -209,8 +209,12 @@ export function AccountsWorkspace({ refreshKey = 0 }: { refreshKey?: number }) {
                     type="button"
                     aria-pressed={days === range.days}
                     onClick={() => setDays(range.days)}
+                    // The coarse-pointer rule in globals.css only floors height, and
+                    // labels this short ("7D", "1Y") never reach 44px wide on padding
+                    // alone — they measured 32-35px. min-w is unconditional because
+                    // equal-width segments read better than staggered ones anyway.
                     className={cn(
-                      "h-8 touch-manipulation rounded-full px-2.5 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-11",
+                      "h-8 min-w-11 touch-manipulation rounded-full px-2.5 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-11",
                       days === range.days ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground",
                     )}
                   >
@@ -259,7 +263,10 @@ function SummaryCards({ payload, loading }: { payload: AccountsPayload; loading:
           transition={{ duration: 0.35, delay: index * 0.04 }}
         >
           <Card className="surface-card group relative h-full gap-3 overflow-hidden rounded-[1.35rem] border-border bg-card py-4 transition-all duration-300 hover:-translate-y-1 hover:border-primary/20 hover:bg-card">
-            <CardHeader className="flex-row items-center justify-between">
+            {/* `flex` is load-bearing: CardHeader is a grid, so flex-row alone left the
+                icon stacked under the label and cost each card 20px of height — 40px
+                across the two rows, on the screen this grid exists to fit. */}
+            <CardHeader className="flex items-center justify-between">
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{card.label}</CardTitle>
               <span className={cn("grid size-8 shrink-0 place-items-center rounded-[0.8rem] border border-border", card.tone)}><card.icon className="size-4" aria-hidden /></span>
             </CardHeader>
@@ -310,7 +317,13 @@ function BadgeTabs({
                   initial={{ scale: 0.7, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.7, opacity: 0 }}
-                  className="tnum rounded-full bg-secondary px-1.5 py-0.5 text-xs leading-none text-current"
+                  // The pill keeps its light background on the selected tab too, so it
+                  // cannot inherit that tab's white text — the count measured 1.09:1
+                  // against it, i.e. invisible.
+                  className={cn(
+                    "tnum rounded-full bg-secondary px-1.5 py-0.5 text-xs leading-none",
+                    active ? "text-secondary-foreground" : "text-current",
+                  )}
                 >
                   {item.badge}
                 </motion.span>

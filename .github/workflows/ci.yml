@@ -1,9 +1,10 @@
 name: CI
 
-# There are no unit tests for most of this app yet, so typecheck + lint is the
-# floor rather than the ceiling. It is still the difference between a type error
-# reaching main and not: `next typegen && tsc --noEmit` is what catches a schema
-# drift after `database.types.ts` is regenerated.
+# Two jobs, because they need different things. `check` needs no secrets and
+# must pass for every fork and every pull request. `e2e` drives a real browser
+# against a real Supabase project, so it can only run where those credentials
+# exist — and it is skipped, not failed, everywhere else. A red X that a
+# contributor has no way to clear is a check people learn to ignore.
 on:
   push:
     branches: [main]
@@ -24,3 +25,41 @@ jobs:
       # not need secrets, and nothing here talks to Supabase or a model.
       - run: npm run typecheck
       - run: npm run test:unit
+
+  e2e:
+    runs-on: ubuntu-latest
+    # Fork pull requests do not receive secrets, so this would fail for a reason
+    # the contributor cannot act on.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check for Supabase credentials
+        id: creds
+        env:
+          URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        run: echo "present=${{ env.URL != '' }}" >> "$GITHUB_OUTPUT"
+      - if: steps.creds.outputs.present == 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.creds.outputs.present == 'true'
+        run: npm run test:e2e
+        env:
+          CI: "true"
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_DOCTOR_EMAIL: ${{ secrets.E2E_DOCTOR_EMAIL }}
+      - if: steps.creds.outputs.present != 'true'
+        run: echo "No Supabase secrets configured — end-to-end tests skipped."
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

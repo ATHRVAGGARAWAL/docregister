@@ -11,13 +11,31 @@
  * text" — the batch transcript still lands, because that is a separate path.
  * The one obligation this class does have is to say so: silence and a working
  * socket look identical from the outside, so every way this can end reaches the
- * caller as a `status` event.
+ * caller as a `status` event, and an ending carries why it ended.
  */
+
+/**
+ * Why live text stopped, at the granularity the doctor's next move depends on.
+ *
+ * Coarser than the close codes on purpose — "sign in again", "you are at the
+ * hourly limit" and "it is not us, it is them" are three different sentences,
+ * and every other distinction the wire makes collapses into one of them.
+ */
+export type LiveTranscriptUnavailableReason =
+  /** No usable socket: refused, blocked, dropped, or the dial budget is spent. */
+  | "unreachable"
+  /** The proxy would not take the access token. */
+  | "unauthorised"
+  /** The doctor's hourly transcription ceiling refused this stream. */
+  | "rate-limited"
+  /** The proxy answered; the transcription service behind it did not. */
+  | "service";
 
 export type LiveTranscriptEvent =
   | { type: "interim"; text: string }
   | { type: "final"; text: string }
-  | { type: "status"; state: "connecting" | "open" | "closed" | "unavailable" };
+  | { type: "status"; state: "connecting" | "open" | "closed" }
+  | { type: "status"; state: "unavailable"; reason: LiveTranscriptUnavailableReason };
 
 export interface LiveTranscriptOptions {
   url: string;
@@ -74,6 +92,24 @@ const OPEN_TIMEOUT_MS = 6_000;
  */
 const TERMINAL_CLOSE_CODES = new Set([1000, 1008, 1011, 4401, 4429]);
 
+/**
+ * What a close code says about the cause, or null when it says nothing.
+ *
+ * 1006 and 1001 are "the connection went away" and name no cause, so they leave
+ * whatever we already knew in place: a 1012 that then runs out of dials is
+ * still a failure of the transcription service, and reporting the last hop as
+ * "unreachable" would point the doctor at their own network for it.
+ */
+function closeReason(code: number): LiveTranscriptUnavailableReason | null {
+  if (code === 4401) return "unauthorised";
+  if (code === 4429) return "rate-limited";
+  // 1011 is the proxy refusing on its own account (misconfigured, or a
+  // rate-limit check it could not run); 1012 is the upstream vendor failing
+  // under it. Neither is anything the doctor can act on, so they read alike.
+  if (code === 1011 || code === 1012) return "service";
+  return null;
+}
+
 export class LiveTranscriptSocket {
   private socket?: WebSocket;
   private opened = false;
@@ -85,6 +121,16 @@ export class LiveTranscriptSocket {
   private dials = 0;
   private retryTimer?: ReturnType<typeof setTimeout>;
   private openTimer?: ReturnType<typeof setTimeout>;
+  /**
+   * Best account so far of why live text is failing, reported if we give up.
+   *
+   * Kept across dials because the dial that explains the failure is rarely the
+   * last one: a proxy that closes 4429 is answered by three more dials that
+   * close the same way, and a vendor outage arrives as one 1012 followed by
+   * timeouts. "Could not reach it" is the honest default only when nothing on
+   * the wire said otherwise.
+   */
+  private failure: LiveTranscriptUnavailableReason = "unreachable";
 
   constructor(private readonly options: LiveTranscriptOptions) {}
 
@@ -92,6 +138,7 @@ export class LiveTranscriptSocket {
     this.closedByUs = false;
     this.abandoned = false;
     this.dials = 0;
+    this.failure = "unreachable";
     this.dial();
   }
 
@@ -106,6 +153,7 @@ export class LiveTranscriptSocket {
       // A malformed URL, or a ws:// upgrade blocked on an https page, throws
       // synchronously and would throw identically on every retry. Backing off
       // and trying again would only delay telling the doctor.
+      this.failure = "unreachable";
       this.giveUp();
       return;
     }
@@ -152,12 +200,28 @@ export class LiveTranscriptSocket {
         const message = JSON.parse(event.data) as {
           type?: string;
           text?: string;
+          state?: string;
         };
         if (message.type === "interim" && message.text) {
           this.options.onEvent({ type: "interim", text: message.text });
         } else if (message.type === "final" && message.text) {
           this.options.onEvent({ type: "final", text: message.text });
+        } else if (message.type === "status" && message.state === "unavailable") {
+          // The proxy is up; what it cannot reach is the transcription service
+          // behind it (`server/stt-proxy.ts` sends this before closing us).
+          // Reported but not acted on: the close that follows carries the code
+          // that decides whether another dial can do better, and redialling a
+          // proxy that is reachable is exactly how a vendor blip recovers. What
+          // this buys is the seconds those dials take — without it the dock
+          // goes on claiming to be listening through a failure already known.
+          this.failure = "service";
+          this.options.onEvent({ type: "status", state: "unavailable", reason: "service" });
         }
+        // Other proxy status frames are deliberately dropped. Its `closed`
+        // means "the upstream went away" and is followed by a close code we
+        // retry on, whereas `closed` out of this class means the caller tore
+        // the capture down — forwarding one as the other would tell the hook a
+        // recording had ended while it was still running.
       } catch {
         /* non-JSON frame from the proxy — ignore */
       }
@@ -176,6 +240,7 @@ export class LiveTranscriptSocket {
       this.clearOpenTimer();
       this.opened = false;
       this.socket = undefined;
+      this.failure = closeReason(event.code) ?? this.failure;
 
       if (TERMINAL_CLOSE_CODES.has(event.code)) {
         this.giveUp();
@@ -210,7 +275,7 @@ export class LiveTranscriptSocket {
     // frames until the doctor stops speaking, so holding them is memory spent
     // on audio no one will transcribe.
     this.pending = [];
-    this.options.onEvent({ type: "status", state: "unavailable" });
+    this.options.onEvent({ type: "status", state: "unavailable", reason: this.failure });
   }
 
   private clearOpenTimer(): void {
@@ -220,7 +285,16 @@ export class LiveTranscriptSocket {
 
   send(frame: ArrayBuffer): void {
     if (this.opened && this.socket?.readyState === WebSocket.OPEN) {
-      this.socket.send(frame);
+      try {
+        this.socket.send(frame);
+      } catch {
+        // Called from the recorder's PCM worklet handler, on the same thread
+        // that is feeding the archival recording. A socket that turns out to be
+        // closing throws InvalidStateError here, and letting that escape would
+        // put an exception into the audio path on every frame for the rest of
+        // the consultation. Dropping the frame costs a word of preview text;
+        // the close event behind this throw is what tells the doctor.
+      }
     } else if (!this.abandoned && this.pending.length < 200) {
       this.pending.push(frame);
     }

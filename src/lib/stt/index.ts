@@ -55,6 +55,21 @@ function fallbackFor(primary: SttProvider): SttProvider | undefined {
  * actually produced the text so the doctor can be told when a note came from
  * the weaker engine. Silently degrading transcription quality on a clinical
  * record is worse than surfacing an error.
+ *
+ * Both legs have to fit inside one request, which is what sets `STT_TIMEOUT_MS`.
+ * Every caller declares `maxDuration = 60`, and the worst case here is a stalled
+ * primary burning its full budget and then a second provider burning its own:
+ * 20s + 20s = 40s, leaving 20s for the multipart parse, the audio upload or
+ * download, the drug lookup and the transcript write. That is the whole reason
+ * the per-provider budget is a third of the request rather than most of it — at
+ * 40s or 60s each the first leg would eat the request and this function would be
+ * decorative, which is exactly the state a provider stall used to produce.
+ *
+ * Two things to check before raising it. `/api/drafts/[id]/retry` spends a
+ * further `LLM_TIMEOUT_MS` on extraction inside the same 60s, so it is the
+ * tighter of the two callers. And Sarvam's romanisation pass is not part of the
+ * 40s above — it runs after a *successful* primary, and is capped separately in
+ * `sarvam.ts` so a nicety cannot push a finished transcript past `maxDuration`.
  */
 export async function transcribeWithFailover(
   input: TranscribeInput,

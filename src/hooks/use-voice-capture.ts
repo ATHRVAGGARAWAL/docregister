@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { LiveTranscriptSocket } from "@/lib/audio/live-transcript";
+import {
+  LiveTranscriptSocket,
+  type LiveTranscriptUnavailableReason,
+} from "@/lib/audio/live-transcript";
 import {
   RECORDING_LIMIT_MS,
   RECORDING_UPLOAD_LIMIT_BYTES,
@@ -27,6 +30,60 @@ export type CapturePhase =
   | "extracting" // transcript in hand, waiting on the LLM
   | "review" // structured draft ready for human confirmation
   | "error";
+
+/**
+ * What the live preview is doing, which is not what the capture is doing.
+ *
+ * Deliberately its own axis rather than more `CapturePhase` values: the
+ * recording of record is the MediaRecorder blob, and it survives every one of
+ * these. A doctor looking at an empty dock has three quite different situations
+ * to tell apart — "give it a second", "you are being recorded but the words
+ * will only appear at the end", and "stop, this is not working" — and only the
+ * last of those is a `phase` of `"error"`.
+ */
+export type LiveTranscriptStatus =
+  /** No live socket for this capture: not configured, or nothing started yet. */
+  | "off"
+  /** Dialling, or redialling after a drop. Text may still start appearing. */
+  | "connecting"
+  /** Words are flowing. */
+  | "live"
+  /** Live text has given up. The recording has not. */
+  | "unavailable";
+
+export interface LiveTranscriptState {
+  status: LiveTranscriptStatus;
+  /**
+   * Doctor-facing sentence for `unavailable`, null otherwise.
+   *
+   * Written here rather than in the socket because the socket knows close codes
+   * and this layer knows what a doctor mid-consultation can do about them.
+   * Every one of these says the recording is unaffected, because the single
+   * most expensive misreading of an empty dock is "it did not hear me" followed
+   * by a repeated consultation.
+   */
+  note: string | null;
+}
+
+// Shared constants rather than fresh objects, so a redial that changes nothing
+// does not hand a memoised dock a new identity ten times a recording.
+const LIVE_TRANSCRIPT_OFF: LiveTranscriptState = { status: "off", note: null };
+const LIVE_TRANSCRIPT_CONNECTING: LiveTranscriptState = { status: "connecting", note: null };
+const LIVE_TRANSCRIPT_LIVE: LiveTranscriptState = { status: "live", note: null };
+
+/** The recording keeps going in every branch — say so in every branch. */
+function unavailableNote(reason: LiveTranscriptUnavailableReason): string {
+  switch (reason) {
+    case "unauthorised":
+      return "Live text stopped because this sign-in could not be verified. The recording is still running and will be transcribed when you press stop — sign in again to bring live text back.";
+    case "rate-limited":
+      return "Live text is off because the hourly transcription limit was reached. The recording is still running; if the transcript is refused too, you can retry it from this screen.";
+    case "service":
+      return "The live transcription service is not responding. The recording is still running and will be transcribed when you press stop.";
+    case "unreachable":
+      return "Live text cannot reach the transcription service on this connection. The recording is still running and will be transcribed when you press stop.";
+  }
+}
 
 export interface CaptureDraft {
   encounterId: string;
@@ -120,7 +177,14 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
   // whatever happens to the socket. So this never moves the state machine — it
   // exists only so the dock can stop claiming to be listening for words it can
   // no longer hear.
-  const [liveTextUnavailable, setLiveTextUnavailable] = useState(false);
+  //
+  // That separation is the whole guarantee that a lost preview cannot lose the
+  // dictation, so it is structural rather than a matter of care: nothing that
+  // writes this field also touches `phase`, `recorderRef` or `process`, and the
+  // path from stop to a filed visit — `recorder.stop()` → upload → extract —
+  // never reads it. A socket that fails on the first frame and one that never
+  // fails produce byte-identical uploads.
+  const [liveTranscript, setLiveTranscript] = useState<LiveTranscriptState>(LIVE_TRANSCRIPT_OFF);
 
   const recorderRef = useRef<VoiceRecorder | null>(null);
   const socketRef = useRef<LiveTranscriptSocket | null>(null);
@@ -161,7 +225,7 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
     // The indicator described a recording that is now over. Carrying it into
     // the review sheet would read as a warning about the draft, which it is
     // not: the draft comes from the uploaded audio, not from the live socket.
-    setLiveTextUnavailable(false);
+    setLiveTranscript(LIVE_TRANSCRIPT_OFF);
   }, []);
 
   const start = useCallback(async () => {
@@ -177,7 +241,7 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
     setFinalText("");
     finalTextRef.current = "";
     setElapsedMs(0);
-    setLiveTextUnavailable(false);
+    setLiveTranscript(LIVE_TRANSCRIPT_OFF);
     setPhase("arming");
 
     const recorder = new VoiceRecorder({
@@ -193,7 +257,13 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
         // not a hard error: the MediaRecorder branch is untouched and the
         // recording the chart is built from is being written as normal.
         if (!aliveRef.current) return;
-        setLiveTextUnavailable(true);
+        // No reason code from the socket, because the socket is fine — this
+        // browser could not build the feed into it, and there is nothing the
+        // doctor can do about that mid-consultation but keep talking.
+        setLiveTranscript({
+          status: "unavailable",
+          note: "Live text is off for this recording. The recording is still running and will be transcribed when you press stop.",
+        });
         // Nothing will ever be sent down it now, and an idle authenticated
         // socket still holds an upstream connection the clinic is paying for.
         socketRef.current?.close();
@@ -225,16 +295,36 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
 
           // A dead feed and a quiet room produce an identical dock — "Listening…"
           // and no text — and the doctor cannot tell which one they are looking
-          // at. The socket has already worked out which it is by the time it
-          // says `unavailable`, having spent its retries; carry that through.
-          if (event.state === "unavailable") setLiveTextUnavailable(true);
-          // A reconnect that lands means interim text is flowing again.
-          if (event.state === "open") setLiveTextUnavailable(false);
-          // `connecting` is the socket still trying, which is what the plain
-          // "Listening…" placeholder already conveys. `closed` only ever follows
-          // our own teardown, which has already decided what the dock shows
-          // next — and acting on it here would wipe the indicator the worklet
-          // failure above just set before the doctor could read it.
+          // at. Everything below only ever writes the preview's own state; none
+          // of it can reach the recording.
+          if (event.state === "connecting") {
+            // Includes redials, so this is also how a dropped socket reads
+            // while it is being replaced. Honest either way: text has stopped
+            // arriving and may resume.
+            setLiveTranscript(LIVE_TRANSCRIPT_CONNECTING);
+          } else if (event.state === "open") {
+            // A reconnect that lands means interim text is flowing again.
+            setLiveTranscript(LIVE_TRANSCRIPT_LIVE);
+          } else if (event.state === "unavailable") {
+            // The socket has already worked out which failure this is by the
+            // time it says so, having spent its retries; carry the reason
+            // through rather than flattening it back to a boolean here.
+            //
+            // Same failure twice is normal — the proxy announces an upstream
+            // outage and then closes on it — so hold the object identity, or a
+            // dock that has just started showing the note re-renders under the
+            // doctor as they read it.
+            const note = unavailableNote(event.reason);
+            setLiveTranscript((current) =>
+              current.status === "unavailable" && current.note === note
+                ? current
+                : { status: "unavailable", note },
+            );
+          }
+          // `closed` is deliberately not handled. It only ever follows our own
+          // teardown, which has already decided what the dock shows next — and
+          // acting on it here would wipe the indicator the worklet failure
+          // above just set before the doctor could read it.
         },
       });
       socketRef.current = socket;
@@ -507,12 +597,18 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
     draft,
     error,
     /**
-     * The live transcript has given up for this recording — the proxy is
-     * unreachable or the PCM worklet never loaded. The capture itself is
-     * unaffected, so this belongs next to "Listening…" as a note, not as an
-     * error and never as colour alone.
+     * The live preview's own state, and the sentence to show when it has
+     * failed. The capture itself is unaffected by all of it, so this belongs
+     * next to "Listening…" as a note, not as an error and never as colour
+     * alone. `phase === "error"` remains the only thing that means the
+     * recording failed.
      */
-    liveTextUnavailable,
+    liveTranscript,
+    /**
+     * Kept for callers that only need "is the preview dead". Derived, so it
+     * cannot drift from the state above.
+     */
+    liveTextUnavailable: liveTranscript.status === "unavailable",
     canRetryTranscription: Boolean(retryRecording),
     approachingLimit: phase === "listening" && elapsedMs > RECORDING_WARNING_MS,
     remainingMs: Math.max(0, RECORDING_LIMIT_MS - elapsedMs),

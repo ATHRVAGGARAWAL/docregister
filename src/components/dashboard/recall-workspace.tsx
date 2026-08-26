@@ -16,11 +16,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
 
-const suggestions = [
-  "What did I prescribe last time?",
-  "Show recent visits for Sunita",
-  "When was Amit's last follow-up?",
-];
+/**
+ * Prompts to get a doctor started, built from names that are actually in their
+ * register.
+ *
+ * These were previously hardcoded to "Sunita" and "Amit". Every doctor who is
+ * not the demo clinic tapped one and got "No patient named Sunita is in your
+ * register" — a feature introducing itself by failing. A suggestion has to be
+ * answerable or it should not carry a name at all, so the name-bearing prompts
+ * only appear once there is a real name to put in them.
+ */
+function buildSuggestions(names: string[]): string[] {
+  const base = ["What did I prescribe last time?"];
+  const [first, second] = names;
+  if (first) base.push(`Show recent visits for ${first}`);
+  if (second) base.push(`When did I last see ${second}?`);
+  // Nothing in the register yet: keep a third prompt that needs no name, so the
+  // row does not look half-empty on a new account.
+  if (base.length === 1) base.push("Which patients did I see this week?");
+  return base;
+}
 
 export function RecallWorkspace({
   question,
@@ -29,6 +44,7 @@ export function RecallWorkspace({
   onAsk,
   onDismiss,
   onPickPatient,
+  recentPatientNames,
   onOpenPatient,
   onRecordAsVisit,
 }: {
@@ -38,6 +54,8 @@ export function RecallWorkspace({
   onAsk: (question: string) => void;
   onDismiss: () => void;
   onPickPatient: (patientId: string) => void;
+  /** Distinct patient names from the register, most recent first. */
+  recentPatientNames: string[];
   onOpenPatient: (patient: PatientMatch) => void;
   /** Set only while the question on screen was spoken rather than typed. */
   onRecordAsVisit?: () => void;
@@ -96,15 +114,20 @@ export function RecallWorkspace({
           </form>
           <div className="no-scrollbar -mx-1 mt-3 flex items-center gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:mt-4 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
             <span className="mr-1 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Try</span>
-            {suggestions.map((suggestion) => (
+            {buildSuggestions(recentPatientNames).map((suggestion) => (
               <button
                 key={suggestion}
                 type="button"
+                // `/api/recall` is a paid model call metered at 60/hour. Without
+                // this, three impatient taps are three unsequenced POSTs racing
+                // to render into the same panel, and the doctor spends three
+                // units of their hourly ceiling to read one answer.
+                disabled={loading}
                 onClick={() => {
                   setDraft(suggestion);
                   onAsk(suggestion);
                 }}
-                className="shrink-0 touch-manipulation rounded-full border border-border bg-secondary px-3 py-1.5 text-xs text-muted-foreground transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11"
+                className="shrink-0 touch-manipulation rounded-full border border-border bg-secondary px-3 py-1.5 text-xs text-muted-foreground transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [@media(pointer:coarse)]:min-h-11"
               >
                 {suggestion}
               </button>

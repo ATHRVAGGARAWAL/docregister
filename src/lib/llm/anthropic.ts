@@ -5,9 +5,9 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type * as z from "zod/v4";
 
 import { env } from "@/lib/env";
-import { LLM_TIMEOUT_MS } from "./types";
 import {
   LlmError,
+  type LlmCallOptions,
   type LlmProvider,
   type StructuredRequest,
   type StructuredResult,
@@ -41,11 +41,14 @@ function getClient(): Anthropic {
   if (!client) {
     client = new Anthropic({
       apiKey: env.anthropicApiKey,
-      // The SDK defaults to a 10-minute timeout and its own retries. Both are
-      // wrong here: the route dies at `maxDuration = 60` regardless, so a longer
-      // budget just means the doctor waits for a failure that was already
-      // certain. Retries are handled one level up, where they can fail over.
-      timeout: LLM_TIMEOUT_MS,
+      // The SDK's own retries are off because they are invisible to the policy
+      // in `index.ts`: they would spend that call's entire budget inside what
+      // looks from above like a single attempt, and they decide on status alone
+      // — including the refusals this app must not send a second time.
+      //
+      // Its 10-minute default timeout is not set here but per request, because
+      // the deadline depends on the tier and on how much of the call's budget
+      // the previous attempt already spent.
       maxRetries: 0,
     });
   }
@@ -55,34 +58,40 @@ function getClient(): Anthropic {
 export class AnthropicProvider implements LlmProvider {
   readonly name = "anthropic";
 
-  async generate<T>(request: StructuredRequest<T>): Promise<StructuredResult<T>> {
+  async generate<T>(
+    request: StructuredRequest<T>,
+    options: LlmCallOptions,
+  ): Promise<StructuredResult<T>> {
     const model = modelFor(request.tier);
 
     let message;
     try {
-      message = await getClient().messages.parse({
-        model,
-        max_tokens: request.maxOutputTokens,
-        // Adaptive thinking: numeral conversion across three languages and
-        // drug disambiguation genuinely benefit from it, and it costs nothing
-        // on the easy dictations. `budget_tokens` is a 400 on this family.
-        thinking: { type: "adaptive" },
-        system: [
-          {
-            type: "text",
-            text: request.system,
-            // The cache breakpoint. Everything above it is byte-identical on
-            // every request; everything per-encounter is in the user turn.
-            cache_control: { type: "ephemeral" },
-          },
-        ],
-        messages: [{ role: "user", content: request.user }],
-        // `schemaName` is Gemini-side labelling; this SDK derives the name
-        // from the Zod schema itself and takes no second argument.
-        output_config: { format: zodOutputFormat(request.schema as z.ZodType<T, unknown>) },
-      });
+      message = await getClient().messages.parse(
+        {
+          model,
+          max_tokens: request.maxOutputTokens,
+          // Adaptive thinking: numeral conversion across three languages and
+          // drug disambiguation genuinely benefit from it, and it costs nothing
+          // on the easy dictations. `budget_tokens` is a 400 on this family.
+          thinking: { type: "adaptive" },
+          system: [
+            {
+              type: "text",
+              text: request.system,
+              // The cache breakpoint. Everything above it is byte-identical on
+              // every request; everything per-encounter is in the user turn.
+              cache_control: { type: "ephemeral" },
+            },
+          ],
+          messages: [{ role: "user", content: request.user }],
+          // `schemaName` is Gemini-side labelling; this SDK derives the name
+          // from the Zod schema itself and takes no second argument.
+          output_config: { format: zodOutputFormat(request.schema as z.ZodType<T, unknown>) },
+        },
+        { timeout: options.timeoutMs },
+      );
     } catch (error) {
-      throw translate(error);
+      throw translate(error, model, options.timeoutMs);
     }
 
     // `parsed_output` is nullable — a refusal or a max-tokens stop leaves it
@@ -108,7 +117,19 @@ export class AnthropicProvider implements LlmProvider {
   }
 }
 
-function translate(error: unknown): LlmError {
+function translate(error: unknown, model: string, timeoutMs: number): LlmError {
+  // Ahead of the `APIError` branch it extends, or a stall would be filed as a
+  // status-less provider error. Retryable: a connection that goes quiet says
+  // nothing about the request, and the next attempt usually lands on a
+  // different edge node — the same reasoning the STT layer already applies.
+  if (error instanceof Anthropic.APIConnectionTimeoutError) {
+    return new LlmError(
+      `${model} did not answer within ${timeoutMs}ms.`,
+      "timeout",
+      true,
+    );
+  }
+
   if (error instanceof Anthropic.APIError) {
     const status = error.status ?? 0;
     if (status === 401 || status === 403) {

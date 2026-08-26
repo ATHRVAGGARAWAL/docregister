@@ -17,6 +17,19 @@ export const SARVAM_SYNC_LIMIT_MS = 29_000;
 const MODEL = "saaras:v3";
 
 /**
+ * Budget for the romanisation pass, deliberately well under `STT_TIMEOUT_MS`.
+ *
+ * `romanise` is a second full transcription of the same audio, and it runs
+ * *after* the transcript of record has already come back. Given the primary
+ * budget it could spend another 20s of the route's 60s, and a request killed at
+ * `maxDuration` dies before `create_transcript_workflow` runs — so a stalled
+ * transliteration would throw away a transcription that had already succeeded.
+ * The worst case here must be a missing romanisation, never a missing
+ * transcript, and 8s is enough for a pass that normally returns in two or three.
+ */
+const ROMANISE_TIMEOUT_MS = 8_000;
+
+/**
  * Sarvam AI — default provider.
  *
  * Chosen for measured Hindi 5.0 / Punjabi 11.2 WER (best of any engine tested)
@@ -36,6 +49,13 @@ export class SarvamProvider implements SttProvider {
   readonly supportsLive = true;
 
   async transcribe(input: TranscribeInput): Promise<TranscribeResult> {
+    return this.requestTranscript(input, STT_TIMEOUT_MS);
+  }
+
+  private async requestTranscript(
+    input: TranscribeInput,
+    timeoutMs: number,
+  ): Promise<TranscribeResult> {
     if (input.durationMs && input.durationMs > SARVAM_SYNC_LIMIT_MS) {
       throw new SttError(
         `Recording is ${Math.round(input.durationMs / 1000)}s; the Sarvam sync ` +
@@ -75,7 +95,7 @@ export class SarvamProvider implements SttProvider {
         method: "POST",
         headers: { "api-subscription-key": env.sarvamApiKey },
         body: form,
-        signal: AbortSignal.timeout(STT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "TimeoutError") {
@@ -99,11 +119,27 @@ export class SarvamProvider implements SttProvider {
       );
     }
 
-    const json = (await response.json()) as {
+    // `fetch` resolves once the headers land; the body is still streaming. A
+    // provider that answers 200 and then stalls, or that is fronted by a proxy
+    // returning an HTML error page, fails here rather than above — and this
+    // used to throw a raw DOMException/SyntaxError past every `SttError`
+    // handler, so `transcribeWithFailover` could not see it was retryable and
+    // the encounter died instead of failing over. The timeout signal covers
+    // this read too; it just surfaces at a different line.
+    let json: {
       transcript?: string;
       language_code?: string;
       diarized_transcript?: unknown;
     };
+    try {
+      json = await response.json();
+    } catch (cause) {
+      throw new SttError(
+        `Sarvam's response did not complete: ${String(cause)}`,
+        "provider_error",
+        true,
+      );
+    }
 
     const text = (json.transcript ?? "").trim();
     if (!text) {
@@ -129,7 +165,10 @@ export class SarvamProvider implements SttProvider {
    */
   async romanise(input: TranscribeInput): Promise<string | undefined> {
     try {
-      const result = await this.transcribe({ ...input, mode: "translit" });
+      const result = await this.requestTranscript(
+        { ...input, mode: "translit" },
+        ROMANISE_TIMEOUT_MS,
+      );
       return result.text;
     } catch {
       // Purely a nicety — never fail the encounter over it.
