@@ -3,7 +3,6 @@
 export interface DailyPoint {
   /** ISO date in IST, e.g. "2026-08-24". Never a timestamp — these are buckets. */
   day: string;
-  revenue_inr: number;
   patient_count: number;
   new_patients: number;
   returning_patients: number;
@@ -16,7 +15,7 @@ export interface AnalyticsPayload {
   series: DailyPoint[];
   totals: Omit<DailyPoint, "day">;
   today: DailyPoint | null;
-  deltas: { revenue: number | null; patients: number | null };
+  deltas: { patients: number | null };
 }
 
 export interface RegisterEntry {
@@ -27,7 +26,6 @@ export interface RegisterEntry {
   age_years: number | null;
   diagnosis: string | null;
   treatment: string | null;
-  fees_inr: number | null;
   is_new_patient: boolean | null;
   visit_number: number | null;
   status: "draft" | "committed" | "discarded";
@@ -50,7 +48,6 @@ export interface PatientHistoryEncounter {
   age_years: number | null;
   diagnosis: string | null;
   treatment: string | null;
-  fees_inr: number | null;
   visit_number: number | null;
   doctor_name: string | null;
   prescription: PatientHistoryPrescription[];
@@ -114,7 +111,6 @@ export interface VisitDetailsPayload {
     age_years: number | null;
     diagnosis: string | null;
     treatment: string | null;
-    fees_inr: number | null;
     visit_number: number | null;
     is_new_patient: boolean | null;
     prescription: VisitPrescriptionItem[];
@@ -136,9 +132,43 @@ export interface VisitDetailsPayload {
       age_years: number | null;
       diagnosis: string | null;
       treatment: string | null;
-      fees_inr: number | null;
       prescription: VisitPrescriptionItem[];
     };
   };
   amendments: VisitAmendment[];
+}
+
+export type AccountEntryKind = "income" | "expense";
+export type AccountEntryStatus = "paid" | "pending";
+export type AccountPaymentMethod = "cash" | "upi" | "card" | "bank_transfer" | "other";
+
+export interface AccountEntry {
+  id: string;
+  kind: AccountEntryKind;
+  status: AccountEntryStatus;
+  amount_paise: number;
+  currency: "INR";
+  category: string;
+  payment_method: AccountPaymentMethod | null;
+  counterparty: string | null;
+  note: string | null;
+  patient_id: string | null;
+  encounter_id: string | null;
+  source: string;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccountSummary {
+  received_paise: number;
+  pending_paise: number;
+  expenses_paise: number;
+  net_paise: number;
+}
+
+export interface AccountsPayload {
+  entries: AccountEntry[];
+  summary: AccountSummary;
+  totalCount: number;
 }

@@ -217,14 +217,13 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
   // Encounter fields and prescription rows are replaced in one transaction.
   // The function derives tenant/doctor identity from auth.uid() and refuses to
   // overwrite another doctor's row, even inside the same clinic.
-  const { error: saveError } = await callWorkflow<unknown>(supabase, "save_extracted_draft", {
+  const { error: saveError } = await callWorkflow<unknown>(supabase, "save_clinical_draft", {
     p_encounter_id: encounterId,
     p_transcript_id: transcriptId,
     p_patient_name_spoken: extraction.patient_name,
     p_age_years: extraction.age_years,
     p_diagnosis: extraction.diagnosis,
     p_treatment: extraction.treatment,
-    p_fees_inr: extraction.fees_inr,
     p_extracted_raw: extraction as unknown as Json,
     p_low_confidence_fields: [
       ...new Set([...extraction.uncertain_fields, ...issues.map((issue) => issue.field)]),

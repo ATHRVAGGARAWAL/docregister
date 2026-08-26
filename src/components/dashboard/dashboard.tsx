@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { BookOpenCheckIcon, CalendarDaysIcon } from "lucide-react";
 
+import { AccountsWorkspace } from "@/components/accounts/accounts-workspace";
 import { AppNavigation, type AppView } from "@/components/dashboard/app-navigation";
 import { OverviewView } from "@/components/dashboard/overview-view";
 import { RecallWorkspace } from "@/components/dashboard/recall-workspace";
@@ -36,7 +37,8 @@ const viewTitles: Record<AppView, string> = {
   register: "Patient register",
   patients: "Patient directory",
   recall: "Patient recall",
-  settings: "Account & settings",
+  accounts: "Accounts",
+  settings: "Settings",
 };
 
 type RegisterStatus = "all" | "committed" | "draft";
@@ -87,11 +89,8 @@ export function Dashboard({
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [registerTotals, setRegisterTotals] = useState({
     count: 0,
-    fees: 0,
     committedCount: initialEntries.filter((entry) => entry.status === "committed").length,
-    committedFees: initialEntries.filter((entry) => entry.status === "committed").reduce((sum, entry) => sum + (entry.fees_inr ?? 0), 0),
     draftCount: initialEntries.filter((entry) => entry.status === "draft").length,
-    draftFees: initialEntries.filter((entry) => entry.status === "draft").reduce((sum, entry) => sum + (entry.fees_inr ?? 0), 0),
   });
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [chartPatient, setChartPatient] = useState<PatientMatch | null>(null);
@@ -192,22 +191,16 @@ export function Dashboard({
       const payload = (await getJson(`/api/register?${params}`)) as {
         entries?: RegisterEntry[];
         totalCount?: number;
-        totalFees?: number;
         committedCount?: number;
-        committedFees?: number;
         draftCount?: number;
-        draftFees?: number;
       };
       if (ticket !== registerTicket.current) return;
       setRegisterEntries(payload.entries ?? []);
       setRegisterOffset(offset);
       setRegisterTotals({
         count: payload.totalCount ?? 0,
-        fees: payload.totalFees ?? 0,
         committedCount: payload.committedCount ?? 0,
-        committedFees: payload.committedFees ?? 0,
         draftCount: payload.draftCount ?? 0,
-        draftFees: payload.draftFees ?? 0,
       });
     } catch (error) {
       if (ticket !== registerTicket.current) return;
@@ -557,11 +550,8 @@ export function Dashboard({
                 <RegisterWorkspace
                   entries={registerEntries}
                   totalCount={registerTotals.count}
-                  totalFees={registerTotals.fees}
                   committedCount={registerTotals.committedCount}
-                  committedFees={registerTotals.committedFees}
                   draftCount={registerTotals.draftCount}
-                  draftFees={registerTotals.draftFees}
                   offset={registerOffset}
                   limit={registerLimit}
                   hasMore={registerOffset + registerLimit < registerTotals.count}
@@ -631,6 +621,7 @@ export function Dashboard({
                   onRecordAsVisit={spokenQuestion ? recordSpokenAsVisit : undefined}
                 />
               )}
+              {view === "accounts" && <AccountsWorkspace />}
               {view === "settings" && (
                 <SettingsWorkspace
                   profile={profile}
@@ -784,7 +775,7 @@ function initialUrlState(): {
   }
   const params = new URLSearchParams(window.location.search);
   const rawView = params.get("view");
-  const view: AppView = rawView === "register" || rawView === "patients" || rawView === "recall" || rawView === "settings" ? rawView : "overview";
+  const view: AppView = rawView === "register" || rawView === "patients" || rawView === "recall" || rawView === "accounts" || rawView === "settings" ? rawView : "overview";
   const rawStatus = params.get("status");
   const status: RegisterStatus = rawStatus === "committed" || rawStatus === "draft" ? rawStatus : "all";
   const daysValue = Number(params.get("days"));

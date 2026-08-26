@@ -5,12 +5,11 @@ import { searchRegister } from "@/lib/register";
 
 /**
  * GET /api/register?days=30&q=&status=committed|draft&limit=50&offset=0
- * -> { entries, totalCount, totalFees, committed/draft totals, pagination }
+ * -> { entries, totalCount, committed/draft totals, pagination }
  *
  * Filtering happens in Postgres. An earlier version loaded a capped page and
  * filtered it here, so a search silently never looked past the newest 300
- * encounters and the workspace's rupee total was the sum of that page rather
- * than of the query.
+ * encounters and the totals described the page rather than the query.
  */
 export const GET = withDoctor(async ({ doctor, supabase, request }) => {
   const url = new URL(request.url);

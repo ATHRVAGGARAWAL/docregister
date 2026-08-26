@@ -5,7 +5,6 @@ import {
   CalendarDaysIcon,
   CheckIcon,
   ClipboardListIcon,
-  IndianRupeeIcon,
   LoaderCircleIcon,
   PencilIcon,
   PillIcon,
@@ -32,7 +31,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
-import { formatClock, formatINR, maskPhone } from "@/lib/format";
+import { formatClock, maskPhone } from "@/lib/format";
 import type { PatientHistoryEncounter, PatientHistoryPayload } from "@/lib/types";
 
 export function PatientHistorySheet({
@@ -90,7 +89,6 @@ export function PatientHistorySheet({
   const totals = useMemo(() => {
     const encounters = history?.encounters ?? [];
     return {
-      fees: encounters.reduce((sum, encounter) => sum + (encounter.fees_inr ?? 0), 0),
       diagnoses: new Set(
         encounters
           .map((encounter) => encounter.diagnosis?.trim())
@@ -213,9 +211,9 @@ export function PatientHistorySheet({
                   }
                 />
                 <SummaryCard
-                  icon={IndianRupeeIcon}
-                  label="Recorded fees"
-                  value={formatINR(totals.fees)}
+                  icon={StethoscopeIcon}
+                  label="Distinct diagnoses"
+                  value={String(totals.diagnoses)}
                 />
               </section>
 
@@ -426,11 +424,6 @@ function VisitCard({ encounter }: { encounter: PatientHistoryEncounter }) {
                 <Badge variant="outline">Visit {encounter.visit_number}</Badge>
               )}
             </div>
-            {encounter.fees_inr !== null && (
-              <span className="tnum text-sm font-semibold text-money">
-                {formatINR(encounter.fees_inr)}
-              </span>
-            )}
           </header>
 
           <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">

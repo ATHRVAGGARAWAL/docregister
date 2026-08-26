@@ -3,7 +3,7 @@
 import { motion } from "motion/react";
 
 import { CountUp } from "@/components/reactbits/count-up";
-import { formatCount, formatINR } from "@/lib/format";
+import { formatCount } from "@/lib/format";
 import type { AnalyticsPayload } from "@/lib/types";
 
 /**
@@ -20,7 +20,6 @@ import type { AnalyticsPayload } from "@/lib/types";
 export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
   const today = analytics.today;
   const seen = today?.patient_count ?? 0;
-  const averageFee = seen > 0 ? Math.round((today?.revenue_inr ?? 0) / seen) : 0;
 
   const tiles = [
     {
@@ -48,18 +47,10 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
       swatch: "var(--chart-2)",
     },
     {
-      // The figure is today's revenue over today's visits, so the label and the
-      // hint both have to say today. This read "Average fee" over "N visits
-      // this period", which put two different windows in one tile and made the
-      // period count look like the denominator of the figure above it.
-      label: "Average fee today",
-      value: averageFee,
-      format: formatINR,
-      money: true,
-      hint:
-        seen > 0
-          ? `across ${formatCount(seen)} visit${seen === 1 ? "" : "s"} today`
-          : "No visits recorded yet today",
+      label: "Visits in range",
+      value: analytics.totals.patient_count,
+      format: formatCount,
+      hint: `${formatCount(analytics.totals.new_patients)} new · ${formatCount(analytics.totals.returning_patients)} returning`,
     },
   ];
 
@@ -89,9 +80,7 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
           </div>
 
           <p
-            className={`tnum mt-2 text-2xl font-semibold tracking-tight ${
-              tile.money ? "text-primary" : "text-foreground"
-            }`}
+            className="tnum mt-2 text-2xl font-semibold tracking-tight text-foreground"
           >
             <CountUp
               to={tile.value}

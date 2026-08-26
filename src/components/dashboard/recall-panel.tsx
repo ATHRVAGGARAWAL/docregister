@@ -6,7 +6,7 @@ import { ChevronRightIcon, Loader2, Quote, TriangleAlert, UserRoundIcon, X } fro
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
-import { formatDayLong, formatINR } from "@/lib/format";
+import { formatDayLong } from "@/lib/format";
 import type { RecallQuery } from "@/lib/llm/schema";
 
 export interface RecallResult {
@@ -17,7 +17,6 @@ export interface RecallResult {
     id: string;
     occurred_at: string;
     diagnosis: string | null;
-    fees_inr: number | null;
     patient_name: string;
     prescription: { drug_name: string; strength: string | null; frequency: string | null }[];
   }[];
@@ -152,7 +151,7 @@ export function RecallPanel({
               colour-only encoding the confidence badge below refuses. The word
               carries the meaning; the tint and the icon only reinforce it. */}
           {result.caveat && (
-            <p className="text-money mt-2 flex items-start gap-1.5 text-xs" role="note">
+            <p className="text-warning mt-2 flex items-start gap-1.5 text-xs" role="note">
               <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
               <span>
                 <span className="font-medium">Caveat:</span> {result.caveat}
@@ -210,11 +209,6 @@ export function RecallPanel({
                         <span className="text-foreground"> · {encounter.diagnosis}</span>
                       )}
                     </span>
-                    {encounter.fees_inr !== null && (
-                      <span className="text-money tnum shrink-0">
-                        {formatINR(encounter.fees_inr)}
-                      </span>
-                    )}
                   </div>
                   {encounter.prescription.length > 0 && (
                     <p className="text-muted-foreground mt-0.5">

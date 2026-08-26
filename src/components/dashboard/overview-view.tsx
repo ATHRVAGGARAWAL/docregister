@@ -6,7 +6,7 @@ import { MixChart } from "@/components/charts/mix-chart";
 import { VolumeChart } from "@/components/charts/volume-chart";
 import { RegisterTimeline } from "@/components/dashboard/register-timeline";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { RevenueHero } from "@/components/dashboard/revenue-hero";
+import { VisitHero } from "@/components/dashboard/visit-hero";
 import { StatRail } from "@/components/dashboard/stat-rail";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -69,10 +69,10 @@ export function OverviewView({
         </Button>
       </section>
 
-      <RevenueHero
+      <VisitHero
         series={analytics.series}
-        todayRevenue={analytics.today?.revenue_inr ?? 0}
-        delta={analytics.deltas.revenue}
+        todayVisits={analytics.today?.patient_count ?? 0}
+        delta={analytics.deltas.patients}
       />
 
       <StatRail analytics={analytics} />
@@ -81,7 +81,7 @@ export function OverviewView({
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold tracking-tight">Clinic trends</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">Revenue and visit mix over time</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Patient volume and visit mix over time</p>
           </div>
           <div className="inline-flex rounded-lg border border-border bg-secondary/60 p-1" role="group" aria-label="Analytics range">
             {RANGES.map((option) => (

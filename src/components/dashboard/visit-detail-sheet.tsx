@@ -17,11 +17,10 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { formatClock, formatINR } from "@/lib/format";
+import { formatClock } from "@/lib/format";
 import type { VisitDetailsPayload } from "@/lib/types";
 
 export function VisitDetailSheet({
@@ -39,7 +38,7 @@ export function VisitDetailSheet({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reason, setReason] = useState("");
-  const [form, setForm] = useState({ diagnosis: "", treatment: "", fees: "" });
+  const [form, setForm] = useState({ diagnosis: "", treatment: "" });
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,7 +53,6 @@ export function VisitDetailSheet({
         setForm({
           diagnosis: data.encounter.effective.diagnosis ?? "",
           treatment: data.encounter.effective.treatment ?? "",
-          fees: data.encounter.effective.fees_inr?.toString() ?? "",
         });
       })
       .catch((cause: unknown) => {
@@ -73,7 +71,6 @@ export function VisitDetailSheet({
     setForm({
       diagnosis: encounter.effective.diagnosis ?? "",
       treatment: encounter.effective.treatment ?? "",
-      fees: encounter.effective.fees_inr?.toString() ?? "",
     });
     setReason("");
     setFormError(null);
@@ -89,14 +86,6 @@ export function VisitDetailSheet({
     const changes: Record<string, unknown> = {};
     if (form.diagnosis !== (encounter.effective.diagnosis ?? "")) changes.diagnosis = form.diagnosis.trim() || null;
     if (form.treatment !== (encounter.effective.treatment ?? "")) changes.treatment = form.treatment.trim() || null;
-    const originalFees = encounter.effective.fees_inr === null ? "" : String(encounter.effective.fees_inr);
-    if (form.fees !== originalFees) {
-      if (form.fees.trim() === "") changes.fees_inr = null;
-      else if (!Number.isFinite(Number(form.fees)) || Number(form.fees) < 0) {
-        setFormError("Fees must be a non-negative number.");
-        return;
-      } else changes.fees_inr = Number(form.fees);
-    }
     if (Object.keys(changes).length === 0) {
       setFormError("Change at least one value before recording a correction.");
       return;
@@ -159,19 +148,15 @@ export function VisitDetailSheet({
                 </div>
                 {editing ? (
                   <div className="mt-4 space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2"><Label htmlFor="visit-diagnosis">Diagnosis</Label><Textarea id="visit-diagnosis" value={form.diagnosis} onChange={(event) => setForm((current) => ({ ...current, diagnosis: event.target.value }))} /></div>
-                      <div className="space-y-2"><Label htmlFor="visit-fees">Fees (₹)</Label><Input id="visit-fees" inputMode="decimal" value={form.fees} onChange={(event) => setForm((current) => ({ ...current, fees: event.target.value }))} /></div>
-                    </div>
+                    <div className="space-y-2"><Label htmlFor="visit-diagnosis">Diagnosis</Label><Textarea id="visit-diagnosis" value={form.diagnosis} onChange={(event) => setForm((current) => ({ ...current, diagnosis: event.target.value }))} /></div>
                     <div className="space-y-2"><Label htmlFor="visit-treatment">Treatment / advice</Label><Textarea id="visit-treatment" value={form.treatment} onChange={(event) => setForm((current) => ({ ...current, treatment: event.target.value }))} /></div>
-                    <div className="space-y-2"><Label htmlFor="visit-reason">Reason for correction <span className="text-destructive">*</span></Label><Textarea id="visit-reason" required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Corrected the fee after checking the receipt" /></div>
+                    <div className="space-y-2"><Label htmlFor="visit-reason">Reason for correction <span className="text-destructive">*</span></Label><Textarea id="visit-reason" required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Clarified the diagnosis after reviewing the note" /></div>
                     {formError && <p className="text-sm text-destructive">{formError}</p>}
                     <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button><Button type="button" onClick={() => void saveCorrection()} disabled={saving}>{saving && <LoaderCircleIcon className="animate-spin" aria-hidden />}Record correction</Button></div>
                   </div>
                 ) : (
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="mt-4 grid gap-4">
                     <Detail label="Diagnosis" value={encounter.effective.diagnosis} />
-                    <Detail label="Fees" value={encounter.effective.fees_inr === null ? "Not recorded" : formatINR(encounter.effective.fees_inr)} />
                     <Detail label="Treatment / advice" value={encounter.effective.treatment} wide />
                   </div>
                 )}
@@ -179,7 +164,7 @@ export function VisitDetailSheet({
 
               <section className="rounded-xl border border-border bg-card p-5"><p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground"><PillIcon className="size-3.5" aria-hidden />Prescription</p>{encounter.effective.prescription.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No medicines recorded.</p> : <ul className="mt-3 divide-y divide-border">{encounter.effective.prescription.map((item, index) => <li key={item.id ?? `${item.drug_name}-${index}`} className="py-3 first:pt-0 last:pb-0"><p className="font-medium">{item.drug_name}{item.strength ? ` · ${item.strength}` : ""}</p><p className="mt-1 text-xs text-muted-foreground">{[item.form, item.frequency_label ?? item.frequency_spoken, item.duration, item.instructions].filter(Boolean).join(" · ") || "Instructions not recorded"}</p></li>)}</ul>}</section>
 
-              {encounter.transcript && <section className="rounded-xl border border-border bg-card p-5"><p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground"><FileTextIcon className="size-3.5" aria-hidden />Transcript evidence {encounter.transcript.degraded && <Badge variant="money">Fallback transcription</Badge>}</p><p className="mt-3 whitespace-pre-wrap text-sm leading-6">{encounter.transcript.raw_text}</p>{encounter.transcript.roman_text && <details className="mt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Romanised transcript</summary><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{encounter.transcript.roman_text}</p></details>}<p className="mt-3 text-xs text-muted-foreground">{encounter.transcript.provider}{encounter.transcript.language_code ? ` · ${encounter.transcript.language_code}` : ""}{encounter.transcript.confidence === null ? "" : ` · ${Math.round(encounter.transcript.confidence * 100)}% confidence`}</p></section>}
+              {encounter.transcript && <section className="rounded-xl border border-border bg-card p-5"><p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground"><FileTextIcon className="size-3.5" aria-hidden />Transcript evidence {encounter.transcript.degraded && <Badge variant="warning">Fallback transcription</Badge>}</p><p className="mt-3 whitespace-pre-wrap text-sm leading-6">{encounter.transcript.raw_text}</p>{encounter.transcript.roman_text && <details className="mt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Romanised transcript</summary><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{encounter.transcript.roman_text}</p></details>}<p className="mt-3 text-xs text-muted-foreground">{encounter.transcript.provider}{encounter.transcript.language_code ? ` · ${encounter.transcript.language_code}` : ""}{encounter.transcript.confidence === null ? "" : ` · ${Math.round(encounter.transcript.confidence * 100)}% confidence`}</p></section>}
 
               <section className="rounded-xl border border-border bg-card p-5"><p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground"><HistoryIcon className="size-3.5" aria-hidden />Amendment history</p>{data.amendments.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No corrections. The source visit is unchanged.</p> : <ol className="mt-3 space-y-3">{data.amendments.map((amendment) => <li key={amendment.id} className="rounded-lg border border-border bg-secondary/35 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><Badge variant="secondary">Revision {amendment.revision}</Badge><span className="text-xs text-muted-foreground">{amendment.author.full_name ?? "Unknown author"} · {new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(amendment.created_at))}</span></div><p className="mt-2 text-sm">{amendment.reason}</p><details className="mt-2 text-xs"><summary className="cursor-pointer text-muted-foreground">Before / after values</summary><div className="mt-2 grid gap-2 sm:grid-cols-2"><pre className="overflow-x-auto rounded bg-background p-2">{JSON.stringify(amendment.before_values, null, 2)}</pre><pre className="overflow-x-auto rounded bg-background p-2">{JSON.stringify(amendment.after_values, null, 2)}</pre></div></details></li>)}</ol>}</section>
             </div>

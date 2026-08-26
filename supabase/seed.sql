@@ -24,6 +24,7 @@ declare
   v_patient  uuid;
   v_enc      uuid;
   v_dx_idx   int;
+  v_amount_paise bigint;
   -- Phone numbers are unique per clinic, so walk a counter rather than hoping
   -- random() does not collide.
   -- Set from the data below, not hardcoded: a surviving walk-in from an earlier
@@ -107,6 +108,7 @@ begin
   -- Leaving those patients behind is the right answer, not a compromise. Once a
   -- real visit is attached to a chart the chart is no longer demo data, and a
   -- seed script has no business deleting a row a clinical record depends on.
+  delete from account_entries where clinic_id = v_clinic and source = 'seed';
   delete from encounters where clinic_id = v_clinic and extracted_raw ->> 'seed' = 'true';
   delete from patients p
    where p.clinic_id = v_clinic
@@ -178,10 +180,11 @@ begin
       end if;
 
       v_dx_idx := 1 + floor(random() * array_length(v_dx, 1))::int;
+      v_amount_paise := (array[200, 300, 300, 400, 500, 500, 600, 800])[1 + floor(random() * 8)::int] * 100;
 
       insert into encounters (
         clinic_id, doctor_id, patient_id, capture_source, status, occurred_at,
-        patient_name_spoken, age_years, diagnosis, treatment, fees_inr,
+        patient_name_spoken, age_years, diagnosis, treatment,
         extraction_model, extracted_raw, committed_at
       )
       values (
@@ -193,12 +196,22 @@ begin
         (select age_years from patients where id = v_patient),
         v_dx[v_dx_idx],
         v_tx[v_dx_idx],
-        (array[200, 300, 300, 400, 500, 500, 600, 800])[1 + floor(random() * 8)::int],
         'seed',
         '{"seed": true}'::jsonb,
         now()
       )
       returning id into v_enc;
+
+      insert into account_entries (
+        clinic_id, doctor_id, patient_id, encounter_id, kind, status,
+        amount_paise, category, payment_method, counterparty, note, source, occurred_at
+      )
+      select v_clinic, v_doctor.id, v_patient, v_enc, 'income', 'paid',
+        v_amount_paise, 'Consultation',
+        (array['cash', 'upi', 'card'])[1 + floor(random() * 3)::int],
+        p.full_name, 'Seeded demo entry', 'seed', e.occurred_at
+      from encounters e join patients p on p.id = v_patient
+      where e.id = v_enc;
 
       insert into prescription_items (
         encounter_id, clinic_id, drug_name, strength, form,

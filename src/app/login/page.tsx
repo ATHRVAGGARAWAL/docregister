@@ -53,12 +53,12 @@ const workflow = [
   {
     icon: SparklesIcon,
     title: "Review the details",
-    copy: "Confirm the patient, diagnosis, treatment and fee before saving.",
+    copy: "Confirm the patient, diagnosis, treatment and prescription before saving.",
   },
   {
     icon: BookOpenCheckIcon,
     title: "Keep the register current",
-    copy: "Your daily patient count and revenue update as you work.",
+    copy: "Your daily patient count and visit history update as you work.",
   },
 ];
 
@@ -180,7 +180,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
             </h1>
             <p className="mt-5 max-w-[34rem] text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
               Turn a quick voice note into a clean, reviewable clinical entry—and keep
-              today&rsquo;s patient and revenue numbers current automatically.
+              today&rsquo;s patient register current automatically.
             </p>
           </Reveal>
 

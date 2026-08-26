@@ -4,7 +4,6 @@ import { ArrowLeftIcon, ArrowRightIcon, CalendarRangeIcon, LoaderCircleIcon, Sea
 
 import { RegisterTimeline } from "@/components/dashboard/register-timeline";
 import { Badge } from "@/components/ui/badge";
-import { formatINR } from "@/lib/format";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,11 +28,8 @@ const STATUSES = [
 export function RegisterWorkspace({
   entries,
   totalCount,
-  totalFees,
   committedCount,
-  committedFees,
   draftCount,
-  draftFees,
   offset,
   limit,
   hasMore,
@@ -54,11 +50,8 @@ export function RegisterWorkspace({
 }: {
   entries: RegisterEntry[];
   totalCount: number;
-  totalFees: number;
   committedCount: number;
-  committedFees: number;
   draftCount: number;
-  draftFees: number;
   offset: number;
   limit: number;
   hasMore: boolean;
@@ -81,7 +74,6 @@ export function RegisterWorkspace({
   // here made the headline the total of the first 300 rows the server returned,
   // presented as the total for the period.
   const showingPartial = totalCount > entries.length;
-  const headlineFees = status === "draft" ? draftFees : status === "committed" ? committedFees : totalFees;
   const headlineCount = status === "draft" ? draftCount : status === "committed" ? committedCount : totalCount;
   const page = registerPageRange(totalCount, offset, entries.length || limit);
 
@@ -101,15 +93,14 @@ export function RegisterWorkspace({
           </p>
         </div>
         <div className="text-left sm:text-right">
-          <p className="tnum text-2xl font-semibold text-money">{formatINR(headlineFees)}</p>
+          <p className="tnum text-2xl font-semibold text-foreground">{headlineCount}</p>
           <p className="text-xs text-muted-foreground">
-            {headlineCount} {status === "draft" ? "pending" : status === "committed" ? "confirmed" : "matching"} visit{headlineCount === 1 ? "" : "s"}
+            {status === "draft" ? "pending" : status === "committed" ? "confirmed" : "matching"} visit{headlineCount === 1 ? "" : "s"}
             {showingPartial ? ` · showing ${entries.length}` : ""}
           </p>
           {draftCount > 0 && (
-            <p className="mt-1 flex items-center justify-end gap-2 text-xs text-money">
-              <Badge variant="money">{draftCount} pending</Badge>
-              {formatINR(draftFees)} excluded from totals
+            <p className="mt-1 flex items-center justify-end gap-2 text-xs text-warning">
+              <Badge variant="warning">{draftCount} pending review</Badge>
             </p>
           )}
         </div>

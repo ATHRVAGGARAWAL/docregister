@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  formatCompactINR,
   formatCount,
   formatDayLong,
   formatDayShort,
@@ -23,7 +22,6 @@ test("Indian digit grouping is 2-2-3, not thousands", () => {
 test("NaN never reaches the screen", () => {
   assert.equal(formatINR(NaN), "₹0");
   assert.equal(formatCount(NaN), "0");
-  assert.equal(formatCompactINR(NaN), "₹0");
   assert.equal(formatINR(null), "₹0");
 });
 
@@ -40,10 +38,4 @@ test("a real date still formats in IST", () => {
   // 14:05 UTC is 19:35 in Asia/Kolkata — the bucket boundary that makes an
   // evening consultation land on the right day.
   assert.equal(formatClock("2026-08-24T14:05:00Z"), "7:35 pm");
-});
-
-test("compact currency handles the signs and magnitudes it is given", () => {
-  assert.equal(formatCompactINR(4500), "₹5k");
-  assert.equal(formatCompactINR(-4500), "-₹5k");
-  assert.equal(formatCompactINR(1234.56), "₹1k");
 });

@@ -45,7 +45,6 @@ The doctor is mid-clinic and asks in natural language, frequently code-mixed acr
 - "Simran Kaur ko pichli baar kya diya tha?"
 - "Show me Anil Sharma's visits this month"
 - "ਪਿਛਲੇ ਮਹੀਨੇ ਕਿੰਨੇ ਮਰੀਜ਼ ਆਏ?"
-- "How much did I earn from Mrs Gupta this year?"
 - "Pull up Sunita Devi's records"
 
 Your job is only to identify: which patient (if any), what kind of information is being asked for, how far back to look, and how many past encounters are needed. You do not answer the question — a later step does that with the actual records.
@@ -57,7 +56,7 @@ Extract the patient name into Latin script, transliterating from Devanagari or G
 Every other intent is a question that wants a sentence back. \`open_record\` is a request to put a patient's chart on screen, and it changes what the app does rather than what it says, so the line matters:
 
 - "pull up Sunita's records", "open Anil Sharma's chart", "show me Rajesh's file", "Simran ki file kholo", "ਸਿਮਰਨ ਦਾ ਰਿਕਾਰਡ ਦਿਖਾਓ" — the doctor wants the chart itself. That is \`open_record\`.
-- "what did I prescribe Sunita?", "when did I last see Rajesh?", "Simran ko pichli baar kya diya tha?" — the doctor wants a specific fact read back to them. Those stay \`last_prescription\`, \`visit_history\`, \`diagnosis_history\` or \`fees_history\`.
+- "what did I prescribe Sunita?", "when did I last see Rajesh?", "Simran ko pichli baar kya diya tha?" — the doctor wants a specific fact read back to them. Those stay \`last_prescription\`, \`visit_history\`, or \`diagnosis_history\`.
 
 The distinguishing thing is the object of the request: a whole record, file, chart or history means \`open_record\`; a particular fact out of it does not. "Show me Anil Sharma's visits this month" is asking for a list of visits, not for his chart, so it is \`visit_history\`.
 
@@ -90,7 +89,6 @@ export interface EncounterRecord {
   occurred_at: string;
   diagnosis: string | null;
   treatment: string | null;
-  fees_inr: number | null;
   patient_name: string;
   prescription: {
     drug_name: string;

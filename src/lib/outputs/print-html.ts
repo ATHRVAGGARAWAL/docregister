@@ -43,7 +43,6 @@ function shell(title: string, body: string, filename: string): string {
     th, td { border-bottom: 1px solid #d8ded7; padding: 9px 6px; text-align: left; vertical-align: top; }
     th { color: #667269; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
     td:last-child, th:last-child { text-align: right; }
-    .total { font-size: 18px; font-weight: 700; }
     .toolbar { display: flex; justify-content: flex-end; gap: 8px; margin: 0 auto 14px; width: min(760px, calc(100% - 32px)); }
     button { border: 1px solid #9cad9f; background: #fff; padding: 8px 14px; border-radius: 5px; cursor: pointer; }
     @media print {
@@ -93,10 +92,4 @@ export function renderPrescriptionHtml(payload: VisitDetailsPayload): string {
   const { encounter } = payload;
   const body = `${header(payload, "Prescription")}<section><h2>Prescription</h2><table><thead><tr><th>#</th><th>Medicine and instructions</th><th></th></tr></thead><tbody>${prescriptionRows(encounter.effective.prescription)}</tbody></table></section>${encounter.effective.diagnosis ? `<section><h2>Diagnosis</h2><p>${escapeHtml(encounter.effective.diagnosis)}</p></section>` : ""}${encounter.effective.treatment ? `<section><h2>Treatment notes</h2><p>${escapeHtml(encounter.effective.treatment)}</p></section>` : ""}<p class="muted" style="margin-top:32px">Printed from the signed register on ${escapeHtml(formatPrintDate(new Date().toISOString()))}. Verify instructions with the clinician.</p>`;
   return shell("Prescription", body, `prescription-${encounter.id}.html`);
-}
-
-export function renderReceiptHtml(payload: VisitDetailsPayload): string {
-  const { encounter } = payload;
-  const body = `${header(payload, "Visit receipt")}<section><h2>Consultation</h2><table><tbody><tr><td>Consultation and recorded care</td><td class="total">${encounter.effective.fees_inr == null ? "Not recorded" : `₹${escapeHtml(encounter.effective.fees_inr.toFixed(2))}`}</td></tr></tbody></table></section><p class="muted" style="margin-top:32px">This receipt is an output of the signed register. It is not a tax invoice unless your clinic has separately configured one.</p>`;
-  return shell("Visit receipt", body, `receipt-${encounter.id}.html`);
 }

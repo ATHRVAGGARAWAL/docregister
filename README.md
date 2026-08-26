@@ -1,13 +1,14 @@
 # docregister
 
 A voice-driven EHR and daily register for Indian clinics. A doctor holds one
-button, says *"Sunita Devi, 42, viral fever, paracetamol 650 SOS, five hundred
-rupees"* — in Hindi, Punjabi, English or all three in one sentence — and it
+button, says *"Sunita Devi, 42, viral fever, paracetamol 650 SOS"* — in Hindi,
+Punjabi, English or all three in one sentence — and it
 becomes a structured, reviewable register entry.
 
 Three features sit on top of that: **historical recall** ("what did I prescribe
-Sunita last time?"), a **daily analytics** view (revenue, volume, new vs
-returning), and a UI built for a phone held in one hand between patients.
+Sunita last time?"), a **daily analytics** view (volume and new vs
+returning), a dedicated **Accounts ledger**, and a UI built for a phone held in
+one hand between patients.
 
 ---
 
@@ -74,7 +75,7 @@ docregister/
 │   │       ├── recall/                 parse → SQL → summarise
 │   │       └── analytics/daily/        daily buckets in IST
 │   ├── components/
-│   │   ├── dashboard/                  shell, revenue hero, stat rail, timeline, recall panel
+│   │   ├── dashboard/                  shell, visit hero, stat rail, timeline, recall panel
 │   │   ├── charts/                     chart chrome, volume area, new-vs-returning stack
 │   │   └── voice/                      dock, waveform, review sheet
 │   ├── hooks/use-voice-capture.ts      the capture state machine
@@ -85,7 +86,7 @@ docregister/
 │   │   ├── supabase/                   browser + server (RLS-scoped) clients
 │   │   ├── api/http.ts                 withDoctor(): auth + error normalisation
 │   │   ├── analytics.ts, register.ts   shared server-side reads
-│   │   └── format.ts                   en-IN money, counts, dates
+│   │   └── format.ts                   en-IN currency, counts, dates
 │   └── proxy.ts                        session refresh + route protection (Next 16 rename)
 ├── server/stt-proxy.ts                 authenticated WebSocket proxy to Sarvam realtime
 ├── public/worklets/pcm-downsampler.js  AudioWorklet: float32 → Int16 PCM @ 16 kHz
@@ -93,6 +94,8 @@ docregister/
     ├── migrations/0001_init.sql        schema, RLS, commit_encounter, analytics fns
     ├── migrations/0002_storage.sql     private dictations bucket + path policies
     ├── migrations/0003_bootstrap.sql   first-login trigger (breaks the RLS deadlock)
+    ├── migrations/0004_…0015_*.sql     security, recovery, amendments, follow-ups
+    ├── migrations/0016_accounts.sql    isolated ledger + legacy financial cleanup
     └── seed.sql                        optional: three weeks of demo register
 ```
 
@@ -159,18 +162,20 @@ cp .env.local.example .env.local     # fill in the two Supabase values
 **1. Create the Supabase project in Mumbai (ap-south-1).** Region is fixed at
 creation and ABDM requires India residency.
 
-**2. Run the migrations** in the Supabase SQL editor, in order:
+**2. Run every migration** in filename order. With a linked Supabase project:
 
-```
-supabase/migrations/0001_init.sql       schema, RLS policies, commit + analytics functions
-supabase/migrations/0002_storage.sql    private `dictations` bucket and its path policies
-supabase/migrations/0003_bootstrap.sql  first-login trigger
+```bash
+npx supabase db push
 ```
 
 `0003` is not optional. Every RLS policy keys off `auth_clinic_id()`, which
 reads the `doctors` table — so a brand-new user with no `doctors` row cannot
 even create their own clinic. A `SECURITY DEFINER` trigger on `auth.users`
 breaks that deadlock at sign-up.
+
+`0016` moves historical visit fees into the doctor-scoped Accounts ledger,
+scrubs financial values from clinical records, and prevents them from being
+written back there. Apply it before opening the Accounts tab.
 
 **3. Enable email sign-in** (Authentication → Providers → Email) and add
 `http://localhost:3000/auth/callback` to the redirect allow-list.
@@ -238,7 +243,7 @@ never its rank, so changing the range never repaints a series.
 as a set; check them before rendering any of them. The gate figures that were
 printed here previously did not match the tokens they described.
 
-**Not boxy, on purpose.** No 12-column grid of equal cards: a full-bleed revenue
+**Not boxy, on purpose.** No 12-column grid of equal cards: a full-bleed visit
 figure with a hand-drawn sparkline, a horizontally-scrolling stat rail, two
 charts, then the day's visits as a timeline on a single hairline spine. Four
 equal boxes on a phone is exactly the industrial dashboard look this app avoids.

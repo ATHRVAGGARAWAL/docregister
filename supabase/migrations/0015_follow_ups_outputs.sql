@@ -101,6 +101,13 @@ language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+-- `returns table (id, clinic_id, created_by, ...)` puts those names in scope as
+-- OUT parameters, and the body then references the same names as columns
+-- (`where id = auth.uid()`, `where created_by = v_doctor.id`). PostgreSQL
+-- cannot tell the two apart and raises 42702 on the first call, so every
+-- follow-up read and write failed. Resolving ambiguous names to the column is
+-- what every one of these sites means.
+#variable_conflict use_column
 declare
   v_doctor doctors%rowtype;
   v_status text := lower(btrim(coalesce(p_status, 'open')));
@@ -164,6 +171,13 @@ language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+-- `returns table (id, clinic_id, created_by, ...)` puts those names in scope as
+-- OUT parameters, and the body then references the same names as columns
+-- (`where id = auth.uid()`, `where created_by = v_doctor.id`). PostgreSQL
+-- cannot tell the two apart and raises 42702 on the first call, so every
+-- follow-up read and write failed. Resolving ambiguous names to the column is
+-- what every one of these sites means.
+#variable_conflict use_column
 declare
   v_doctor doctors%rowtype;
   v_row follow_ups%rowtype;
@@ -267,6 +281,13 @@ language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+-- `returns table (id, clinic_id, created_by, ...)` puts those names in scope as
+-- OUT parameters, and the body then references the same names as columns
+-- (`where id = auth.uid()`, `where created_by = v_doctor.id`). PostgreSQL
+-- cannot tell the two apart and raises 42702 on the first call, so every
+-- follow-up read and write failed. Resolving ambiguous names to the column is
+-- what every one of these sites means.
+#variable_conflict use_column
 declare
   v_doctor doctors%rowtype;
   v_row follow_ups%rowtype;

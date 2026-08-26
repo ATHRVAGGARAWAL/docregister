@@ -37,7 +37,6 @@ export const POST = withDoctor<Params>(async ({ supabase, request, params }) => 
     "age_years",
     "diagnosis",
     "treatment",
-    "fees_inr",
     "prescription",
   ]);
   if (Object.keys(changes).some((key) => !allowed.has(key))) {

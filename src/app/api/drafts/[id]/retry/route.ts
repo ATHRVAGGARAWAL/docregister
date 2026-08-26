@@ -104,14 +104,13 @@ export const POST = withDoctor<{ id: string }>(async ({ doctor, supabase, params
       instructions: item.instructions,
     };
   });
-  const { error: saveError } = await callWorkflow(supabase, "save_extracted_draft", {
+  const { error: saveError } = await callWorkflow(supabase, "save_clinical_draft", {
     p_encounter_id: params.id,
     p_transcript_id: transcriptId,
     p_patient_name_spoken: extraction.patient_name,
     p_age_years: extraction.age_years,
     p_diagnosis: extraction.diagnosis,
     p_treatment: extraction.treatment,
-    p_fees_inr: extraction.fees_inr,
     p_extracted_raw: extraction,
     p_low_confidence_fields: [
       ...new Set([...extraction.uncertain_fields, ...outcome.issues.map((issue) => issue.field)]),

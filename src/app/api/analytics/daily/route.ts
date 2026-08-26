@@ -5,7 +5,7 @@ import { loadDailyStats, shiftDays, todayInIndia } from "@/lib/analytics";
 
 /**
  * GET /api/analytics/daily?from=YYYY-MM-DD&to=YYYY-MM-DD&days=30
- * -> { series: [{ day, revenue_inr, patient_count, new_patients, returning_patients }],
+ * -> { series: [{ day, patient_count, new_patients, returning_patients }],
  *      totals, today, deltas }
  *
  * Aggregation happens in Postgres (`clinic_daily_stats`), which matters for two
@@ -16,7 +16,7 @@ import { loadDailyStats, shiftDays, todayInIndia } from "@/lib/analytics";
  * every evening consultation after 5:30 pm into tomorrow.
  *
  * Deliberately takes no `doctorId` or `scope`. It used to accept both, which
- * let any member of a clinic read a colleague's revenue by passing their id —
+ * let any member of a clinic read a colleague's activity by passing their id —
  * ids that `doctors_read` hands out to every member of the clinic. RLS did not
  * catch it because `clinic_daily_stats` is correctly scoped to the *clinic*;
  * the leak was within that boundary. There is no role to gate on either:

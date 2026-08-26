@@ -42,7 +42,7 @@ import { MedicationEditor } from "@/components/voice/medication-editor";
  * The confirmation step — the only place a dictated visit becomes a record.
  *
  * Everything upstream is a suggestion engine. The recogniser can mishear a
- * drug, the extractor can misread a fee, and neither of them knows which Sunita
+ * drug, and neither system knows which Sunita
  * Devi this is. So this sheet is not a formality to click through: uncertain
  * fields are visibly marked, the patient is chosen rather than guessed, and
  * nothing is written until the doctor presses save.
@@ -66,7 +66,6 @@ export function ReviewSheet({
   const [age, setAge] = useState(draft.extraction.age_years?.toString() ?? "");
   const [diagnosis, setDiagnosis] = useState(draft.extraction.diagnosis ?? "");
   const [treatment, setTreatment] = useState(draft.extraction.treatment ?? "");
-  const [fees, setFees] = useState(draft.extraction.fees_inr?.toString() ?? "");
   const [phone, setPhone] = useState(draft.patientIdentity?.phone ?? "");
   const [sex, setSex] = useState<PatientSex | "">(draft.patientIdentity?.sex ?? "");
   const [drugs, setDrugs] = useState<ReviewMedication[]>(draft.extraction.prescription);
@@ -122,7 +121,6 @@ export function ReviewSheet({
     age !== (draft.extraction.age_years?.toString() ?? "") ||
     diagnosis !== (draft.extraction.diagnosis ?? "") ||
     treatment !== (draft.extraction.treatment ?? "") ||
-    fees !== (draft.extraction.fees_inr?.toString() ?? "") ||
     drugs !== draft.extraction.prescription ||
     phone !== (draft.patientIdentity?.phone ?? "") ||
     sex !== (draft.patientIdentity?.sex ?? "") ||
@@ -200,7 +198,6 @@ export function ReviewSheet({
         setAge(body.extraction.age_years?.toString() ?? "");
         setDiagnosis(body.extraction.diagnosis ?? "");
         setTreatment(body.extraction.treatment ?? "");
-        setFees(body.extraction.fees_inr?.toString() ?? "");
         setDrugs(body.extraction.prescription ?? []);
         const nextUncertain = new Set(
           buildReviewChecklist(body.extraction).map((item) => item.key),
@@ -223,10 +220,9 @@ export function ReviewSheet({
       age_years: parseNumber(age),
       diagnosis: diagnosis.trim() || null,
       treatment: treatment.trim() || null,
-      fees_inr: parseNumber(fees),
       prescription: drugs,
     }),
-    [age, diagnosis, draftVersion, drugs, fees, name, treatment],
+    [age, diagnosis, draftVersion, drugs, name, treatment],
   );
 
   // Voice capture already creates the draft server-side. Once a doctor starts
@@ -280,15 +276,6 @@ export function ReviewSheet({
     }
     if (!patient && !asNew) {
       setFailure("Choose the patient, or add them as new.");
-      return;
-    }
-    // `inputMode="numeric"` is a keyboard hint, not a constraint, so these can
-    // still hold "12o0". That used to become NaN, which `JSON.stringify`
-    // serialises as null — the visit committed with the fee silently missing,
-    // and the fee is the number the whole revenue view is built on. Refuse it
-    // and say so instead.
-    if (!isNumericField(fees)) {
-      setFailure("Fees must be a number, or left blank.");
       return;
     }
     if (!isNumericField(age)) {
@@ -389,8 +376,8 @@ export function ReviewSheet({
           /* Warning stock: solid tinted card, full-strength border, and an icon.
              The three cues are redundant on purpose — this banner is the only
              thing standing between a bad transcription and a medical record. */
-          <div className="border-money/35 bg-money/10 mx-5 mb-3 flex shrink-0 gap-2.5 rounded-lg border px-3.5 py-2.5">
-            <AlertTriangle className="text-money mt-0.5 size-4 shrink-0" aria-hidden />
+          <div className="border-warning/35 bg-warning/10 mx-5 mb-3 flex shrink-0 gap-2.5 rounded-lg border px-3.5 py-2.5">
+            <AlertTriangle className="text-warning mt-0.5 size-4 shrink-0" aria-hidden />
             <ul className="text-foreground space-y-0.5 text-xs">
               {degraded && (
                 <li>
@@ -491,7 +478,7 @@ export function ReviewSheet({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="max-w-48">
             <Field label="Age" flagged={uncertain.has("age_years")}>
               <Input
                 id={reviewFieldId("age_years")}
@@ -502,18 +489,6 @@ export function ReviewSheet({
                 }}
                 inputMode="numeric"
                 className="tnum"
-              />
-            </Field>
-            <Field label="Fees (₹)" flagged={uncertain.has("fees_inr")}>
-              <Input
-                id={reviewFieldId("fees_inr")}
-                value={fees}
-                onChange={(event) => {
-                  setFees(event.target.value);
-                  markReviewed("fees_inr");
-                }}
-                inputMode="numeric"
-                className="text-money tnum"
               />
             </Field>
           </div>
@@ -779,7 +754,7 @@ function ReviewNavigator({
   const nextIndex = items.findIndex((item) => !reviewedKeys.has(item.key));
   const targetIndex = nextIndex >= 0 ? nextIndex : Math.min(activeIndex, items.length - 1);
   return (
-    <section aria-label="Fields to review" className="mx-5 mb-3 rounded-lg border border-money/35 bg-money/10 p-3">
+    <section aria-label="Fields to review" className="mx-5 mb-3 rounded-lg border border-warning/35 bg-warning/10 p-3">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-medium">Review flagged details</p>
@@ -801,7 +776,7 @@ function ReviewNavigator({
                 "rounded-full border px-2 py-1 text-[11px]",
                 reviewedKeys.has(item.key)
                   ? "border-primary/30 text-primary"
-                  : "border-money/45 text-money",
+                  : "border-warning/45 text-warning",
               )}
             >
               {reviewedKeys.has(item.key) ? "✓ " : ""}{item.label}
@@ -861,7 +836,7 @@ function PatientOption({
         {icon}
         <span className="truncate">{title}</span>
         {collides && (
-          <span className="border-money/40 text-money shrink-0 rounded-sm border px-1.5 py-0.5 text-[0.6875rem] leading-none font-normal">
+          <span className="border-warning/40 text-warning shrink-0 rounded-sm border px-1.5 py-0.5 text-[0.6875rem] leading-none font-normal">
             same name
           </span>
         )}
@@ -955,8 +930,8 @@ function Field({
           {label}
           {/* Flagged fields get a dot and a word — never colour alone. */}
           {flagged && (
-            <span className="text-money flex items-center gap-1 tracking-normal normal-case">
-              <span className="bg-money size-1.5 rounded-full" aria-hidden />
+            <span className="text-warning flex items-center gap-1 tracking-normal normal-case">
+              <span className="bg-warning size-1.5 rounded-full" aria-hidden />
               check this
             </span>
           )}

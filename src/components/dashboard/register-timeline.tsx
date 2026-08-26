@@ -12,7 +12,7 @@ import {
 import { AnimatedItem } from "@/components/reactbits/reveal";
 import { Badge } from "@/components/ui/badge";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
-import { formatClock, formatDayLong, formatINR } from "@/lib/format";
+import { formatClock, formatDayLong } from "@/lib/format";
 import type { RegisterEntry } from "@/lib/types";
 
 export function RegisterTimeline({
@@ -78,7 +78,7 @@ export function RegisterTimeline({
                 <span
                   className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-full border ${
                     entry.status === "draft"
-                      ? "border-money/25 bg-money/10 text-money"
+                      ? "border-warning/25 bg-warning/10 text-warning"
                       : "border-primary/20 bg-primary/10 text-primary"
                   }`}
                 >
@@ -115,7 +115,7 @@ export function RegisterTimeline({
                           <h3 className="font-semibold tracking-tight">{entry.patient_name}</h3>
                         )}
                         {entry.status === "draft" ? (
-                          <Badge variant="money">Needs review</Badge>
+                          <Badge variant="warning">Needs review</Badge>
                         ) : entry.is_new_patient ? (
                           <Badge variant="default">First visit</Badge>
                         ) : (
@@ -133,9 +133,6 @@ export function RegisterTimeline({
                         )}
                       </p>
                     </div>
-                    <p className="tnum shrink-0 text-sm font-semibold text-money">
-                      {entry.fees_inr !== null ? formatINR(entry.fees_inr) : "—"}
-                    </p>
                   </div>
 
                   {entry.status === "draft" && onOpenDraft && (
@@ -145,7 +142,7 @@ export function RegisterTimeline({
                         event.stopPropagation();
                         onOpenDraft(entry);
                       }}
-                      className="mt-3 inline-flex items-center rounded-md border border-money/35 bg-money/10 px-2.5 py-1.5 text-xs font-medium text-money transition-colors hover:bg-money/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="mt-3 inline-flex items-center rounded-md border border-warning/35 bg-warning/10 px-2.5 py-1.5 text-xs font-medium text-warning transition-colors hover:bg-warning/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       Review this draft
                     </button>

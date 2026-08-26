@@ -6,7 +6,7 @@ import * as z from "zod/v4";
  * Deliberately free of numeric and string-length constraints. The structured
  * output layer does not support `minimum` / `maximum` / `minLength`, so any
  * such constraint here would either be silently dropped or rejected outright.
- * Range checking for age and fees therefore happens in `validateExtraction`
+ * Range checking for age therefore happens in `validateExtraction`
  * below, after parsing — see the check-constraints in
  * `supabase/migrations/0001_init.sql` for the matching database-level guard.
  *
@@ -72,12 +72,6 @@ export const ExtractionSchema = z.object({
     .describe(
       "Free-text treatment plan summary in English, including advice and follow-up. This is the narrative; individual drugs also go in `prescription`.",
     ),
-  fees_inr: z
-    .number()
-    .nullable()
-    .describe(
-      "Consultation fee in Indian rupees as a number. Spoken forms include 'paanch sau' (500), 'छह सौ' (600), 'five hundred', 'do hazaar' (2000). Null if no fee was mentioned.",
-    ),
   prescription: z
     .array(PrescriptionItemSchema)
     .describe("One entry per drug. Empty array if nothing was prescribed."),
@@ -88,13 +82,13 @@ export const ExtractionSchema = z.object({
   uncertain_fields: z
     .array(z.string())
     .describe(
-      "Names of fields you were not confident about, e.g. ['patient_name','fees_inr']. Be liberal: flagging a field costs the doctor one glance, a wrong drug name costs far more.",
+      "Names of fields you were not confident about, e.g. ['patient_name','prescription.0.strength']. Be liberal: flagging a field costs the doctor one glance, a wrong drug name costs far more.",
     ),
   notes_for_doctor: z
     .string()
     .nullable()
     .describe(
-      "One short sentence if something needs the doctor's attention, e.g. an ambiguous drug name or a fee that could be 500 or 5000. Null if nothing is ambiguous.",
+      "One short sentence if something needs the doctor's attention, e.g. an ambiguous drug name or missing duration. Null if nothing is ambiguous.",
     ),
 });
 
@@ -119,18 +113,6 @@ export function validateExtraction(value: Extraction): ValidationIssue[] {
       issues.push({
         field: "age_years",
         message: `Age of ${value.age_years} is outside a plausible range — please confirm.`,
-      });
-    }
-  }
-
-  if (value.fees_inr !== null) {
-    if (value.fees_inr < 0) {
-      issues.push({ field: "fees_inr", message: "Fee cannot be negative." });
-    } else if (value.fees_inr > 100_000) {
-      // Usually a mis-heard order of magnitude: "five hundred" heard as 5000.
-      issues.push({
-        field: "fees_inr",
-        message: `₹${value.fees_inr.toLocaleString("en-IN")} is unusually high — check the transcript.`,
       });
     }
   }
@@ -198,7 +180,6 @@ export const RecallQuerySchema = z.object({
       "last_prescription",
       "visit_history",
       "diagnosis_history",
-      "fees_history",
       "general",
       "open_record",
     ])

@@ -61,7 +61,6 @@ export interface ManualVisitInput {
   age_years: number | null;
   diagnosis: string | null;
   treatment: string | null;
-  fees_inr: number | null;
   prescription: ReviewMedication[];
 }
 
@@ -76,7 +75,6 @@ const FIELD_LABELS: Record<string, string> = {
   age_years: "Age",
   diagnosis: "Diagnosis",
   treatment: "Treatment",
-  fees_inr: "Consultation fee",
 };
 
 const MEDICATION_LABELS: Record<string, string> = {

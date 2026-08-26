@@ -56,6 +56,8 @@
   --destructive: oklch(0.545 0.19 27);
   --destructive-foreground: oklch(0.985 0.01 27);
 
+  --warning: oklch(0.52 0.12 72);
+
   /* Money gets its own ink and never shares it with anything else. A doctor
      scanning this screen is looking for rupees; a hue reserved to that one
      meaning is what makes them findable without reading. */
@@ -101,7 +103,7 @@
      validate them before rendering any of them. */
   --chart-1: oklch(0.605 0.115 182); /* new patients   */
   --chart-2: oklch(0.47 0.15 288); /* returning      */
-  --chart-3: oklch(0.585 0.13 62); /* revenue        */
+  --chart-3: oklch(0.585 0.13 62); /* available slot */
   --chart-4: oklch(0.54 0.16 25);
   --chart-5: oklch(0.52 0.08 230);
 
@@ -172,6 +174,8 @@
   --destructive: oklch(0.645 0.175 25);
   --destructive-foreground: oklch(0.18 0.03 25);
 
+  --warning: oklch(0.78 0.12 78);
+
   --money: oklch(0.79 0.115 78);
 
   --border: oklch(0.3 0.01 258);
@@ -235,6 +239,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
   --color-money: var(--money);
   --color-border: var(--border);
   --color-input: var(--input);

@@ -24,11 +24,11 @@ The audio was recorded in an Indian clinic and transcribed by a speech-to-text e
 
 ## What you produce
 
-A structured record with: patient name, age, diagnosis, treatment plan, consultation fee, and the individual prescription lines.
+A structured record with: patient name, age, diagnosis, treatment plan, and the individual prescription lines. Ignore payment, price, fee, and billing language; finances are recorded separately in Accounts.
 
 ## Rules that matter most
 
-**Never invent a value.** If the doctor did not say the patient's age, the age is null. An empty field the doctor fills in during review costs three seconds; a plausible fabricated value that reaches a patient record may never be caught. This applies with particular force to drug names, strengths and fees.
+**Never invent a value.** If the doctor did not say the patient's age, the age is null. An empty field the doctor fills in during review costs three seconds; a plausible fabricated value that reaches a patient record may never be caught. This applies with particular force to drug names and strengths.
 
 **Preserve drug names exactly as spoken.** Indian practice runs heavily on brand names — Dolo, Crocin, Pan-D, Shelcal, Augmentin, Zerodol, Monocef. If the doctor said a brand, record the brand. Do not helpfully substitute the generic molecule, and do not correct a brand to a similar-sounding one. If a drug name is garbled beyond recognition, put your best reading in \`drug_name\` and add the field to \`uncertain_fields\`.
 
@@ -38,9 +38,7 @@ A structured record with: patient name, age, diagnosis, treatment plan, consulta
 - English: "forty-two" → 42, "five hundred" → 500
 - Hindi/Urdu: "बयालीस" → 42, "पाँच सौ" → 500, "do hazaar" → 2000, "dhai sau" → 250
 - Punjabi: "ਅਠਾਈ" → 28, "ਚਾਰ ਸੌ" → 400
-- The Indian system uses lakh (100,000) and crore (10,000,000), though these are rare for a consultation fee.
-
-**Fees are in Indian rupees.** A consultation fee is typically ₹100–₹2000. If you extract something far outside that range, still record what you heard, but list \`fees_inr\` in \`uncertain_fields\` — "five hundred" misheard as "five thousand" is a common and costly transcription failure.
+- The Indian system uses lakh (100,000) and crore (10,000,000).
 
 **Age can be stated in months for infants.** "chhah mahine ka baccha" is 6 months → record 0 and note it in \`notes_for_doctor\`.
 
@@ -138,7 +136,6 @@ function mockExtraction(transcript: string): ExtractionOutcome {
         age_years: 28,
         diagnosis: "Migraine",
         treatment: "Naproxen for 7 days; advised to track triggers and review if unresolved.",
-        fees_inr: 400,
         prescription: [
           {
             drug_name: "Naproxen",
@@ -158,7 +155,6 @@ function mockExtraction(transcript: string): ExtractionOutcome {
           age_years: 65,
           diagnosis: "Type 2 diabetes mellitus, poorly controlled; hypertension",
           treatment: "Continue Metformin, add Telmisartan. Review in two weeks.",
-          fees_inr: 600,
           prescription: [
             {
               drug_name: "Metformin",
@@ -185,7 +181,6 @@ function mockExtraction(transcript: string): ExtractionOutcome {
           age_years: 42,
           diagnosis: "Acute pharyngitis",
           treatment: "Azithromycin course with Paracetamol as needed for fever.",
-          fees_inr: 500,
           prescription: [
             {
               drug_name: "Azithromycin",

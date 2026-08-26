@@ -222,7 +222,7 @@ function sttResponse(error: SttError): [message: string, status: number] {
  *
  * The type parameter is the caller's *expectation*, not a guarantee — nothing
  * here validates the payload. Every field is re-checked at its point of use
- * (`requireString`, `coerceAge`, `coerceFees`), and the database's own checks
+ * (`requireString`, `coerceAge`, route-specific validators), and the database's own checks
  * are the backstop.
  */
 export async function readBody<T>(request: Request): Promise<T> {

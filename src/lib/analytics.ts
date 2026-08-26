@@ -55,7 +55,6 @@ export async function loadDailyStats(
   // has to wonder whether it is adding numbers or concatenating strings.
   const series: DailyPoint[] = ((data ?? []) as DailyPoint[]).map((point) => ({
     day: String(point.day),
-    revenue_inr: Number(point.revenue_inr) || 0,
     patient_count: Number(point.patient_count) || 0,
     new_patients: Number(point.new_patients) || 0,
     returning_patients: Number(point.returning_patients) || 0,
@@ -63,12 +62,11 @@ export async function loadDailyStats(
 
   const totals = series.reduce(
     (acc, point) => ({
-      revenue_inr: acc.revenue_inr + point.revenue_inr,
       patient_count: acc.patient_count + point.patient_count,
       new_patients: acc.new_patients + point.new_patients,
       returning_patients: acc.returning_patients + point.returning_patients,
     }),
-    { revenue_inr: 0, patient_count: 0, new_patients: 0, returning_patients: 0 },
+    { patient_count: 0, new_patients: 0, returning_patients: 0 },
   );
 
   const today = series.at(-1) ?? null;
@@ -84,7 +82,6 @@ export async function loadDailyStats(
     // Percentage deltas are computed here rather than in the component so the
     // divide-by-zero case (a first day, or a holiday) is handled once.
     deltas: {
-      revenue: percentDelta(today?.revenue_inr, yesterday?.revenue_inr),
       patients: percentDelta(today?.patient_count, yesterday?.patient_count),
     },
   };
@@ -102,7 +99,6 @@ export function emptyAnalytics(days = 30): AnalyticsPayload {
   const from = shiftDays(to, -(days - 1));
   const series: DailyPoint[] = Array.from({ length: days }, (_, index) => ({
     day: shiftDays(from, index),
-    revenue_inr: 0,
     patient_count: 0,
     new_patients: 0,
     returning_patients: 0,
@@ -113,8 +109,8 @@ export function emptyAnalytics(days = 30): AnalyticsPayload {
     to,
     scope: "doctor",
     series,
-    totals: { revenue_inr: 0, patient_count: 0, new_patients: 0, returning_patients: 0 },
+    totals: { patient_count: 0, new_patients: 0, returning_patients: 0 },
     today: series.at(-1) ?? null,
-    deltas: { revenue: null, patients: null },
+    deltas: { patients: null },
   };
 }

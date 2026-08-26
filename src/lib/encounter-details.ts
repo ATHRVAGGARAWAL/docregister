@@ -17,7 +17,6 @@ type RawEncounter = {
   age_years: number | null;
   diagnosis: string | null;
   treatment: string | null;
-  fees_inr: number | string | null;
   is_new_patient: boolean | null;
   visit_number: number | null;
 };
@@ -45,7 +44,7 @@ export async function loadEncounterDetails(
     .from("encounters")
     .select(
       `id, clinic_id, doctor_id, patient_id, transcript_id, status, occurred_at,
-       patient_name_spoken, age_years, diagnosis, treatment, fees_inr,
+       patient_name_spoken, age_years, diagnosis, treatment,
        is_new_patient, visit_number`,
     )
     .eq("id", encounterId)
@@ -145,15 +144,15 @@ export async function loadEncounterDetails(
     age_years: raw.age_years,
     diagnosis: raw.diagnosis,
     treatment: raw.treatment,
-    fees_inr: raw.fees_inr === null ? null : Number(raw.fees_inr),
     prescription,
   };
-  const replayed = applyEncounterAmendments(sourceEffective, amendments);
-  const effective = {
-    ...replayed,
-    fees_inr: replayed.fees_inr === null ? null : Number(replayed.fees_inr),
-  };
-  const mappedAmendments: VisitAmendment[] = amendments.map((amendment) => {
+  const clinicalAmendments = amendments.map((amendment) => ({
+    ...amendment,
+    before_values: withoutFinancialFields(amendment.before_values),
+    after_values: withoutFinancialFields(amendment.after_values),
+  }));
+  const effective = applyEncounterAmendments(sourceEffective, clinicalAmendments);
+  const mappedAmendments: VisitAmendment[] = clinicalAmendments.map((amendment) => {
     return {
       id: amendment.id,
       revision: amendment.revision,
@@ -201,7 +200,6 @@ export async function loadEncounterDetails(
       age_years: raw.age_years,
       diagnosis: raw.diagnosis,
       treatment: raw.treatment,
-      fees_inr: raw.fees_inr === null ? null : Number(raw.fees_inr),
       visit_number: raw.visit_number,
       is_new_patient: raw.is_new_patient,
       prescription,
@@ -210,4 +208,10 @@ export async function loadEncounterDetails(
     },
     amendments: mappedAmendments,
   };
+}
+
+function withoutFinancialFields(values: Record<string, unknown>): Record<string, unknown> {
+  const clinical = { ...values };
+  delete clinical.fees_inr;
+  return clinical;
 }

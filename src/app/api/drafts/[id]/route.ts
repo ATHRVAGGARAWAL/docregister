@@ -19,7 +19,7 @@ export const GET = withDoctor<Params>(async ({ doctor, supabase, params }) => {
   const { data: row, error } = await db
     .from("encounters")
     .select(
-      "id, status, patient_id, patient_name_spoken, age_years, diagnosis, treatment, fees_inr, low_confidence_fields, extracted_raw, draft_version, patients(id, full_name, phone, age_years, sex), transcripts(id, raw_text, roman_text, language_code, degraded, audio_path), prescription_items(drug_name, strength, form, frequency_spoken, duration, route, instructions, position, needs_review)",
+      "id, status, patient_id, patient_name_spoken, age_years, diagnosis, treatment, low_confidence_fields, extracted_raw, draft_version, patients(id, full_name, phone, age_years, sex), transcripts(id, raw_text, roman_text, language_code, degraded, audio_path), prescription_items(drug_name, strength, form, frequency_spoken, duration, route, instructions, position, needs_review)",
     )
     .eq("id", params.id)
     .eq("doctor_id", doctor.id)
@@ -59,9 +59,6 @@ export const GET = withDoctor<Params>(async ({ doctor, supabase, params }) => {
       age_years: row.age_years ?? numberValue(extracted.age_years),
       diagnosis: row.diagnosis ?? stringValue(extracted.diagnosis),
       treatment: row.treatment ?? stringValue(extracted.treatment),
-      fees_inr: row.fees_inr === null || row.fees_inr === undefined
-        ? numberValue(extracted.fees_inr)
-        : Number(row.fees_inr),
       prescription: items.map((item: any) => ({
         drug_name: item.drug_name,
         strength: item.strength ?? null,
@@ -72,7 +69,7 @@ export const GET = withDoctor<Params>(async ({ doctor, supabase, params }) => {
         instructions: item.instructions ?? null,
       })),
       uncertain_fields: Array.isArray(row.low_confidence_fields)
-        ? row.low_confidence_fields
+        ? row.low_confidence_fields.filter((field: string) => field !== "fees_inr")
         : [],
       notes_for_doctor: stringValue(extracted.notes_for_doctor),
     },
@@ -96,7 +93,6 @@ interface DraftPatch {
   age_years?: unknown;
   diagnosis?: unknown;
   treatment?: unknown;
-  fees_inr?: unknown;
   prescription?: unknown;
 }
 
@@ -118,7 +114,6 @@ export const PATCH = withDoctor<Params>(async ({ doctor, supabase, request, para
   if ("age_years" in body) patch.age_years = age(body.age_years);
   if ("diagnosis" in body) patch.diagnosis = text(body.diagnosis);
   if ("treatment" in body) patch.treatment = text(body.treatment);
-  if ("fees_inr" in body) patch.fees_inr = fees(body.fees_inr);
 
   const { data: updated, error } = await callWorkflow<Record<string, unknown>>(supabase, "update_draft_workflow", {
     p_encounter_id: params.id,
@@ -199,10 +194,4 @@ function age(value: unknown): number | null {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0 || n > 130) throw new ApiError("Age must be between 0 and 130.");
   return Math.floor(n);
-}
-function fees(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 0 || n > 1_000_000) throw new ApiError("Fees must be a valid non-negative number.");
-  return n;
 }

@@ -61,7 +61,6 @@ interface PatchBody {
   age_years?: number | null;
   diagnosis?: string | null;
   treatment?: string | null;
-  fees_inr?: number | null;
   prescription?: PrescriptionInput[];
 }
 
@@ -96,7 +95,6 @@ export const PATCH = withDoctor<Params>(async ({ supabase, request, params }) =>
   if ("age_years" in body) patch.age_years = coerceAge(body.age_years);
   if ("diagnosis" in body) patch.diagnosis = coerceText(body.diagnosis);
   if ("treatment" in body) patch.treatment = coerceText(body.treatment);
-  if ("fees_inr" in body) patch.fees_inr = coerceFees(body.fees_inr);
 
   let items: Array<Record<string, Json>> | null = null;
   if (body.prescription) {
@@ -192,14 +190,6 @@ function coerceAge(value: unknown): number | null {
     throw new ApiError("Age must be between 0 and 130.");
   }
   return Math.floor(age);
-}
-
-function coerceFees(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const fees = Number(value);
-  if (!Number.isFinite(fees) || fees < 0) throw new ApiError("Fees cannot be negative.");
-  if (fees > 1_000_000) throw new ApiError("That fee looks wrong — please check it.");
-  return fees;
 }
 
 /**

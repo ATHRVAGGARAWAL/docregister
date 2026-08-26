@@ -32,7 +32,6 @@ export const POST = withDoctor(async ({ supabase, request }) => {
   const phone = normalisePatientPhone(phoneInput);
   const sex = optionalSex(body.sex);
   const age = optionalInteger(body.age_years, "Age", 0, 130);
-  const fees = optionalNumber(body.fees_inr, "Fees", 0, 1_000_000);
   const diagnosis = optionalText(body.diagnosis, 2_000);
   const treatment = optionalText(body.treatment, 2_000);
   const prescription = parsePrescription(body.prescription);
@@ -57,7 +56,6 @@ export const POST = withDoctor(async ({ supabase, request }) => {
     age_years: age,
     diagnosis,
     treatment,
-    fees_inr: fees,
     phone,
     sex,
   };
@@ -91,7 +89,6 @@ export const POST = withDoctor(async ({ supabase, request }) => {
       age_years: age,
       diagnosis,
       treatment,
-      fees_inr: fees,
       prescription,
       uncertain_fields: [],
       notes_for_doctor: null,
@@ -171,20 +168,6 @@ function optionalInteger(
   const number = Number(value);
   if (!Number.isInteger(number) || number < minimum || number > maximum) {
     throw new ApiError(`${label} must be a whole number between ${minimum} and ${maximum}.`);
-  }
-  return number;
-}
-
-function optionalNumber(
-  value: unknown,
-  label: string,
-  minimum: number,
-  maximum: number,
-): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const number = Number(value);
-  if (!Number.isFinite(number) || number < minimum || number > maximum) {
-    throw new ApiError(`${label} must be between ${minimum} and ${maximum}.`);
   }
   return number;
 }

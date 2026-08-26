@@ -56,7 +56,6 @@ export function ManualVisitFlow({
   const [age, setAge] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
   const [treatment, setTreatment] = useState("");
-  const [fees, setFees] = useState("");
   const [medications, setMedications] = useState<ReviewMedication[]>([
     { ...FIRST_MEDICATION },
   ]);
@@ -71,7 +70,6 @@ export function ManualVisitFlow({
     setAge("");
     setDiagnosis("");
     setTreatment("");
-    setFees("");
     setMedications([{ ...FIRST_MEDICATION }]);
     setDraft(null);
     setSaving(false);
@@ -93,10 +91,6 @@ export function ManualVisitFlow({
     }
     if (!isNumericField(age) || (age.trim() && Number(age) > 130)) {
       setFailure("Age must be a number between 0 and 130, or left blank.");
-      return;
-    }
-    if (!isNumericField(fees) || (fees.trim() && Number(fees) < 0)) {
-      setFailure("Fees must be a non-negative number, or left blank.");
       return;
     }
     if (phoneIssue) {
@@ -138,7 +132,6 @@ export function ManualVisitFlow({
           age_years: parseNumber(age),
           diagnosis: diagnosis.trim() || null,
           treatment: treatment.trim() || null,
-          fees_inr: parseNumber(fees),
           prescription,
         }),
       });
@@ -253,16 +246,6 @@ export function ManualVisitFlow({
                 onChange={(event) => setTreatment(event.target.value)}
                 rows={3}
                 className="resize-none"
-              />
-            </FormField>
-
-            <FormField label="Fees (₹)" htmlFor="manual-fees">
-              <Input
-                id="manual-fees"
-                value={fees}
-                onChange={(event) => setFees(event.target.value)}
-                inputMode="decimal"
-                className="text-money tnum max-w-48"
               />
             </FormField>
 

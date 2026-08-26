@@ -65,6 +65,95 @@ export type Database = {
         };
         Relationships: [];
       };
+      account_entries: {
+        Row: {
+          amount_paise: number;
+          category: string;
+          clinic_id: string;
+          counterparty: string | null;
+          created_at: string;
+          currency: string;
+          doctor_id: string;
+          encounter_id: string | null;
+          id: string;
+          kind: string;
+          note: string | null;
+          occurred_at: string;
+          patient_id: string | null;
+          payment_method: string | null;
+          source: string;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          amount_paise: number;
+          category: string;
+          clinic_id: string;
+          counterparty?: string | null;
+          created_at?: string;
+          currency?: string;
+          doctor_id: string;
+          encounter_id?: string | null;
+          id?: string;
+          kind: string;
+          note?: string | null;
+          occurred_at?: string;
+          patient_id?: string | null;
+          payment_method?: string | null;
+          source?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          amount_paise?: number;
+          category?: string;
+          clinic_id?: string;
+          counterparty?: string | null;
+          created_at?: string;
+          currency?: string;
+          doctor_id?: string;
+          encounter_id?: string | null;
+          id?: string;
+          kind?: string;
+          note?: string | null;
+          occurred_at?: string;
+          patient_id?: string | null;
+          payment_method?: string | null;
+          source?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "account_entries_clinic_id_fkey";
+            columns: ["clinic_id"];
+            isOneToOne: false;
+            referencedRelation: "clinics";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "account_entries_doctor_id_fkey";
+            columns: ["doctor_id"];
+            isOneToOne: false;
+            referencedRelation: "doctors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "account_entries_encounter_id_fkey";
+            columns: ["encounter_id"];
+            isOneToOne: false;
+            referencedRelation: "encounters";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "account_entries_patient_id_fkey";
+            columns: ["patient_id"];
+            isOneToOne: false;
+            referencedRelation: "patients";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       clinics: {
         Row: {
           city: string | null;
@@ -464,7 +553,6 @@ export type Database = {
           new_patients: number;
           patient_count: number;
           returning_patients: number;
-          revenue_inr: number;
         }[];
       };
       commit_encounter: {
@@ -508,7 +596,6 @@ export type Database = {
           age_years: number;
           diagnosis: string;
           drugs: string[];
-          fees_inr: number;
           id: string;
           is_new_patient: boolean;
           occurred_at: string;
@@ -516,9 +603,48 @@ export type Database = {
           patient_name: string;
           status: string;
           total_count: number;
-          total_fees: number;
           treatment: string;
           visit_number: number;
+          committed_count: number;
+          draft_count: number;
+        }[];
+      };
+      account_entries_search: {
+        Args: {
+          p_from: string;
+          p_kind?: string | null;
+          p_limit?: number;
+          p_offset?: number;
+          p_query?: string | null;
+          p_status?: string | null;
+          p_to: string;
+        };
+        Returns: {
+          amount_paise: number;
+          category: string;
+          counterparty: string | null;
+          created_at: string;
+          currency: string;
+          encounter_id: string | null;
+          id: string;
+          kind: string;
+          note: string | null;
+          occurred_at: string;
+          patient_id: string | null;
+          payment_method: string | null;
+          source: string;
+          status: string;
+          total_count: number;
+          updated_at: string;
+        }[];
+      };
+      account_entries_summary: {
+        Args: { p_from: string; p_to: string };
+        Returns: {
+          expenses_paise: number;
+          net_paise: number;
+          pending_paise: number;
+          received_paise: number;
         }[];
       };
       show_limit: { Args: never; Returns: number };

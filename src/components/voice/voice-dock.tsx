@@ -295,7 +295,7 @@ export function VoiceDock({
                 /* A countdown the doctor has to act on inside ten seconds. It
                    was 11px, which is unreadable at arm's length on a phone held
                    at a bedside — the one place this message is ever shown. */
-                <p className="text-money mt-1.5 text-sm font-medium" role="status">
+                <p className="text-warning mt-1.5 text-sm font-medium" role="status">
                   {Math.ceil(remainingMs / 1000)}s left — wrap up this patient.
                 </p>
               )}

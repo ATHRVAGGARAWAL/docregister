@@ -252,7 +252,7 @@ function MedicationField({
         htmlFor={reviewFieldId(fieldKey)}
         className={cn(
           "text-muted-foreground mb-1.5 flex text-[11px] tracking-[0.1em] uppercase",
-          flagged && !reviewed && "text-money",
+          flagged && !reviewed && "text-warning",
         )}
       >
         {label}

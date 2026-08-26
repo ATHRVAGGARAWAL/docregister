@@ -25,7 +25,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "docregister — voice register for clinics",
   description:
-    "Dictate a consultation in Hindi, Punjabi or English and it becomes a structured register entry. Revenue, patient volume and history, from your phone.",
+    "Dictate a consultation in Hindi, Punjabi or English and it becomes a structured register entry, with patient history from your phone.",
   applicationName: "docregister",
   // A doctor's register is not something to hand to a crawler.
   robots: { index: false, follow: false },
@@ -73,7 +73,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             throttles *CSS* animation — Motion animates from JavaScript, so it
             sailed straight past. `voice-dock`, `waveform` and `click-spark` each
             check the preference by hand; `Reveal`, `AnimatedItem` and the
-            revenue hero did not, which meant a doctor who asked their phone for
+            dashboard hero did not, which meant a doctor who asked their phone for
             less motion still got a slide and a scale on every register row. */}
         <MotionConfig reducedMotion="user">{children}</MotionConfig>
       </body>

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRightIcon, CalendarPlusIcon, PrinterIcon, ReceiptTextIcon } from "lucide-react";
+import { ArrowRightIcon, CalendarPlusIcon, PrinterIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -23,7 +23,6 @@ export function PostCommitActions({
   return (
     <div className="flex flex-wrap items-center gap-2" aria-label="Saved visit actions">
       <Button asChild variant="outline" size="sm"><a href={`/api/encounters/${encodeURIComponent(encounterId)}/prescription/print`} target="_blank" rel="noreferrer"><PrinterIcon className="size-4" aria-hidden />Print prescription</a></Button>
-      <Button asChild variant="outline" size="sm"><a href={`/api/encounters/${encodeURIComponent(encounterId)}/receipt/print`} target="_blank" rel="noreferrer"><ReceiptTextIcon className="size-4" aria-hidden />Print receipt</a></Button>
       {onScheduleFollowUp && <Button type="button" variant="secondary" size="sm" onClick={() => onScheduleFollowUp(patientId, encounterId)}><CalendarPlusIcon className="size-4" aria-hidden />Schedule follow-up</Button>}
       {onViewRegister && <Button type="button" variant="ghost" size="sm" onClick={onViewRegister}>View register<ArrowRightIcon className="size-4" aria-hidden /></Button>}
     </div>

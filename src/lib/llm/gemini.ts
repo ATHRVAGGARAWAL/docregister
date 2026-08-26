@@ -170,7 +170,7 @@ function prune(node: unknown): unknown {
 
   // Gemini emits fields in the order the schema lists them, and its own docs
   // note that ordering affects output quality. `schema.ts` is already written
-  // in the order a doctor dictates — name, age, diagnosis, treatment, fee — so
+  // in the order a doctor dictates — name, age, diagnosis, treatment — so
   // pinning that order also lets the model fill fields in the order it read
   // them in the transcript, rather than jumping back and forth.
   if (out.properties && typeof out.properties === "object") {

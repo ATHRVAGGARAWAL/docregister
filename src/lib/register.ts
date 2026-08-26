@@ -12,8 +12,8 @@ import type { RegisterEntry } from "@/lib/types";
  * Drafts are included deliberately. A draft is a consultation that happened —
  * the doctor dictated it — and hiding it until confirmation is how a visit gets
  * forgotten between one patient and the next. It appears in the timeline marked
- * "Needs review" and is excluded from every total, which is the honest way to
- * show something that is real but not yet signed.
+ * "Needs review", which is the honest way to show something that is real but
+ * not yet signed.
  */
 
 export async function loadTodayRegister(
@@ -36,9 +36,9 @@ export async function loadRegister(
     .from("encounters")
     .select(
       `id, occurred_at, patient_id, patient_name_spoken, age_years, diagnosis,
-       treatment, fees_inr, is_new_patient, visit_number, status,
-       patients ( full_name ),
-       prescription_items ( drug_name, strength, frequency_label, position )`,
+       treatment, is_new_patient, visit_number, status,
+       patients!encounters_patient_id_fkey ( full_name ),
+       prescription_items!prescription_items_encounter_id_fkey ( drug_name, strength, frequency_label, position )`,
     )
     .eq("doctor_id", doctorId)
     .gte("occurred_at", startOfDayInIndia(from))
@@ -61,7 +61,6 @@ export async function loadRegister(
     age_years: row.age_years,
     diagnosis: row.diagnosis,
     treatment: row.treatment,
-    fees_inr: row.fees_inr === null ? null : Number(row.fees_inr),
     is_new_patient: row.is_new_patient,
     visit_number: row.visit_number,
     status: row.status,
@@ -84,12 +83,8 @@ export interface RegisterSearchResult {
   entries: RegisterEntry[];
   /** Visits matching the filters, not the number returned. */
   totalCount: number;
-  /** Fees across every match, not just this page. */
-  totalFees: number;
   committedCount: number;
-  committedFees: number;
   draftCount: number;
-  draftFees: number;
   limit: number;
   offset: number;
 }
@@ -102,17 +97,13 @@ interface RegisterSearchRow {
   age_years: number | null;
   diagnosis: string | null;
   treatment: string | null;
-  fees_inr: number | string | null;
   is_new_patient: boolean | null;
   visit_number: number | null;
   status: RegisterEntry["status"];
   drugs: string[] | null;
   total_count: number | string;
-  total_fees: number | string | null;
   committed_count?: number | string;
-  committed_fees?: number | string | null;
   draft_count?: number | string;
-  draft_fees?: number | string | null;
 }
 
 /**
@@ -172,19 +163,14 @@ export async function searchRegister(
       age_years: row.age_years,
       diagnosis: row.diagnosis,
       treatment: row.treatment,
-      // `numeric` arrives as a string over PostgREST.
-      fees_inr: row.fees_inr === null ? null : Number(row.fees_inr),
       is_new_patient: row.is_new_patient,
       visit_number: row.visit_number,
       status: row.status,
       drugs: row.drugs ?? [],
     })),
     totalCount: Number(rows[0]?.total_count ?? 0),
-    totalFees: Number(rows[0]?.total_fees ?? 0),
     committedCount: Number(summary?.committed_count ?? 0),
-    committedFees: Number(summary?.committed_fees ?? 0),
     draftCount: Number(summary?.draft_count ?? 0),
-    draftFees: Number(summary?.draft_fees ?? 0),
     limit,
     offset,
   };

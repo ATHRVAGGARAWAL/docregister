@@ -16,8 +16,7 @@ const plain = new Intl.NumberFormat("en-IN");
 
 /**
  * `??` catches null and undefined; it does not catch NaN, and these values come
- * from summed API responses where a NaN is entirely reachable. `formatINR(NaN)`
- * used to render the string "₹NaN" into the revenue hero.
+ * from summed API responses where a NaN is entirely reachable.
  */
 function finite(value: number | null | undefined): number {
   const parsed = Number(value ?? 0);
@@ -30,16 +29,6 @@ export function formatINR(value: number | null | undefined): string {
 
 export function formatCount(value: number | null | undefined): string {
   return plain.format(finite(value));
-}
-
-/** Axis ticks only — compact forms save horizontal space a phone doesn't have. */
-export function formatCompactINR(input: number): string {
-  const value = finite(input);
-  if (value < 0) return `-${formatCompactINR(-value)}`;
-  if (value >= 10_000_000) return `₹${(value / 10_000_000).toFixed(1)}Cr`;
-  if (value >= 100_000) return `₹${(value / 100_000).toFixed(1)}L`;
-  if (value >= 1_000) return `₹${Math.round(value / 1_000)}k`;
-  return `₹${Math.round(value)}`;
 }
 
 /**

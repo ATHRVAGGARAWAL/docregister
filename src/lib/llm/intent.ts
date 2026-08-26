@@ -40,7 +40,7 @@ import { UtteranceKindSchema, type UtteranceKind } from "./schema";
 
 const CLASSIFIER_SYSTEM = `You are given the transcript of something a doctor just said into their clinic app. Decide which of exactly two things it was.
 
-**dictation** — the doctor is recording a consultation that has just happened, so that it goes into their register. It typically carries some combination of a patient's name, an age, a complaint, a clinical impression, drugs with strengths and frequencies, advice, follow-up, and a consultation fee. This is what the microphone is for and it is the large majority of what it hears.
+**dictation** — the doctor is recording a consultation that has just happened, so that it goes into their register. It typically carries some combination of a patient's name, an age, a complaint, a clinical impression, drugs with strengths and frequencies, advice, and follow-up. This is what the microphone is for and it is the large majority of what it hears.
 
 **question** — the doctor is asking the app for something that is already in their register: what they prescribed a patient last time, when they last saw someone, how many patients they saw last week, how much they earned this month. This also covers a request to put a patient's chart on screen — "pull up Sunita's records", "Sunita ki file kholo", "open Anil Sharma's chart" — which is phrased as an instruction rather than a question but is still a request for records that already exist, not a new one being recorded.
 

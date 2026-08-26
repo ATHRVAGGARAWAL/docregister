@@ -8,7 +8,7 @@ import { useInView, useMotionValue, useSpring } from "motion/react";
  *
  * 1. `format`. The original formats through `Intl.NumberFormat("en-US")`, which
  *    groups in thousands. Indian digit grouping is 2-2-3 — a doctor reading
- *    "₹125,000" instead of "₹1,25,000" has to stop and count zeros — so the
+ *    locale-specific formatting remains stable throughout the animation, so the
  *    formatter is injected by the caller and the component never assumes one.
  *
  * 2. Server-rendered final value. The original writes into `ref.textContent`

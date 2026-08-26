@@ -21,7 +21,6 @@ interface EncounterRow {
   age_years: number | null;
   diagnosis: string | null;
   treatment: string | null;
-  fees_inr: number | string | null;
   visit_number: number | null;
   doctors: { full_name: string } | null;
   prescription_items: {
@@ -55,10 +54,16 @@ export const GET = withDoctor<{ id: string }>(async ({ doctor, supabase, params 
 
   const { data: encounters, error: encountersError } = await supabase
     .from("encounters")
+    // The doctor embed names its foreign key deliberately. Migration 0011 added
+    // encounters_doctor_same_clinic alongside the original
+    // encounters_doctor_id_fkey, so two relationships now join these tables and
+    // PostgREST refuses to guess between them (PGRST201) — which turned every
+    // patient chart into a 500. The plain key is the one that means "who saw
+    // this patient"; the composite one exists to enforce tenancy.
     .select(
-      `id, occurred_at, age_years, diagnosis, treatment, fees_inr, visit_number,
-       doctors ( full_name ),
-       prescription_items (
+      `id, occurred_at, age_years, diagnosis, treatment, visit_number,
+       doctors!encounters_doctor_id_fkey ( full_name ),
+       prescription_items!prescription_items_encounter_id_fkey (
          id, drug_name, strength, form, frequency_label, frequency_spoken,
          duration, instructions, position
        )`,
@@ -81,7 +86,6 @@ export const GET = withDoctor<{ id: string }>(async ({ doctor, supabase, params 
       age_years: encounter.age_years,
       diagnosis: encounter.diagnosis,
       treatment: encounter.treatment,
-      fees_inr: encounter.fees_inr === null ? null : Number(encounter.fees_inr),
       visit_number: encounter.visit_number,
       doctor_name: encounter.doctors?.full_name ?? null,
       prescription: [...encounter.prescription_items]

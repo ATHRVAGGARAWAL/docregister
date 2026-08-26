@@ -116,9 +116,9 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
   let select = supabase
     .from("encounters")
     .select(
-      `id, occurred_at, diagnosis, treatment, fees_inr, visit_number,
-       patients!inner ( id, full_name ),
-       prescription_items ( drug_name, strength, frequency_label, frequency_spoken, duration, instructions )`,
+      `id, occurred_at, diagnosis, treatment, visit_number,
+       patients!encounters_patient_id_fkey!inner ( id, full_name ),
+       prescription_items!prescription_items_encounter_id_fkey ( drug_name, strength, frequency_label, frequency_spoken, duration, instructions )`,
     )
     .eq("status", "committed")
     .order("occurred_at", { ascending: false })
@@ -146,7 +146,6 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
     occurred_at: string;
     diagnosis: string | null;
     treatment: string | null;
-    fees_inr: number | null;
     visit_number: number | null;
     patients: { id: string; full_name: string } | null;
     prescription_items: {
@@ -164,7 +163,6 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
     occurred_at: row.occurred_at,
     diagnosis: row.diagnosis,
     treatment: row.treatment,
-    fees_inr: row.fees_inr,
     patient_name: row.patients?.full_name ?? "Unknown",
     prescription: row.prescription_items.map((item) => ({
       drug_name: item.drug_name,

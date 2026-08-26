@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { escapeHtml, renderPrescriptionHtml, renderReceiptHtml } from "../../src/lib/outputs/print-html.ts";
+import { escapeHtml, renderPrescriptionHtml } from "../../src/lib/outputs/print-html.ts";
 
 const payload = {
   encounter: {
@@ -15,7 +15,6 @@ const payload = {
     age_years: 42,
     diagnosis: "Fever & cough",
     treatment: "Rest",
-    fees_inr: 600,
     visit_number: 2,
     is_new_patient: false,
     prescription: [],
@@ -25,7 +24,6 @@ const payload = {
       age_years: 42,
       diagnosis: "Fever & cough",
       treatment: "Rest",
-      fees_inr: 600,
       prescription: [{
         id: "44444444-4444-4444-8444-444444444444",
         drug_name: "Amox <bad>",
@@ -51,8 +49,6 @@ test("print HTML escapes clinical values", () => {
   assert.doesNotMatch(html, /<script>/);
 });
 
-test("print outputs include the browser print control and receipt amount", () => {
+test("prescription output includes the browser print control", () => {
   assert.match(renderPrescriptionHtml(payload), /window\.print\(\)/);
-  assert.match(renderReceiptHtml(payload), /₹600\.00/);
-  assert.match(renderReceiptHtml(payload), /Cache-Control|Visit receipt/);
 });
