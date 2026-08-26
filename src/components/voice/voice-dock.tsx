@@ -9,6 +9,12 @@ import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/format";
 import type { CapturePhase } from "@/hooks/use-voice-capture";
 import { cn } from "@/lib/utils";
+import {
+  isKeyboardVoiceActivation,
+  voicePointerDownIntent,
+  voicePointerReleaseIntent,
+  type VoicePointerIntent,
+} from "@/lib/audio/voice-gesture";
 
 /**
  * The floating dock — the app's one persistent control.
@@ -50,9 +56,6 @@ import { cn } from "@/lib/utils";
  */
 
 const LOCK_DISTANCE = 64;
-/** Under this, with no travel, a press was a tap and not a hold. */
-const TAP_MS = 350;
-const TAP_SLOP_PX = 10;
 
 export function VoiceDock({
   phase,
@@ -92,9 +95,10 @@ export function VoiceDock({
   const [question, setQuestion] = useState("");
   const originY = useRef(0);
   const pressedAt = useRef(0);
-  // Set for the duration of a pointer interaction so the synthetic `click` that
-  // follows a mouse or touch press does not run the keyboard path as well.
-  const pointerHandled = useRef(false);
+  // Capture what this particular pointer intended before `onStart` changes the
+  // phase. Without this, the release of the first tap can look like a second
+  // recording gesture after React re-renders the dock as `arming`.
+  const pointerIntent = useRef<VoicePointerIntent>("none");
   const dockRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
 
@@ -121,8 +125,21 @@ export function VoiceDock({
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent) => {
-      if (listening || busy) return;
-      pointerHandled.current = true;
+      if (!event.isPrimary || event.button !== 0) return;
+
+      const intent = voicePointerDownIntent({ listening, busy });
+      pointerIntent.current = intent;
+      if (intent === "none") return;
+
+      // A second tap is unambiguously a stop. Do it on pointer-down so a mobile
+      // browser cannot lose the action if the control changes during pointer-up
+      // or before its delayed synthetic click.
+      if (intent === "stop") {
+        setSlide(0);
+        onStop();
+        return;
+      }
+
       // Capture the pointer so the slide keeps tracking even when the finger
       // leaves the 64px key — which it always does, that being the point.
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -132,7 +149,7 @@ export function VoiceDock({
       setLocked(false);
       onStart();
     },
-    [busy, listening, onStart],
+    [busy, listening, onStart, onStop],
   );
 
   const handlePointerMove = useCallback(
@@ -154,44 +171,36 @@ export function VoiceDock({
     (event: React.PointerEvent) => {
       const travel = Math.abs(originY.current - event.clientY);
       const heldFor = performance.now() - pressedAt.current;
+      const intent = pointerIntent.current;
+      pointerIntent.current = "none";
       setSlide(0);
 
-      // The latch exists so the synthetic click that trails a tap does not also
-      // run the keyboard path. But a click only follows a *still* pointerup — a
-      // slide-to-lock drag, or a cancelled gesture, produces none, so the latch
-      // stayed set and swallowed the next keyboard Enter/Space on the mic,
-      // silently disabling keyboard operation of the app's primary control.
-      // Clear it exactly when no click is coming to clear it for us.
-      if (event.type === "pointercancel" || travel >= TAP_SLOP_PX) {
-        pointerHandled.current = false;
-      }
+      const releaseIntent = voicePointerReleaseIntent({
+        pointerIntent: intent,
+        listening,
+        locked,
+        cancelled: event.type === "pointercancel",
+        heldForMs: heldFor,
+        travelPx: travel,
+      });
 
-      if (locked) return; // stays open until the stop button is pressed
-      if (!listening) return;
-
-      // A quick, still press is a tap: keep recording and hand the doctor their
-      // thumb back. Anything longer or with travel in it was a hold, and a hold
-      // ends when it is released.
-      if (heldFor < TAP_MS && travel < TAP_SLOP_PX) {
+      if (releaseIntent === "lock") {
         setLocked(true);
         navigator.vibrate?.(12);
         return;
       }
 
-      onStop();
+      if (releaseIntent === "stop") onStop();
     },
     [listening, locked, onStop],
   );
 
   /* ---- Keyboard: Enter / Space ------------------------------------------ */
 
-  const handleClick = useCallback(() => {
-    // Mouse and touch already ran the pointer path; this is the trailing click
-    // they generate. Only a keyboard (or assistive tech) reaches past here.
-    if (pointerHandled.current) {
-      pointerHandled.current = false;
-      return;
-    }
+  const handleClick = useCallback((event: React.MouseEvent) => {
+    // Pointer input already ran on pointer-down. Keyboard and assistive
+    // technology clicks have detail 0 and use this accessible toggle path.
+    if (!isKeyboardVoiceActivation(event.detail)) return;
     if (busy) return;
 
     if (listening) {
@@ -409,7 +418,8 @@ export function VoiceDock({
                 )}
                 <button
                   type="button"
-                  onClick={onStop}
+                  onPointerDown={handlePointerDown}
+                  onClick={handleClick}
                   className="pressable grid size-14 place-items-center rounded-full border border-destructive bg-destructive text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none sm:size-16"
                 >
                   <Square className="size-5 fill-current" aria-hidden />
