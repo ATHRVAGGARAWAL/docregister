@@ -190,6 +190,13 @@ function llmResponse(error: LlmError): [message: string, status: number] {
       return ["The assistant would not process that dictation. Try again.", 422];
     case "truncated":
       return ["That dictation was too long for the assistant to finish.", 422];
+    case "timeout":
+      // Distinct from the default on purpose. "Could not read that dictation"
+      // tells a doctor their speech was the problem and invites them to say it
+      // differently; a timeout means the provider never answered, and the same
+      // words will very likely work on the next attempt. 504 rather than 502
+      // because nothing upstream failed — it did not reply.
+      return ["The assistant did not respond in time. Try again.", 504];
     default:
       return ["The assistant could not read that dictation. Try again.", 502];
   }

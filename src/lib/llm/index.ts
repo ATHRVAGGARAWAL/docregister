@@ -118,12 +118,18 @@ const NEVER_RETRY: ReadonlySet<LlmErrorCode> = new Set(["blocked", "auth"]);
 /**
  * The single entry point the prompt modules use.
  *
- * Bounded in two directions, because until now it was bounded in neither. A
- * provider that accepted the connection and then stalled held the route open
- * for its full minute with the review sheet spinning and failed anyway; and a
- * transient 529 failed the consultation outright even though `retryable` — a
- * flag declared with the first adapter and read by nothing — already knew
- * better.
+ * Bounded in two directions, and the two bounds answer different failures.
+ *
+ * A per-attempt deadline is for a provider that accepts the connection and then
+ * stalls: without it the request holds the route open until the platform kills
+ * it, the doctor watches the review sheet spin for a minute, and it fails
+ * anyway. A total budget is what keeps the retries themselves from becoming
+ * that same stall — the sum has to fit inside the route's `maxDuration` or the
+ * retry is just a slower way to lose the consultation.
+ *
+ * Retries are gated on `LlmError.retryable` rather than on the status code,
+ * because that flag is where each adapter has already decided which of its
+ * vendor's failures a second identical call could plausibly change.
  *
  * Mock mode never reaches here: `extract.ts`, `recall.ts` and `intent.ts`
  * return their offline answers before calling this, so `LLM_MOCK=1` keeps its

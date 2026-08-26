@@ -142,7 +142,13 @@ function decorate(
 export const config = {
   // Skip static assets and the audio worklet — running an auth round trip for
   // every icon is pure latency.
+  //
+  // `.webmanifest` is here for a stronger reason than latency: a browser fetches
+  // the manifest to decide whether the app is installable, and it does that
+  // without credentials. Bounced to /login it parses as HTML, so installation
+  // silently never becomes available — no error, just an "Add to home screen"
+  // that is permanently absent.
   matcher: [
-    "/((?!_next/static|_next/image|worklets|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?)$).*)",
+    "/((?!_next/static|_next/image|worklets|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?|webmanifest)$).*)",
   ],
 };

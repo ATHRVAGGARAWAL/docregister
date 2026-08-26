@@ -70,6 +70,16 @@ const MAX_LIMIT = 1000;
 const STORAGE_BATCH = 100;
 
 /**
+ * How many ids may go into one `.in("id", …)` filter.
+ *
+ * PostgREST puts that list in the query string, so the ceiling is the gateway's
+ * URL limit, not a database one. A uuid plus its separator is 37 bytes; 100 of
+ * them is ~3.7 KB, which sits comfortably inside the usual 8 KB while keeping
+ * the number of round trips low.
+ */
+const MARK_BATCH = 100;
+
+/**
  * The one new secret this route needs, read the way `src/lib/env.ts` reads its
  * own: a lazy getter, so importing this module cannot fail a deployment that
  * has not scheduled the purge yet. It is declared here rather than added to
@@ -289,27 +299,42 @@ export async function POST(request: Request) {
 
   let marked = 0;
   if (purgedIds.length > 0) {
-    const { data: updated, error: updateError } = await supabase
-      .from("transcripts")
-      .update({ audio_deleted_at: new Date().toISOString(), audio_path: null })
-      // `purgedIds` is built from this run's own select, never from the
-      // request. `audio_deleted_at is null` is re-asserted so that two
-      // overlapping runs cannot restamp a row the first one already closed —
-      // the second simply updates nothing, which is what makes the whole route
-      // safe to call again at any time.
-      .in("id", purgedIds)
-      .is("audio_deleted_at", null)
-      .select("id");
+    // Chunked for the same reason the deletes are: `.in("id", …)` becomes a
+    // query string, and PostgREST is fronted by a gateway that rejects a long
+    // one. At `MAX_LIMIT` this list is a thousand uuids — roughly 37 KB of URL,
+    // well past any reasonable header limit — so a full backlog run would fail
+    // here, after the objects were already deleted. That is the worst place in
+    // this route to fail, because it is the window where storage and the audit
+    // trail disagree.
+    const timestamp = new Date().toISOString();
+    for (const batch of chunked(purgedIds, MARK_BATCH)) {
+      const { data: updated, error: updateError } = await supabase
+        .from("transcripts")
+        .update({ audio_deleted_at: timestamp, audio_path: null })
+        // `purgedIds` is built from this run's own select, never from the
+        // request. `audio_deleted_at is null` is re-asserted so that two
+        // overlapping runs cannot restamp a row the first one already closed —
+        // the second simply updates nothing, which is what makes the whole
+        // route safe to call again at any time.
+        .in("id", batch)
+        .is("audio_deleted_at", null)
+        .select("id");
 
-    if (updateError) {
-      // The objects are gone but the rows still claim otherwise. Nothing is
-      // lost — the next run finds the same rows, `remove` reports nothing to
-      // delete, `confirmAbsent` says absent, and the mark is retried.
-      console.error("[audio-retention] could not record the deletions", updateError.code);
-      return json({ error: "Recordings were deleted but could not be recorded as deleted." }, 502);
+      if (updateError) {
+        // The objects are gone but the rows still claim otherwise. Nothing is
+        // lost — the next run finds the same rows, `remove` reports nothing to
+        // delete, `confirmAbsent` says absent, and the mark is retried. Earlier
+        // batches in this loop stay marked, which is correct: they describe
+        // objects that really are gone.
+        console.error("[audio-retention] could not record the deletions", updateError.code);
+        return json(
+          { error: "Recordings were deleted but could not be recorded as deleted." },
+          502,
+        );
+      }
+
+      marked += updated?.length ?? 0;
     }
-
-    marked = updated?.length ?? 0;
   }
 
   const [remaining, withoutExpiry] = await Promise.all([

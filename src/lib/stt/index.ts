@@ -66,8 +66,8 @@ function fallbackFor(primary: SttProvider): SttProvider | undefined {
  * decorative, which is exactly the state a provider stall used to produce.
  *
  * Two things to check before raising it. `/api/drafts/[id]/retry` spends a
- * further `LLM_TIMEOUT_MS` on extraction inside the same 60s, so it is the
- * tighter of the two callers. And Sarvam's romanisation pass is not part of the
+ * further `BUDGET_MS.precise.total` (36s, in src/lib/llm/index.ts) on extraction
+ * inside the same 60s, so it is the tighter of the two callers. And Sarvam's romanisation pass is not part of the
  * 40s above — it runs after a *successful* primary, and is capped separately in
  * `sarvam.ts` so a nicety cannot push a finished transcript past `maxDuration`.
  */

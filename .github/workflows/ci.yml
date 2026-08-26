@@ -1,10 +1,22 @@
 name: CI
 
-# Two jobs, because they need different things. `check` needs no secrets and
-# must pass for every fork and every pull request. `e2e` drives a real browser
-# against a real Supabase project, so it can only run where those credentials
-# exist — and it is skipped, not failed, everywhere else. A red X that a
-# contributor has no way to clear is a check people learn to ignore.
+# Three floors, cheapest first.
+#
+#   check  — lint, `next typegen && tsc --noEmit`, and the unit suite. Needs no
+#            secrets, so it is the one gate a fork's pull request can clear.
+#            `next typegen` is what catches a schema drift after
+#            `database.types.ts` is regenerated.
+#   e2e    — a real browser against the built app. It covers the failures that
+#            typecheck cannot see because they are produced by the router, the
+#            proxy and hydration rather than by any function: a deep link that
+#            renders the wrong workspace, an /api path that answers with the
+#            login page's HTML, a count that says "0 patients" over a clinic
+#            that has 46.
+#
+# The e2e job needs a Supabase project to sign in against, and a fork does not
+# have one. It is gated on the secrets being readable rather than skipped by
+# hand, because a red X a contributor cannot clear is a check they learn to
+# ignore.
 on:
   push:
     branches: [main]
@@ -26,11 +38,48 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:unit
 
-  e2e:
+  # GitHub does not expose the `secrets` context to a job-level `if`, so the
+  # question "can we sign in?" has to be answered inside a job and published as
+  # an output. Only emptiness is ever printed — never a value.
+  e2e-secrets:
     runs-on: ubuntu-latest
-    # Fork pull requests do not receive secrets, so this would fail for a reason
-    # the contributor cannot act on.
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    outputs:
+      present: ${{ steps.probe.outputs.present }}
+    steps:
+      - id: probe
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DOCTOR_EMAIL: ${{ secrets.E2E_DOCTOR_EMAIL }}
+        run: |
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_PUBLISHABLE_KEY" ] \
+            && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] && [ -n "$DOCTOR_EMAIL" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping the end-to-end suite: this run cannot read NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY and E2E_DOCTOR_EMAIL. Expected on a fork."
+          fi
+
+  e2e:
+    needs: [check, e2e-secrets]
+    if: needs.e2e-secrets.outputs.present == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # An address that already has a doctor row in that project. The suite
+      # mints a magic-link session for it; it never creates the account.
+      E2E_DOCTOR_EMAIL: ${{ secrets.E2E_DOCTOR_EMAIL }}
+      # No provider keys in CI, and none needed: nothing in this suite dictates
+      # or extracts. The mock adapters keep a route that reaches a model from
+      # failing on a missing key rather than on the thing under test.
+      STT_PROVIDER: mock
+      LLM_PROVIDER: mock
+      # Playwright's traces and screenshots land outside the checkout, so they
+      # cannot be picked up as source changes.
+      PLAYWRIGHT_OUTPUT_DIR: ${{ runner.temp }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,28 +87,19 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Check for Supabase credentials
-        id: creds
-        env:
-          URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        run: echo "present=${{ env.URL != '' }}" >> "$GITHUB_OUTPUT"
-      - if: steps.creds.outputs.present == 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.creds.outputs.present == 'true'
-        run: npm run test:e2e
-        env:
-          CI: "true"
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          E2E_DOCTOR_EMAIL: ${{ secrets.E2E_DOCTOR_EMAIL }}
-      - if: steps.creds.outputs.present != 'true'
-        run: echo "No Supabase secrets configured — end-to-end tests skipped."
-      - uses: actions/upload-artifact@v4
-        if: failure()
+      # Chromium only. The suite asserts layout and console behaviour that this
+      # app is actually shipped against, and a second engine would triple the
+      # runtime to report differences no doctor will ever see.
+      - run: npx playwright install --with-deps chromium
+      # The built app, not `next dev`: the dev bundle ships an error overlay and
+      # a dev-tools launcher that a doctor never gets, and both are DOM the
+      # layout assertions would have to be taught to ignore.
+      - run: npm run build
+      - run: npm run test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
+          name: playwright-trace
+          path: ${{ runner.temp }}/docregister-e2e
           retention-days: 7
+          if-no-files-found: ignore

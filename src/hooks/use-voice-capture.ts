@@ -182,8 +182,15 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
   // dictation, so it is structural rather than a matter of care: nothing that
   // writes this field also touches `phase`, `recorderRef` or `process`, and the
   // path from stop to a filed visit — `recorder.stop()` → upload → extract —
-  // never reads it. A socket that fails on the first frame and one that never
-  // fails produce byte-identical uploads.
+  // never reads it.
+  //
+  // The uploads are not byte-identical: the form carries `liveText` alongside
+  // the audio, so a socket that died contributes an empty one. That field is
+  // only ever stored (`transcripts.live_text`) and shown back as provenance —
+  // nothing derives the register entry from it, and batch transcription of the
+  // recorded audio is what produces the text either way. So what survives a
+  // dead socket is the whole clinical record; what is lost is the preview and
+  // the note of what the preview said.
   const [liveTranscript, setLiveTranscript] = useState<LiveTranscriptState>(LIVE_TRANSCRIPT_OFF);
 
   const recorderRef = useRef<VoiceRecorder | null>(null);
@@ -306,8 +313,16 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
             // A reconnect that lands means interim text is flowing again.
             setLiveTranscript(LIVE_TRANSCRIPT_LIVE);
           } else if (event.state === "unavailable") {
-            // The socket has already worked out which failure this is by the
-            // time it says so, having spent its retries; carry the reason
+            // Two different things reach here and only one of them is terminal.
+            // `giveUp()` means the dial budget is spent and no more text is
+            // coming. The proxy's own `unavailable` frame means the vendor
+            // behind a reachable proxy is refusing right now — a redial may
+            // still recover, and a later `open` will move this back to live.
+            //
+            // Both are reported the same way on purpose: from the doctor's side
+            // the honest statement is identical — text has stopped arriving —
+            // and a preview that keeps claiming to listen through a failure the
+            // socket already knows about is the worse lie. Carry the reason
             // through rather than flattening it back to a boolean here.
             //
             // Same failure twice is normal — the proxy announces an upstream

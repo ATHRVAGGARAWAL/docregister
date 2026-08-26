@@ -44,6 +44,12 @@ const nextConfig: NextConfig = {
       { source: "/_next/static/:path*", headers: staticHeaders },
       { source: "/worklets/:path*", headers: staticHeaders },
       { source: "/favicon.ico", headers: staticHeaders },
+      // The manifest and its icons are now excluded from the auth proxy so a
+      // browser can read them uncredentialed. That exclusion also means they no
+      // longer inherit the proxy's security headers, so they are given them
+      // here rather than being the only unprotected responses on the origin.
+      { source: "/manifest.webmanifest", headers: staticHeaders },
+      { source: "/icons/:path*", headers: staticHeaders },
     ];
   },
 };

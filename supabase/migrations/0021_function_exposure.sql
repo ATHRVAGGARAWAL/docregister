@@ -29,8 +29,9 @@
 --
 -- (2) INTERNAL HELPERS with no caller. `mark_audio_deleted` is SECURITY
 --     DEFINER and 0011 granted it to `authenticated` for an audio-retention
---     caller that was never written — nothing under src/ names it, and the
---     retention job cannot use it: the function joins `doctors where id =
+--     caller that was never written. The retention job that now exists
+--     (src/app/api/maintenance/audio-retention/route.ts) names the function
+--     only to explain why it does not call it: the function joins `doctors where id =
 --     auth.uid()`, which is null under the service-role key a scheduled job
 --     runs with. So the grant buys the app nothing and costs it this: any
 --     doctor can null the `audio_path` of every transcript in their clinic in
