@@ -46,6 +46,8 @@ export function VoiceDock({
   onStart,
   onStop,
   onCancel,
+  canRetryTranscription,
+  onRetryTranscription,
   onAsk,
   onManualEntry,
 }: {
@@ -62,6 +64,8 @@ export function VoiceDock({
   onStart: () => void;
   onStop: () => void;
   onCancel: () => void;
+  canRetryTranscription: boolean;
+  onRetryTranscription: () => void;
   onAsk: (question: string) => void;
   onManualEntry: () => void;
 }) {
@@ -203,7 +207,7 @@ export function VoiceDock({
               <span className="relative grid size-10 shrink-0 place-items-center rounded-full border border-primary/20 bg-primary/10 text-primary">
                 {!reduceMotion && (
                   <motion.span
-                    className="absolute inset-0 rounded-full border border-primary/35"
+                    className="pointer-events-none absolute inset-0 rounded-full border border-primary/35"
                     animate={{ scale: [1, 1.45], opacity: [0.75, 0] }}
                     transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
                     aria-hidden
@@ -259,10 +263,17 @@ export function VoiceDock({
         {error && (
           <div className="col-span-full mt-2 flex flex-col gap-2 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <p role="alert" className="text-xs text-destructive">{error}</p>
-            <Button type="button" size="sm" variant="outline" onClick={onManualEntry}>
-              <FilePenLine className="size-4" aria-hidden />
-              Enter manually
-            </Button>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {canRetryTranscription && (
+                <Button type="button" size="sm" onClick={onRetryTranscription}>
+                  Retry transcription
+                </Button>
+              )}
+              <Button type="button" size="sm" variant="outline" onClick={onManualEntry}>
+                <FilePenLine className="size-4" aria-hidden />
+                Enter manually
+              </Button>
+            </div>
           </div>
         )}
 
@@ -282,7 +293,7 @@ export function VoiceDock({
               <div className="relative">
                 {!reduceMotion && (
                   <motion.span
-                    className="absolute -inset-2 rounded-full border border-destructive/35"
+                    className="pointer-events-none absolute -inset-2 rounded-full border border-destructive/35"
                     animate={{ scale: [1, 1.35], opacity: [0.6, 0] }}
                     transition={{ duration: 1.35, repeat: Infinity, ease: "easeOut" }}
                     aria-hidden
@@ -291,7 +302,7 @@ export function VoiceDock({
                 <button
                   type="button"
                   onClick={handleToggle}
-                  className="pressable grid size-14 place-items-center rounded-full border border-destructive bg-destructive text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none sm:size-16"
+                  className="pressable relative z-10 grid size-14 touch-manipulation place-items-center rounded-full border border-destructive bg-destructive text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none sm:size-16"
                 >
                   <Square className="size-5 fill-current" aria-hidden />
                   <span className="sr-only">Stop recording and review this visit</span>
@@ -312,7 +323,7 @@ export function VoiceDock({
                     aria-pressed={false}
                     style={{ transform: `scale(${reduceMotion ? 1 : 1 + level * 0.1})` }}
                     className={cn(
-                      "relative grid place-items-center rounded-full border border-primary bg-primary text-primary-foreground shadow-flat transition-[transform,background-color] duration-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:opacity-50",
+                      "relative grid touch-manipulation place-items-center rounded-full border border-primary bg-primary text-primary-foreground shadow-flat transition-[transform,background-color] duration-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:opacity-50",
                       "size-14",
                     )}
                     aria-label="Start recording a visit"

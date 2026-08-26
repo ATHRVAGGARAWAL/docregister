@@ -619,7 +619,9 @@ export function Dashboard({
                   loadingRange={loadingRange}
                   rangeError={analyticsError}
                   onRangeChange={(days) => void loadRange(days)}
+                  dictationPhase={capture.phase}
                   onStartDictation={() => void capture.start()}
+                  onStopDictation={() => void capture.stop()}
                   onOpenRegister={() => changeView("register")}
                   onOpenRecall={() => changeView("recall")}
                   onOpenPatient={setChartPatient}
@@ -742,6 +744,8 @@ export function Dashboard({
         onStart={() => void capture.start()}
         onStop={() => void capture.stop()}
         onCancel={capture.cancel}
+        canRetryTranscription={capture.canRetryTranscription}
+        onRetryTranscription={capture.retryTranscription}
         onAsk={(text) => {
           // The dock's own box is typed too, so the same rule applies as in the
           // recall workspace above.

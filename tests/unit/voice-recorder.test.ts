@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { VoiceRecorder } from "../../src/lib/audio/recorder.ts";
+import { RECORDING_AUDIO_BITS_PER_SECOND } from "../../src/lib/audio/limits.ts";
 
 class FakeNode {
   connect() {
@@ -35,8 +36,10 @@ class FakeMediaRecorder {
   ondataavailable: ((event: { data: Blob }) => void) | null = null;
   onerror: (() => void) | null = null;
   onstop: (() => void) | null = null;
+  readonly options?: MediaRecorderOptions;
 
-  constructor() {
+  constructor(_stream?: MediaStream, options?: MediaRecorderOptions) {
+    this.options = options;
     FakeMediaRecorder.instances.push(this);
   }
 
@@ -46,6 +49,7 @@ class FakeMediaRecorder {
 
   stop() {
     this.state = "inactive";
+    this.ondataavailable?.({ data: new Blob(["recorded voice"], { type: this.mimeType }) });
     this.onstop?.();
   }
 }
@@ -94,6 +98,29 @@ test("cancelling while permission is pending stops a later-arriving stream", asy
 
     await assert.rejects(starting, (error: Error) => error.name === "AbortError");
     assert.equal(track.stopped, true);
+  } finally {
+    restore();
+  }
+});
+
+test("stopping finalises the blob and releases the microphone immediately", async () => {
+  const track = { stopped: false, stop() { this.stopped = true; } };
+  const restore = installBrowserAudioMocks({
+    getUserMedia: async () => ({ getTracks: () => [track] }),
+    addModule: async () => undefined,
+  });
+
+  try {
+    const recorder = new VoiceRecorder();
+    await recorder.start();
+
+    const mediaRecorder = FakeMediaRecorder.instances.at(-1);
+    assert.equal(mediaRecorder?.options?.audioBitsPerSecond, RECORDING_AUDIO_BITS_PER_SECOND);
+
+    const result = await recorder.stop();
+    assert.equal(track.stopped, true);
+    assert.equal(await result.blob.text(), "recorded voice");
+    assert.equal(result.mimeType, "audio/webm;codecs=opus");
   } finally {
     restore();
   }

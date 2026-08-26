@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { LiveTranscriptSocket } from "@/lib/audio/live-transcript";
-import { RECORDING_LIMIT_MS, RECORDING_WARNING_MS } from "@/lib/audio/limits";
+import {
+  RECORDING_LIMIT_MS,
+  RECORDING_UPLOAD_LIMIT_BYTES,
+  RECORDING_WARNING_MS,
+} from "@/lib/audio/limits";
 import { VoiceRecorder, type RecordingResult } from "@/lib/audio/recorder";
 import type { Extraction } from "@/lib/llm/schema";
 
@@ -110,6 +114,7 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
   const [finalText, setFinalText] = useState("");
   const [draft, setDraft] = useState<CaptureDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryRecording, setRetryRecording] = useState<RecordingResult | null>(null);
   // Tracked apart from `phase` on purpose. Live text is feedback; the
   // MediaRecorder blob is the transcript of record, and it keeps being written
   // whatever happens to the socket. So this never moves the state machine — it
@@ -122,6 +127,7 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef(0);
   const spectrumRef = useRef<Uint8Array>(new Uint8Array(0));
+  const finalTextRef = useRef("");
   // Guards the whole async tail against a component that unmounts mid-flight —
   // a real risk here, because the doctor can navigate away while the LLM runs.
   const aliveRef = useRef(true);
@@ -159,12 +165,17 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
   }, []);
 
   const start = useCallback(async () => {
-    if (phase === "listening" || phase === "arming") return;
+    // `recorderRef` closes the double-tap window before React has rendered the
+    // new phase. The phase guard also prevents the Overview CTA from starting a
+    // second microphone while the previous visit is being processed.
+    if (recorderRef.current || (phase !== "idle" && phase !== "error")) return;
 
     setError(null);
+    setRetryRecording(null);
     setDraft(null);
     setInterimText("");
     setFinalText("");
+    finalTextRef.current = "";
     setElapsedMs(0);
     setLiveTextUnavailable(false);
     setPhase("arming");
@@ -203,7 +214,11 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
             return;
           }
           if (event.type === "final") {
-            setFinalText((prev) => (prev ? `${prev} ${event.text}` : event.text));
+            const next = finalTextRef.current
+              ? `${finalTextRef.current} ${event.text}`
+              : event.text;
+            finalTextRef.current = next;
+            setFinalText(next);
             setInterimText("");
             return;
           }
@@ -276,27 +291,46 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
       form.append("mimeType", recording.mimeType);
       form.append("durationMs", String(Math.round(recording.durationMs)));
       form.append("sampleRate", String(recording.sampleRate));
-      form.append("liveText", finalText);
+      form.append("liveText", finalTextRef.current);
       if (languageParam) form.append("languages", languageParam);
 
+      let transcribed: TranscribePayload;
       try {
         const transcribeResponse = await fetch("/api/encounters/transcribe", {
           method: "POST",
           body: form,
         });
-        const transcribed = await readJson(transcribeResponse);
+        transcribed = await readJson<TranscribePayload>(transcribeResponse);
+        if (!aliveRef.current) return;
+      } catch (cause) {
         if (!aliveRef.current) return;
 
-        setFinalText(transcribed.text ?? "");
-        setInterimText("");
-        setPhase("extracting");
+        const retryable = isRetryableTranscriptionFailure(cause);
+        setRetryRecording(retryable ? recording : null);
+        console.error("[voice] transcription upload failed", {
+          bytes: recording.blob.size,
+          durationMs: Math.round(recording.durationMs),
+          mimeType: recording.mimeType,
+          error: cause instanceof Error ? cause.name : "UnknownError",
+        });
+        setError(transcriptionFailureMessage(cause, retryable));
+        setPhase("error");
+        return;
+      }
 
+      setRetryRecording(null);
+      finalTextRef.current = transcribed.text ?? "";
+      setFinalText(finalTextRef.current);
+      setInterimText("");
+      setPhase("extracting");
+
+      try {
         const extractResponse = await fetch("/api/encounters/extract", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ transcriptId: transcribed.transcriptId }),
         });
-        const extracted = await readJson(extractResponse);
+        const extracted = await readJson<ExtractPayload & { kind?: string }>(extractResponse);
         if (!aliveRef.current) return;
 
         // "Pull up Sunita's records" comes through the same key as a
@@ -320,8 +354,14 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
         setPhase("error");
       }
     },
-    [finalText, languageParam],
+    [languageParam],
   );
+
+  const retryTranscription = useCallback(() => {
+    if (!retryRecording || phase === "transcribing" || phase === "extracting") return;
+    setError(null);
+    void process(retryRecording);
+  }, [phase, process, retryRecording]);
 
   /**
    * File a recording as a visit after the classifier called it a question.
@@ -346,7 +386,7 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
           treatAs: "dictation",
         }),
       });
-      const extracted = await readJson(response);
+      const extracted = await readJson<ExtractPayload>(response);
       if (!aliveRef.current) return;
 
       setDraft(draftFrom(transcript, extracted));
@@ -372,6 +412,7 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
       teardownCapture();
       setInterimText("");
       setFinalText("");
+      finalTextRef.current = "";
       setElapsedMs(0);
       setPhase("idle");
       return;
@@ -408,6 +449,18 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
       return;
     }
 
+    if (recording.blob.size > RECORDING_UPLOAD_LIMIT_BYTES) {
+      console.error("[voice] recording exceeds upload ceiling", {
+        bytes: recording.blob.size,
+        durationMs: Math.round(recording.durationMs),
+        mimeType: recording.mimeType,
+      });
+      setRetryRecording(null);
+      setError("This recording is too large to upload. Please enter this visit manually.");
+      setPhase("error");
+      return;
+    }
+
     await process(recording);
   }, [phase, process, teardownCapture]);
 
@@ -417,7 +470,9 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
     teardownCapture();
     setInterimText("");
     setFinalText("");
+    finalTextRef.current = "";
     setElapsedMs(0);
+    setRetryRecording(null);
     setPhase("idle");
   }, [teardownCapture]);
 
@@ -426,21 +481,20 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
     setError(null);
     setInterimText("");
     setFinalText("");
+    finalTextRef.current = "";
     setElapsedMs(0);
+    setRetryRecording(null);
     setPhase("idle");
   }, []);
 
-  // Stop at one minute so a consultation stays bounded and the upload remains
-  // reliable on a clinic's mobile connection.
+  // Stop on a real deadline rather than waiting for the display interval to
+  // notice it crossed one minute. Mobile Safari may throttle interval-driven
+  // renders, which used to let the encoded duration overshoot the upload limit.
   useEffect(() => {
     if (phase !== "listening") return;
-    if (elapsedMs < RECORDING_LIMIT_MS) return;
-    // Cross the effect boundary through a task. `stop` intentionally performs
-    // immediate UI teardown before awaiting MediaRecorder, which should not be
-    // invoked synchronously from an effect body.
-    const timeout = window.setTimeout(() => void stop(), 0);
+    const timeout = window.setTimeout(() => void stop(), RECORDING_LIMIT_MS);
     return () => window.clearTimeout(timeout);
-  }, [elapsedMs, phase, stop]);
+  }, [phase, stop]);
 
   return {
     phase,
@@ -459,10 +513,12 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
      * error and never as colour alone.
      */
     liveTextUnavailable,
+    canRetryTranscription: Boolean(retryRecording),
     approachingLimit: phase === "listening" && elapsedMs > RECORDING_WARNING_MS,
     remainingMs: Math.max(0, RECORDING_LIMIT_MS - elapsedMs),
     start,
     stop,
+    retryTranscription,
     cancel,
     reset,
     recordAsVisit,
@@ -522,10 +578,39 @@ function extensionFor(mimeType: string): string {
   return "webm";
 }
 
-async function readJson(response: Response) {
+class ApiResponseError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiResponseError";
+  }
+}
+
+function isRetryableTranscriptionFailure(cause: unknown): boolean {
+  if (!(cause instanceof ApiResponseError)) return true;
+  return cause.status === 408 || cause.status === 429 || cause.status >= 500;
+}
+
+function transcriptionFailureMessage(cause: unknown, retryable: boolean): string {
+  if (!(cause instanceof ApiResponseError)) {
+    return "Could not reach the server. This recording is still available on this screen — check your connection and try again.";
+  }
+  if (retryable) {
+    return `${cause.message} This recording is still available on this screen.`;
+  }
+  return cause.message;
+}
+
+async function readJson<T = Record<string, unknown>>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload?.error ?? `Request failed (${response.status})`);
+    const message =
+      typeof payload === "object" && payload && "error" in payload && typeof payload.error === "string"
+        ? payload.error
+        : `Request failed (${response.status})`;
+    throw new ApiResponseError(message, response.status);
   }
-  return payload;
+  return payload as T;
 }

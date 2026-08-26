@@ -210,10 +210,10 @@ function sttResponse(error: SttError): [message: string, status: number] {
     case "auth":
       return ["Transcription is not configured. Check the server API key.", 502];
     default:
-      // "Try again" is a real instruction, not a platitude: the transcribe
-      // route stores the audio before it calls a provider, so a retry costs the
-      // doctor a tap rather than the whole consultation.
-      return ["Transcription failed. Your recording was saved — try again.", 502];
+      // The browser retains the original blob and exposes a retry action. The
+      // server may also have stored the upload, but it cannot promise a usable
+      // retry id until a transcript row exists.
+      return ["Transcription failed. Please try again.", 502];
   }
 }
 

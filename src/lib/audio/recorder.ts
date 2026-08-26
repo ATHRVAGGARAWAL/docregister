@@ -1,5 +1,7 @@
 "use client";
 
+import { RECORDING_AUDIO_BITS_PER_SECOND } from "./limits.ts";
+
 /**
  * Dual-path audio capture.
  *
@@ -199,10 +201,21 @@ export class VoiceRecorder {
     this.source.connect(destination);
 
     const { mimeType } = pickMimeType();
-    this.recorder = new MediaRecorder(
-      destination.stream,
-      mimeType ? { mimeType } : undefined,
-    );
+    const recorderOptions: MediaRecorderOptions = {
+      audioBitsPerSecond: RECORDING_AUDIO_BITS_PER_SECOND,
+      ...(mimeType ? { mimeType } : {}),
+    };
+    try {
+      this.recorder = new MediaRecorder(destination.stream, recorderOptions);
+    } catch {
+      // Older WebKit builds may accept the MIME type but reject the bitrate
+      // option. Falling back still records; the client-side byte ceiling keeps
+      // an unexpectedly large result away from the hosting edge.
+      this.recorder = new MediaRecorder(
+        destination.stream,
+        mimeType ? { mimeType } : undefined,
+      );
+    }
     this.negotiatedMime = this.recorder.mimeType || mimeType || "audio/webm";
     this.chunks = [];
     this.recorder.ondataavailable = (event) => {
@@ -278,7 +291,10 @@ export class VoiceRecorder {
     // already rejects a blob under 1 KB with a clear message, which is a better
     // outcome than an await that never returns.
     const blob = await new Promise<Blob>((resolve) => {
+      let settled = false;
       const settle = () => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         resolve(new Blob(this.chunks, { type: this.negotiatedMime }));
       };
@@ -290,12 +306,19 @@ export class VoiceRecorder {
       if (recorder.state !== "inactive") {
         try {
           recorder.stop();
+          // MediaRecorder can take a moment to finalise its container, but the
+          // microphone hardware no longer needs to remain live during that
+          // wait. This turns off iOS's recording indicator as soon as Stop is
+          // accepted while `dataavailable` still delivers the buffered audio.
+          this.stopInputTracks();
         } catch {
           // Already stopping, or in a state that refuses stop(). Either way the
           // chunks are what they are.
+          this.stopInputTracks();
           settle();
         }
       } else {
+        this.stopInputTracks();
         settle();
       }
     });
@@ -356,7 +379,7 @@ export class VoiceRecorder {
     // Stopping every track is what turns off the OS microphone indicator. A
     // recording light that stays on after a consultation is alarming to a
     // doctor and looks like the app is still listening — because it is.
-    this.stream?.getTracks().forEach((track) => track.stop());
+    this.stopInputTracks();
 
     void this.context?.close().catch(() => undefined);
 
@@ -367,6 +390,10 @@ export class VoiceRecorder {
     this.worklet = undefined;
     this.workletSink = undefined;
     this.recorder = undefined;
+  }
+
+  private stopInputTracks() {
+    this.stream?.getTracks().forEach((track) => track.stop());
   }
 }
 

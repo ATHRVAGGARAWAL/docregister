@@ -5,6 +5,7 @@ import {
   CalendarDaysIcon,
   HistoryIcon,
   Mic2Icon,
+  Square,
   SparklesIcon,
 } from "@/components/icons";
 
@@ -15,7 +16,7 @@ import { StatRail } from "@/components/dashboard/stat-rail";
 import { VisitHero } from "@/components/dashboard/visit-hero";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import type { PatientMatch } from "@/hooks/use-voice-capture";
+import type { CapturePhase, PatientMatch } from "@/hooks/use-voice-capture";
 import { cn } from "@/lib/utils";
 import type { AnalyticsPayload, RegisterEntry } from "@/lib/types";
 
@@ -36,7 +37,9 @@ export function OverviewView({
   loadingRange,
   rangeError,
   onRangeChange,
+  dictationPhase,
   onStartDictation,
+  onStopDictation,
   onOpenRegister,
   onOpenRecall,
   onOpenPatient,
@@ -48,11 +51,16 @@ export function OverviewView({
   loadingRange: boolean;
   rangeError: string | null;
   onRangeChange: (days: number) => void;
+  dictationPhase: CapturePhase;
   onStartDictation: () => void;
+  onStopDictation: () => void;
   onOpenRegister: () => void;
   onOpenRecall: () => void;
   onOpenPatient: (patient: PatientMatch) => void;
 }) {
+  const recording = dictationPhase === "arming" || dictationPhase === "listening";
+  const processing = dictationPhase === "transcribing" || dictationPhase === "extracting";
+
   return (
     <div className="space-y-6 sm:space-y-11">
       <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end sm:gap-6">
@@ -70,13 +78,20 @@ export function OverviewView({
         </div>
         <Button
           size="lg"
-          onClick={onStartDictation}
+          variant={recording ? "destructive" : "default"}
+          onClick={recording ? onStopDictation : onStartDictation}
+          disabled={processing}
+          aria-pressed={recording}
           className="group h-11 rounded-full px-5 sm:h-12 sm:w-auto"
         >
           <span className="relative grid size-7 place-items-center rounded-full border border-primary-foreground">
-            <Mic2Icon className="size-4 transition-transform duration-300 group-hover:scale-110" aria-hidden />
+            {recording ? (
+              <Square className="size-3.5 fill-current" aria-hidden />
+            ) : (
+              <Mic2Icon className="size-4 transition-transform duration-300 group-hover:scale-110" aria-hidden />
+            )}
           </span>
-          Dictate a visit
+          {processing ? "Processing visit…" : recording ? "Stop & review" : "Dictate a visit"}
         </Button>
       </section>
 

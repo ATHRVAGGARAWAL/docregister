@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { ApiError, withDoctor } from "@/lib/api/http";
-import { RECORDING_UPLOAD_LIMIT_MS } from "@/lib/audio/limits";
+import {
+  RECORDING_UPLOAD_LIMIT_BYTES,
+  RECORDING_UPLOAD_LIMIT_MS,
+} from "@/lib/audio/limits";
 import { SttError, transcribeWithFailover } from "@/lib/stt";
 import { callWorkflow } from "@/lib/supabase/workflows";
 
@@ -21,8 +24,6 @@ import { callWorkflow } from "@/lib/supabase/workflows";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MAX_BYTES = 25 * 1024 * 1024;
-
 export const POST = withDoctor(async ({ doctor, supabase, request }) => {
   const form = await request.formData().catch(() => null);
   if (!form) throw new ApiError("Expected multipart/form-data.");
@@ -30,7 +31,9 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
   const audio = form.get("audio");
   if (!(audio instanceof Blob)) throw new ApiError("No audio file was attached.");
   if (audio.size === 0) throw new ApiError("The audio file was empty.");
-  if (audio.size > MAX_BYTES) throw new ApiError("That recording is too large.", 413);
+  if (audio.size > RECORDING_UPLOAD_LIMIT_BYTES) {
+    throw new ApiError("That recording is too large to upload.", 413);
+  }
 
   const mimeType = String(form.get("mimeType") || audio.type || "audio/webm");
   const durationMs = Number(form.get("durationMs")) || undefined;
