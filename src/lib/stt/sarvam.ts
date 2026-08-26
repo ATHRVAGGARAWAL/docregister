@@ -57,11 +57,23 @@ export class SarvamProvider implements SttProvider {
     timeoutMs: number,
   ): Promise<TranscribeResult> {
     if (input.durationMs && input.durationMs > SARVAM_SYNC_LIMIT_MS) {
+      // Retryable, and that word means something specific here: `index.ts`
+      // gates *failover to the other provider* on it, not a second call to this
+      // one. "Longer than Sarvam's sync endpoint accepts" is precisely the
+      // failure a different provider can change — ElevenLabs declares no
+      // duration ceiling, and the recorder lets a doctor speak for 60s
+      // (RECORDING_LIMIT_MS), warning only at 50s.
+      //
+      // Left non-retryable, a Sarvam-primary deployment fails every dictation
+      // over 29s outright, and tells the doctor "that recording was too long"
+      // about a length the app had just invited. If both providers refuse, that
+      // message is reached anyway and is then true.
       throw new SttError(
         `Recording is ${Math.round(input.durationMs / 1000)}s; the Sarvam sync ` +
           `endpoint accepts ~30s. Use the live WebSocket transcript for this ` +
           `encounter, or route it through Sarvam's Batch API.`,
         "too_long",
+        true,
       );
     }
 

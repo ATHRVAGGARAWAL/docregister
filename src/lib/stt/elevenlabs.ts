@@ -88,7 +88,17 @@ export class ElevenLabsProvider implements SttProvider {
       const body = await response.text().catch(() => "");
       throw new SttError(
         `ElevenLabs returned ${response.status}: ${body.slice(0, 300)}`,
-        response.status === 401 ? "auth" : "provider_error",
+        // 429 is called by its name so the doctor is told the service is busy
+        // and to try in a moment, rather than the generic "transcription
+        // failed". `sarvam.ts` already maps it that way; `sttResponse`
+        // switches on the code, so leaving them different meant the same
+        // vendor condition read differently depending on which provider was
+        // primary.
+        response.status === 401
+          ? "auth"
+          : response.status === 429
+            ? "rate_limited"
+            : "provider_error",
         response.status >= 500 || response.status === 429,
       );
     }
