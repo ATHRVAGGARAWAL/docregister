@@ -20,11 +20,19 @@ export const runtime = "nodejs";
  * could not fit under, so the case it exists for — a draft that failed once
  * already — was the case most likely to be killed halfway through.
  *
- * Raising the declaration is the honest half of the fix. The other half is that
- * a doctor should not wait 80s, which wants either a two-request split or a
- * deadline threaded into both legs; both are larger changes than this file.
+ * Left at 60 deliberately, and that is a compromise rather than a fix. Vercel
+ * caps a Node function at 60s on Hobby and allows more only on a paid plan, and
+ * this app is deployed there and live — a declaration the plan rejects fails the
+ * deploy, which is worse for a clinical register than the rare mid-retry kill it
+ * would prevent.
+ *
+ * So the overflow is written down rather than papered over. Closing it properly
+ * is one of: raise this to ~120 once the plan allows it, split retry into two
+ * requests (transcribe, then extract) so neither leg carries both budgets, or
+ * thread a deadline through both legs so extraction takes what transcription
+ * left. The third is the best of the three and the largest.
  */
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 /**
  * Re-run a voice draft from its retained private recording.

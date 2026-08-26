@@ -1,17 +1,25 @@
 -- docregister — the index and RLS decisions behind the performance advisories
 --
--- The advisor reports twenty foreign keys with no covering index and two
--- policies that re-evaluate auth per row. Both lists are answered here, but
--- only two indexes are created.
+-- The advisor reports twenty-one foreign keys with no covering index and two
+-- policies that re-evaluate auth per row. The policies are rewritten below. Not
+-- one of the twenty-one keys is given an index, so the advisory still lists all
+-- twenty-one after this migration; that is the decision, not an oversight.
 --
 -- An index is not free. This app writes on every consultation, and an index on
 -- a hot table is paid for on each insert and on each update that touches its
 -- columns, forever, in exchange for a read that may never happen. So every
 -- flagged key was judged on the two questions that decide whether it will ever
 -- be read: does a delete of the parent row actually happen in this app, and is
--- the column ever a query predicate. The eighteen that answer no to both are
--- left alone and written down at the bottom of this file, so the next person
--- reading the same advisory does not have to re-derive the reasoning.
+-- the column ever a query predicate. All twenty-one answer no to both, and each
+-- verdict is written down at the bottom of this file so the next person reading
+-- the same advisory does not have to re-derive it.
+--
+-- The two indexes this file does create are not on that list and do not shorten
+-- it. They serve two reads the app performs constantly, on columns the lint
+-- already treated as covered: it matches a foreign key against an index's
+-- leading columns, in the key's own order, and never looks at a partial index's
+-- predicate. The pre-existing partial indexes leading with encounters.doctor_id
+-- and encounters.patient_id satisfy it while serving neither query.
 --
 -- Nothing here uses CREATE INDEX CONCURRENTLY. The migration runner executes
 -- each file inside a single transaction, which a concurrent build is not
@@ -110,7 +118,7 @@ create policy clinic_invites_owner_read on clinic_invites
   );
 
 -- ---------------------------------------------------------------------------
--- The eighteen foreign keys left unindexed, and why
+-- The twenty-one foreign keys the advisory lists, and why each stays unindexed
 -- ---------------------------------------------------------------------------
 --
 -- Three facts about this schema decide most of the list.
@@ -154,7 +162,8 @@ create policy clinic_invites_owner_read on clinic_invites
 --     clinic-day, both already indexed, and the author's name is resolved
 --     afterwards by doctors.id. A RESTRICT parent link, never a search key.
 --   encounters (doctor_id, clinic_id), (patient_id, clinic_id) — same-clinic
---     guards; both now have a leading-column index from above.
+--     guards. A probe drives off the doctor_id or patient_id index above and
+--     rechecks clinic_id from the heap.
 --   encounters (transcript_id, clinic_id, doctor_id) — served by
 --     encounters_one_per_transcript_idx. Its `transcript_id is not null`
 --     predicate is implied by the probe's equality, so the planner can use it.
