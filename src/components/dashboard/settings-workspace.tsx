@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
+import { ClinicMembers } from "@/components/clinic/clinic-members";
 import {
   BadgeCheckIcon,
   Building2Icon,
@@ -216,6 +218,8 @@ export function SettingsWorkspace({
         </aside>
 
         <div className="space-y-4">
+          <ClinicMembers isOwner={profile.role === "owner"} />
+
       <Card className="surface-card gap-0 rounded-[1.65rem] border-border bg-card py-0">
         <CardHeader className="border-b border-border px-5 py-5 sm:px-6">
           <div className="flex items-center gap-3">

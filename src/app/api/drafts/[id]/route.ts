@@ -43,7 +43,7 @@ export const GET = withDoctor<Params>(async ({ doctor, supabase, params }) => {
   const phone = typeof extracted.phone === "string" ? normalisePatientPhone(extracted.phone) : null;
   const sex = isPatientSex(extracted.sex) ? extracted.sex : null;
   const { data: matches, error: matchError } = patientName
-    ? await supabase.rpc("match_patients", { p_name: patientName, p_phone: null, p_limit: 5 })
+    ? await supabase.rpc("match_patients", { p_name: patientName, p_limit: 5 })
     : { data: [], error: null };
   if (matchError) console.warn("[drafts/get] patient suggestions unavailable", matchError.code);
 

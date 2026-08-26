@@ -51,7 +51,6 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
   if (!patientId && query.patient_name) {
     const { data: matches } = await supabase.rpc("match_patients", {
       p_name: query.patient_name,
-      p_phone: null,
       p_limit: 5,
     });
     candidates = matches ?? [];

@@ -71,6 +71,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
 
   const [mode, setMode] = useState<AuthMode>(inviteToken ? "signup" : "signin");
   const [fullName, setFullName] = useState("");
+  const [clinicName, setClinicName] = useState("");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>(callbackError ? "error" : "idle");
   const [message, setMessage] = useState(callbackMessage);
@@ -91,7 +92,8 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
     event.preventDefault();
     const normalizedEmail = email.trim();
     const normalizedName = fullName.trim();
-    if (!normalizedEmail || (mode === "signup" && !normalizedName)) return;
+    const normalizedClinic = clinicName.trim();
+    if (!normalizedEmail || (mode === "signup" && (!normalizedName || !normalizedClinic))) return;
 
     setStatus("sending");
     setMessage("");
@@ -107,7 +109,12 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
             ? {
                 data: {
                   full_name: normalizedName,
-                  ...(inviteToken ? { invite_token: inviteToken } : {}),
+                  // An invite already names the clinic and proves the claim, so
+                  // the typed name would only be a second, weaker answer to a
+                  // question that is already settled.
+                  ...(inviteToken
+                    ? { invite_token: inviteToken }
+                    : { clinic_name: normalizedClinic }),
                 },
               }
             : {}),
@@ -275,6 +282,35 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                             placeholder="Dr. Aditi Mehta"
                             className="h-12"
                           />
+                        </div>
+                      )}
+
+                      {signingUp && !inviteToken && (
+                        <div className="space-y-2">
+                          <Label htmlFor="clinic-name">Clinic name</Label>
+                          <Input
+                            id="clinic-name"
+                            name="clinic-name"
+                            type="text"
+                            required
+                            autoComplete="organization"
+                            aria-describedby="clinic-hint"
+                            value={clinicName}
+                            onChange={(event) => {
+                              setClinicName(event.target.value);
+                              clearError();
+                            }}
+                            placeholder="Sunrise Family Clinic"
+                            className="h-12"
+                          />
+                          <p
+                            id="clinic-hint"
+                            className="text-muted-foreground text-xs leading-5"
+                          >
+                            Type it exactly as your colleagues do. If someone from your clinic
+                            is already here, you will join their register once they approve
+                            you — capitalisation and extra spaces do not matter.
+                          </p>
                         </div>
                       )}
 

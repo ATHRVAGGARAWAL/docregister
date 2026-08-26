@@ -73,7 +73,7 @@ export const POST = withDoctor(async ({ supabase, request }) => {
 
   const { data: matches, error: matchError } = await supabase.rpc("match_patients", {
     p_name: patientName,
-    p_phone: phone,
+    p_phone: phone ?? undefined,
     p_limit: 8,
   });
   if (matchError) console.error("[manual encounter] patient match failed", matchError);

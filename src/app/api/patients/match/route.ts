@@ -24,8 +24,8 @@ export const GET = withDoctor(async ({ supabase, request }) => {
   if (!name && !phone) return NextResponse.json({ matches: [] });
 
   const { data, error } = await supabase.rpc("match_patients", {
-    p_name: name || null,
-    p_phone: phone,
+    p_name: name,
+    p_phone: phone ?? undefined,
     p_limit: limit,
   });
 

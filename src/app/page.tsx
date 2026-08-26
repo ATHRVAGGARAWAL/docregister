@@ -1,10 +1,15 @@
 import { redirect } from "next/navigation";
 
+import { PendingApproval } from "@/components/clinic/pending-approval";
 import { Dashboard } from "@/components/dashboard/dashboard";
 import { emptyAnalytics, loadDailyStats } from "@/lib/analytics";
 import { liveProxyUrl } from "@/lib/env";
 import { loadTodayRegister } from "@/lib/register";
-import { getCurrentDoctor, getSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  getCurrentDoctor,
+  getPendingClinicName,
+  getSupabaseServerClient,
+} from "@/lib/supabase/server";
 import { parseDashboardUrlState, type RawSearchParams } from "@/lib/url-state";
 
 /**
@@ -27,6 +32,20 @@ export default async function RegisterPage({
 }) {
   const doctor = await getCurrentDoctor();
   if (!doctor) redirect("/login");
+
+  // Before anything is loaded, not after. Every query below resolves through
+  // `auth_clinic_id()`, which is NULL until an owner admits this doctor — so
+  // rendering the dashboard here would spend the round trips only to paint an
+  // empty register that looks broken rather than pending.
+  if (doctor.membership_status === "pending") {
+    return (
+      <PendingApproval
+        clinicName={await getPendingClinicName(doctor.clinic_id)}
+        doctorName={doctor.full_name}
+        email={doctor.email}
+      />
+    );
+  }
 
   // Parsed here rather than in the client, so the server renders the same view
   // the URL asks for. Reading it after hydration meant a deep link to

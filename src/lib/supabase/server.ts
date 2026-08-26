@@ -49,12 +49,34 @@ export async function getCurrentDoctor() {
 
   const { data, error } = await supabase
     .from("doctors")
-    .select("id, clinic_id, full_name, registration_no, speciality, role, dictation_langs")
+    .select(
+      "id, clinic_id, full_name, registration_no, speciality, role, dictation_langs, membership_status",
+    )
     .eq("id", user.id)
     .single();
 
   if (error || !data) return null;
+
+  // `membership_status` rides along because a pending member is a real,
+  // signed-in doctor who can read exactly one row — their own. Everything
+  // clinic-scoped resolves through `auth_clinic_id()`, which returns NULL until
+  // an owner admits them, so they would otherwise reach a register that is
+  // empty for a reason nothing on screen explains.
   return { ...data, email: user.email ?? null };
+}
+
+/**
+ * The clinic a pending member asked to join, for the waiting screen.
+ *
+ * Read through the caller's own session rather than a service-role client: the
+ * `clinic_read` policy is `id = auth_clinic_id()`, which is NULL while pending,
+ * so this deliberately uses the doctor's `clinic_id` — the one row they are
+ * allowed to know about because they typed its name themselves.
+ */
+export async function getPendingClinicName(clinicId: string): Promise<string | null> {
+  const supabase = await getSupabaseServerClient();
+  const { data } = await supabase.rpc("pending_clinic_name", { p_clinic_id: clinicId });
+  return typeof data === "string" && data.length > 0 ? data : null;
 }
 
 export type CurrentDoctor = NonNullable<
