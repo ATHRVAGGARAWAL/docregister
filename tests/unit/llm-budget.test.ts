@@ -335,6 +335,29 @@ test("a retry that could not finish inside the budget is not started at all", as
   }
 });
 
+test("giving up happens while time is left, not once it has run out", async () => {
+  // The guard's claim is that it stops *early*. The boundary above is measured
+  // in MIN_ATTEMPT_MS and so re-aims itself whenever that constant is tuned,
+  // which is what keeps it honest through a deliberate change — but it also
+  // means a MIN_ATTEMPT_MS of zero would satisfy it while making the guard dead
+  // code and the policy "keep retrying until the clock runs out". The
+  // difference is the case below, and it is the one that costs money: a request
+  // the clinic is billed for and the doctor waits out, to arrive at a deadline
+  // that was already certain when it was sent.
+  for (const tier of TIERS) {
+    const budget = BUDGET_MS[tier];
+
+    // One millisecond survives the backoff — enough for the loop to subtract
+    // and find a positive number, nowhere near enough for a model to answer in.
+    const run = await callWithBudget(tier, [
+      { spends: budget.total - BACKOFF_MS - 1, throws: retryable("timeout") },
+    ]);
+
+    assert.equal(run.deadlines.length, 1, `${tier}: an attempt was started with 1ms to answer in`);
+    assert.deepEqual(run.backoffs, [], `${tier}: a backoff was waited out for a doomed attempt`);
+  }
+});
+
 test("a non-retryable failure is not retried", async () => {
   for (const code of ["invalid_output", "provider_error", "truncated"]) {
     const run = await callWithBudget(TIERS[0], [

@@ -89,10 +89,11 @@ export function VoiceDock({
    * the dock make the specific offer — the connection you lost is back, send
    * the thing you already said — instead of a generic "try again".
    *
-   * Snapshotted as the hold appears rather than in an effect, so the answer is
-   * on screen in the same paint as the failure. The second branch covers the
-   * order that is not guaranteed on a phone losing signal: the upload can
-   * reject a beat before the browser fires `offline`.
+   * Snapshotted as the hold appears rather than in an effect — React's
+   * adjust-state-during-render pattern, which lands in the same paint as the
+   * failure instead of flashing the generic error for a frame first. The
+   * second branch covers the ordering a phone losing signal does not
+   * guarantee: the upload can reject a beat before `offline` fires.
    *
    * This lives in memory for the life of the page and deliberately goes no
    * further — what it refers to is consultation audio on a shared clinic
@@ -314,9 +315,10 @@ export function VoiceDock({
           onManualEntry={onManualEntry}
         />
 
-        {/* The notice above says all of this better when the network is why the
-            upload failed, and says it without the raw "try again" that sends a
-            doctor back into a retry that cannot work yet. */}
+        {/* Stood down while the notice above is explaining the same failure in
+            terms the doctor can act on. Two boxes making one point, one of them
+            ending in a bare "try again", is how a doctor decides the dictation
+            was at fault and says the whole consultation over. */}
         {error && !offlineHold && (
           <div className="col-span-full mt-2 flex flex-col gap-2 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <p role="alert" className="text-xs text-destructive">{error}</p>

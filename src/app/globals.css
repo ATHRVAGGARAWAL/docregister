@@ -11,33 +11,61 @@
   --card-foreground: #1d1d1f;
   --popover: #ffffff;
   --popover-foreground: #1d1d1f;
-  --primary: #0071e3;
+  /* Apple's system blue reads at 4.70:1 on white and 4.15:1 on the soft-blue
+     chip, so it never carried body text at AAA. Still fully saturated and still
+     blue — hue 210° to 217°, lightness 45% to 36% — and it measures 8.18:1 on
+     the page, 7.51:1 on a card and 7.23:1 on --primary-soft. Darkening a
+     light-theme accent helps both of its jobs at once, so the white label on a
+     filled primary button goes the same way: 4.70:1 to 8.18:1. */
+  --primary: #0046b8;
   --primary-foreground: #ffffff;
   --primary-soft: #e8f2ff;
   --secondary: #f5f5f7;
   --secondary-foreground: #1d1d1f;
   --muted: #f5f5f7;
-  --muted-foreground: #6e6e73;
-  --accent: #0071e3;
+  /* Carries 122 of the app's `text-xs` labels, which is the smallest type here
+     and so the least forgiving. Was 5.07:1 on the page and 4.66:1 on a card;
+     now 8.14:1 and 7.48:1. */
+  --muted-foreground: #4f4f54;
+  --accent: #0046b8;
   --accent-foreground: #ffffff;
-  --destructive: #d70015;
+  /* The dictation-failure notice paints this colour at 12px on top of its own
+     10% tint, and that composite is the tightest surface the token ever lands
+     on: the old #d70015 read 4.15:1 there. Deep enough to clear 7:1 on the tint
+     (7.03:1) and it clears it everywhere else too — 9.25:1 on the page, 8.50:1
+     on a card, 8.36:1 on the soft red chip, 9.25:1 for the white label on the
+     filled destructive button. */
+  --destructive: #940015;
   --destructive-foreground: #ffffff;
   --destructive-soft: #fff0f0;
-  --warning: #9a4b00;
+  /* Same move as --primary and for the same reason: in a light theme the accent
+     is both the text and the fill, and deepening it helps both. Amber was
+     6.21:1 on the page and 5.08:1 on the `bg-warning/8` strip it labels; now
+     9.10:1 and 7.35:1. Green was 5.20:1 on the page and 4.75:1 on its soft
+     chip, where every rupee amount in the register is printed; now 8.34:1 and
+     7.61:1. */
+  --warning: #743800;
   --warning-soft: #fff5e6;
-  --money: #147d3f;
+  --money: #0e5a2d;
   --money-soft: #eaf8ee;
   --border: #d2d2d7;
   --input: #ffffff;
-  --ring: #0071e3;
-  --chart-1: #0071e3;
+  /* WCAG 1.4.11 wants 3:1 on the boundary that identifies a control. --border is
+     1.51:1 on the page, which is right for a card (identified by its fill and
+     its elevation) and wrong for a text field, whose edge is the only thing
+     saying "type here". 3.62:1 on the field fill, 3.33:1 on a card. */
+  --field-border: #86868b;
+  --ring: #0046b8;
+  --chart-1: #0046b8;
   --chart-2: #6e6e73;
   --chart-3: #86868b;
   --chart-4: #3a3a3c;
   --chart-5: #aeaeb2;
   --grid: #e5e5ea;
-  --axis: #6e6e73;
+  --axis: #4f4f54;
   --scrim: rgb(0 0 0 / 0.56);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
   --elev-raise: 0 12px 32px rgb(0 0 0 / 0.08), 0 2px 8px rgb(0 0 0 / 0.04);
   --elev-flat: 0 1px 2px rgb(0 0 0 / 0.06);
   --elev-press: inset 0 1px 2px rgb(0 0 0 / 0.05);
@@ -51,13 +79,27 @@
   --card-foreground: #f5f5f7;
   --popover: #1c1c1e;
   --popover-foreground: #f5f5f7;
+  /* Unchanged, and deliberately: on a dark theme one accent token cannot do
+     both of its jobs at AAA. As text it needs to be light (7:1 on #1c1c1e needs
+     a relative luminance of at least 0.382); as a fill under a white label it
+     needs to be dark (at most 0.089). The ranges do not overlap — they do not
+     even overlap at AA — so the fix is to split the token, not to retune it.
+     Measured today: 5.76:1 as text on the page, 3.65:1 for the white label on a
+     filled primary button. Same story for --destructive at 3.41:1. */
   --primary: #0a84ff;
   --primary-foreground: #ffffff;
-  --primary-soft: #0b2947;
+  /* --primary on this chip measured 4.05:1, under AA for body text. Deepening
+     the chip rather than the accent takes it to 4.81:1; AAA is out of reach
+     while one token is both the accent text and the button fill (see the note
+     on --primary above). */
+  --primary-soft: #071a2e;
   --secondary: #2c2c2e;
   --secondary-foreground: #f5f5f7;
   --muted: #1c1c1e;
-  --muted-foreground: #aeaeb2;
+  /* Cleared AAA on the page and on a card but sat at 6.30:1 on a --secondary
+     well and inside a field, which is where most of it lives. Now 7.36:1 there,
+     11.09:1 on the page. */
+  --muted-foreground: #bcbcc0;
   --accent: #0a84ff;
   --accent-foreground: #ffffff;
   --destructive: #ff453a;
@@ -66,9 +108,14 @@
   --warning: #ff9f0a;
   --warning-soft: #35230d;
   --money: #30d158;
-  --money-soft: #12351d;
+  /* The amounts on this chip read 6.69:1 against the old fill. Unlike the blue,
+     green is only ever text here, so darkening the chip under it is enough:
+     7.88:1. */
+  --money-soft: #0d2716;
   --border: #38383a;
   --input: #2c2c2e;
+  /* 3.35:1 on the field fill, 4.09:1 on a card. */
+  --field-border: #7c7c80;
   --ring: #0a84ff;
   --chart-1: #0a84ff;
   --chart-2: #aeaeb2;
@@ -76,7 +123,7 @@
   --chart-4: #636366;
   --chart-5: #48484a;
   --grid: #2c2c2e;
-  --axis: #aeaeb2;
+  --axis: #bcbcc0;
   --scrim: rgb(0 0 0 / 0.72);
   --elev-raise: 0 16px 40px rgb(0 0 0 / 0.52), 0 2px 10px rgb(0 0 0 / 0.3);
   --elev-flat: 0 1px 2px rgb(0 0 0 / 0.42);
@@ -108,6 +155,7 @@
   --color-money: var(--money);
   --color-money-soft: var(--money-soft);
   --color-border: var(--border);
+  --color-field-border: var(--field-border);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
@@ -169,9 +217,27 @@
     color: var(--foreground);
   }
 
+  /* WCAG 2.4.7 / 2.4.13. Important on purpose: Tailwind's utilities live in a
+     later cascade layer than this one, so a `focus-visible:outline-none` on any
+     component would win and the indicator would simply be gone. Taking the ring
+     away must not be reachable from a className. Components that draw their own
+     `ring-*` halo keep it — same token, same colour, so the two read as one
+     indicator rather than two. The offset is load-bearing on a filled accent
+     button, where --ring equals the fill: pushed clear of the element, the
+     outline lands on the surface behind it instead of on itself. */
   :focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
+    outline: var(--focus-ring-width) solid var(--ring) !important;
+    outline-offset: var(--focus-ring-offset) !important;
+  }
+
+  /* Two of the things that take focus here are containers rather than controls:
+     the landmark the skip link jumps to, and the sheet Radix focuses on open
+     when it was opened from the keyboard. Both run to an edge of the viewport,
+     so an outline drawn outside them lands off-screen and widens the document.
+     Inset instead: still 2px, still --ring, still not removable. */
+  [data-skip-target]:focus-visible,
+  [data-slot="sheet-content"]:focus-visible {
+    outline-offset: -3px !important;
   }
 
   .tnum {
@@ -264,6 +330,44 @@
   .transcript-final {
     opacity: 1;
   }
+
+  /* WCAG 1.4.11. A panel is identified by its fill and its elevation, so the
+     soft --border is right there. A text field has neither — its edge is the
+     whole affordance — so it takes the 3:1 boundary. Ordered after the surface
+     classes above because both selectors weigh the same. */
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="select"],
+  [data-slot="search-field-input"] {
+    border-color: var(--field-border);
+  }
+
+  /* Off-screen rather than hidden: it has to stay in the tab order to be the
+     first thing a keyboard reaches. */
+  .skip-link {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 80;
+    margin: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    transform: translateY(calc(-100% - 1.5rem));
+    border: 1px solid var(--field-border);
+    border-radius: var(--radius-md);
+    background: var(--popover);
+    box-shadow: var(--elev-raise);
+    color: var(--foreground);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform 160ms var(--ease-fluid);
+  }
+
+  /* :focus, not :focus-visible — the link is off-screen, so the only way to
+     reach it is the keyboard, and Safari does not always call that visible. */
+  .skip-link:focus {
+    transform: translateY(env(safe-area-inset-top, 0px));
+  }
 }
 
 @keyframes key-pulse {
@@ -316,6 +420,7 @@
   :root,
   .dark {
     --border: currentColor;
+    --field-border: currentColor;
   }
 
   .surface-panel,
@@ -339,5 +444,27 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Zeroing a duration only makes the movement instant — the lift and the shrink
+     are still movement. Under this query a press is a colour change. */
+  .pressable:hover:not(:disabled),
+  .pressable:active:not(:disabled) {
+    transform: none;
+  }
+
+  /* The recording ring is the one animation carrying meaning, so it holds a
+     static ring rather than freezing on the transparent end of its keyframes. */
+  .key-pulse::after {
+    animation: none;
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Windows high-contrast replaces authored colours wholesale, including --ring. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight !important;
   }
 }

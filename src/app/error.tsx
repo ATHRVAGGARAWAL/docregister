@@ -1,39 +1,33 @@
 "use client";
 
-import { useEffect } from "react";
+import { ErrorScreen } from "@/components/error/error-screen";
 
-import { CircleAlertIcon } from "@/components/icons";
-import { BrandLockup } from "@/components/brand/brand-mark";
-import { Button } from "@/components/ui/button";
-
-export default function ErrorPage({
+/**
+ * The boundary around every route segment below the root layout.
+ *
+ * `error` is typed `unknown` rather than the documented `Error & { digest? }`
+ * because Next's own boundary source says it does not guarantee an Error — a
+ * thrown string arrives here unchanged, and this file must not be the second
+ * thing that breaks.
+ *
+ * `retry`, not `reset`: `reset` only clears the boundary's state and re-renders
+ * the payload it already has, which for a failed server render is the same
+ * failure again. `retry` refetches first.
+ */
+export default function RouteError({
   error,
-  reset,
+  retry,
 }: {
-  error: Error & { digest?: string };
-  reset: () => void;
+  error: unknown;
+  retry: () => void;
 }) {
-  useEffect(() => {
-    console.error("[app] route render failed", error);
-  }, [error]);
-
   return (
-    <main className="grid min-h-dvh place-items-center bg-background px-6">
-      <div className="w-full max-w-md">
-        <BrandLockup subtitle="Clinical workspace" />
-        <section className="surface-elevated mt-6 p-6">
-          <span className="grid size-11 place-items-center rounded-full bg-destructive-soft text-destructive">
-            <CircleAlertIcon className="size-5" aria-hidden />
-          </span>
-          <h1 className="mt-5 text-xl font-semibold tracking-[-0.025em]">This workspace could not load</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Your saved records were not changed. Try loading the workspace again.
-          </p>
-          <Button type="button" size="lg" className="mt-6 w-full" onClick={reset}>
-            Try again
-          </Button>
-        </section>
-      </div>
-    </main>
+    <ErrorScreen
+      scope="route"
+      error={error}
+      onRetry={retry}
+      title="The register could not be opened"
+      description="Nothing you have already saved has changed. Try again, and if this screen comes back, reopen the register."
+    />
   );
 }

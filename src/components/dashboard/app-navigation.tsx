@@ -76,7 +76,13 @@ export function AppNavigation({
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-background lg:flex lg:flex-col">
+      {/* Labelled because a workspace may render an <aside> of its own: two
+          unnamed complementary landmarks are indistinguishable in the landmark
+          list a screen reader navigates by. */}
+      <aside
+        aria-label="Workspace sidebar"
+        className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-background lg:flex lg:flex-col"
+      >
         <div className="border-b border-border px-5 py-5">
           <BrandLockup subtitle="Clinical workspace" />
         </div>
@@ -236,7 +242,9 @@ function ProfileBlock({
   return (
     <div className={cn("surface-inset rounded-xl", compact ? "p-2.5" : "p-3", className)}>
       <div className="flex items-center gap-3">
-        <span className={cn("grid shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground", compact ? "size-9" : "size-10")}>
+        {/* Decorative: the initials are derived from the same name rendered beside
+            them, so exposing them only puts a bare letter in front of it. */}
+        <span aria-hidden className={cn("grid shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground", compact ? "size-9" : "size-10")}>
           {initials || "DR"}
         </span>
         <div className="min-w-0 flex-1">

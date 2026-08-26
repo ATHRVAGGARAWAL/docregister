@@ -42,7 +42,14 @@ export function OfflineNotice({
   if (!offline && !heldRecording) return null;
 
   const Icon = offline ? CircleAlertIcon : CircleCheckIcon;
-  const headline = offline ? "No connection." : "The connection is back.";
+  // "appears to be", not "is". All that has happened is `navigator.onLine`
+  // reading true again, which says an interface exists and nothing more — the
+  // asymmetry is documented on useNetworkStatus. A flat "the connection is
+  // back" would have this component assert something the browser never told
+  // it, to a doctor who is about to press a button on the strength of the
+  // sentence. Hedging costs a word; being confidently wrong costs their trust
+  // in every other message the dock shows.
+  const headline = offline ? "No connection." : "The connection appears to be back.";
   const detail = offline
     ? heldRecording
       ? "This recording is held on this screen and has not been filed. Keep this page open — nothing is saved to the phone."

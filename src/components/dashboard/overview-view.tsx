@@ -193,7 +193,10 @@ export function OverviewView({
           />
         </section>
 
-        <aside className="surface-elevated group relative isolate h-fit min-h-0 overflow-hidden rounded-[1.5rem] p-5 sm:min-h-72 sm:p-7">
+        <aside
+          aria-labelledby="clinical-recall-title"
+          className="surface-elevated group relative isolate h-fit min-h-0 overflow-hidden rounded-[1.5rem] p-5 sm:min-h-72 sm:p-7"
+        >
           <div className="flex items-center justify-between">
             <span className="grid size-11 place-items-center rounded-[1.1rem] border border-primary/20 bg-primary-soft text-primary">
               <HistoryIcon className="size-5" strokeWidth={1.7} aria-hidden />
@@ -203,7 +206,10 @@ export function OverviewView({
           <p className="mt-5 text-xs font-semibold tracking-[0.16em] text-primary uppercase sm:mt-8">
             Clinical recall
           </p>
-          <h2 className="mt-2 max-w-xs text-xl font-semibold leading-7 tracking-[-0.035em] text-foreground">
+          <h2
+            id="clinical-recall-title"
+            className="mt-2 max-w-xs text-xl font-semibold leading-7 tracking-[-0.035em] text-foreground"
+          >
             Need the last prescription?
           </h2>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
