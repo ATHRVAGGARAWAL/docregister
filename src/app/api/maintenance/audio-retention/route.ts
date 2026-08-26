@@ -151,6 +151,14 @@ function secretMatches(presented: string, expected: string): boolean {
   return timingSafeEqual(a, b);
 }
 
+/**
+ * Nonsense is refused; more-than-we-allow is clamped.
+ *
+ * The asymmetry is deliberate. `limit=abc` or `limit=0` is a scheduler that has
+ * been configured wrong, and failing loudly is how that gets noticed. A number
+ * above `MAX_LIMIT` is a scheduler asking to drain as much as it can, which is
+ * a reasonable thing to ask and a bad thing to fail a nightly job over.
+ */
 function parseLimit(raw: string | null): number | null {
   if (raw === null || raw === "") return DEFAULT_LIMIT;
   const parsed = Number(raw);
@@ -214,7 +222,7 @@ export async function POST(request: Request) {
 
   const limit = parseLimit(new URL(request.url).searchParams.get("limit"));
   if (limit === null) {
-    return json({ error: `\`limit\` must be a whole number between 1 and ${MAX_LIMIT}.` }, 400);
+    return json({ error: "`limit` must be a whole number of 1 or more." }, 400);
   }
 
   const startedAt = new Date();

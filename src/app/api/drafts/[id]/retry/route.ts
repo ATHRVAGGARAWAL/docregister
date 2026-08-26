@@ -7,7 +7,24 @@ import { transcribeWithFailover, type SttProviderName } from "@/lib/stt";
 import { callWorkflow } from "@/lib/supabase/workflows";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+
+/**
+ * Longer than the 60s every other route declares, because this one is the only
+ * caller that pays for transcription and extraction in the same request.
+ *
+ * Worst case: a stalled primary and its fallback burn 20s each
+ * (`STT_TIMEOUT_MS` x2 = 40s), extraction takes its full budget
+ * (`BUDGET_MS.precise.total` = 36s), and the surrounding work — two selects, the
+ * audio download, `match_patients` and two workflow RPCs — adds several more.
+ * That is ~80s. At 60 this route was declaring a ceiling its own worst path
+ * could not fit under, so the case it exists for — a draft that failed once
+ * already — was the case most likely to be killed halfway through.
+ *
+ * Raising the declaration is the honest half of the fix. The other half is that
+ * a doctor should not wait 80s, which wants either a two-request split or a
+ * deadline threaded into both legs; both are larger changes than this file.
+ */
+export const maxDuration = 120;
 
 /**
  * Re-run a voice draft from its retained private recording.
