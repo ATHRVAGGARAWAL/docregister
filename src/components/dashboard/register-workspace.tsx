@@ -8,7 +8,7 @@ import {
   ClipboardClockIcon,
   LoaderCircleIcon,
   SearchIcon,
-} from "lucide-react";
+} from "@/components/icons";
 
 import { RegisterTimeline } from "@/components/dashboard/register-timeline";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -86,15 +86,11 @@ export function RegisterWorkspace({
 
   return (
     <div className="space-y-5 sm:space-y-7">
-      <section className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-card/35 p-5 shadow-[0_24px_70px_-42px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:p-7">
-        <div
-          className="pointer-events-none absolute -right-20 -top-28 size-72 rounded-full bg-primary/12 blur-3xl"
-          aria-hidden
-        />
+      <section className="surface-elevated relative overflow-hidden rounded-[1.75rem] p-5 sm:p-7">
         <div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div className="max-w-xl">
-            <p className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-primary">
-              <span className="grid size-7 place-items-center rounded-full border border-primary/20 bg-primary/10">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+              <span className="grid size-7 place-items-center rounded-full border border-primary/20 bg-primary-soft">
                 <CalendarRangeIcon className="size-3.5" aria-hidden />
               </span>
               Clinical timeline
@@ -108,9 +104,9 @@ export function RegisterWorkspace({
             </p>
           </div>
 
-          <dl className="glass-inset grid grid-cols-3 divide-x divide-border/60 rounded-2xl px-1 py-3 sm:min-w-[22rem]">
+          <dl className="surface-inset grid grid-cols-3 divide-x divide-border/60 rounded-2xl px-1 py-3 sm:min-w-[22rem]">
             <div className="px-3 sm:px-5">
-              <dt className="text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Matching
               </dt>
               <dd className="tnum mt-1 text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
@@ -118,7 +114,7 @@ export function RegisterWorkspace({
               </dd>
             </div>
             <div className="px-3 sm:px-5">
-              <dt className="flex items-center gap-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 <CircleCheckBigIcon className="size-3 text-primary" aria-hidden />
                 Confirmed
               </dt>
@@ -127,7 +123,7 @@ export function RegisterWorkspace({
               </dd>
             </div>
             <div className="px-3 sm:px-5">
-              <dt className="flex items-center gap-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 <ClipboardClockIcon className="size-3 text-warning" aria-hidden />
                 Review
               </dt>
@@ -144,7 +140,7 @@ export function RegisterWorkspace({
         )}
       </section>
 
-      <section className="glass-panel rounded-[1.5rem] p-3 sm:p-4">
+      <section className="surface-panel rounded-[1.5rem] p-3 sm:p-4">
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -159,7 +155,7 @@ export function RegisterWorkspace({
               onChange={(event) => onQueryChange(event.target.value)}
               placeholder="Search patient, diagnosis, treatment or medicine"
               aria-label="Search register"
-              className="glass-inset h-12 rounded-xl border-white/10 bg-background/25 pl-11 shadow-none"
+              className="surface-inset h-12 rounded-xl border-border bg-background pl-11 shadow-none"
             />
           </div>
           <Button type="submit" size="lg" disabled={loading} className="h-12 rounded-xl px-6">
@@ -168,9 +164,9 @@ export function RegisterWorkspace({
           </Button>
         </form>
 
-        <div className="mt-3 flex flex-col gap-3 border-t border-white/10 pt-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="no-scrollbar glass-inset flex max-w-full gap-1 overflow-x-auto rounded-xl p-1" role="group" aria-label="Register date range">
+            <div className="no-scrollbar surface-inset flex max-w-full gap-1 overflow-x-auto rounded-xl p-1" role="group" aria-label="Register date range">
               {RANGES.map((option) => (
                 <button
                   key={option.days}
@@ -181,7 +177,7 @@ export function RegisterWorkspace({
                     "min-h-9 shrink-0 touch-manipulation rounded-lg px-3 text-xs font-medium transition-all duration-200 [@media(pointer:coarse)]:min-h-11",
                     days === option.days
                       ? "bg-foreground text-background shadow-sm"
-                      : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground",
                   )}
                 >
                   {option.label}
@@ -189,7 +185,7 @@ export function RegisterWorkspace({
               ))}
             </div>
 
-            <div className="no-scrollbar glass-inset flex max-w-full gap-1 overflow-x-auto rounded-xl p-1" role="group" aria-label="Register status">
+            <div className="no-scrollbar surface-inset flex max-w-full gap-1 overflow-x-auto rounded-xl p-1" role="group" aria-label="Register status">
               {STATUSES.map((option) => (
                 <button
                   key={option.value}
@@ -199,8 +195,8 @@ export function RegisterWorkspace({
                   className={cn(
                     "min-h-9 shrink-0 touch-manipulation rounded-lg border px-3 text-xs font-medium transition-all duration-200 [@media(pointer:coarse)]:min-h-11",
                     status === option.value
-                      ? "border-primary/25 bg-primary/12 text-primary shadow-[0_8px_24px_-16px_var(--primary)]"
-                      : "border-transparent text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                      ? "border-primary/25 bg-primary-soft text-primary"
+                      : "border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground",
                   )}
                 >
                   {option.label}
@@ -210,7 +206,7 @@ export function RegisterWorkspace({
           </div>
 
           {draftCount > 0 && (
-            <Button type="button" variant="outline" size="sm" onClick={onReviewNext} className="h-10 rounded-xl border-warning/20 bg-warning/8 text-warning hover:bg-warning/12">
+            <Button type="button" variant="outline" size="sm" onClick={onReviewNext} className="h-10 rounded-xl border-warning/20 bg-warning-soft text-warning hover:bg-warning-soft">
               Review next <ArrowRightIcon aria-hidden />
             </Button>
           )}
@@ -222,7 +218,7 @@ export function RegisterWorkspace({
           Visit log
         </h2>
         {loading ? (
-          <div className="glass-card grid min-h-64 place-items-center rounded-[1.5rem]">
+          <div className="surface-card grid min-h-64 place-items-center rounded-[1.5rem]">
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <LoaderCircleIcon className="size-4 animate-spin" aria-hidden />
               Loading register…
@@ -241,7 +237,7 @@ export function RegisterWorkspace({
       </section>
 
       {!loading && !error && totalCount > 0 && (
-        <nav className="glass-inset flex items-center justify-between rounded-2xl px-3 py-2 sm:px-4" aria-label="Register pages">
+        <nav className="surface-inset flex items-center justify-between rounded-2xl px-3 py-2 sm:px-4" aria-label="Register pages">
           <p className="text-xs text-muted-foreground">
             Showing {page.from}–{page.to} of {totalCount}
           </p>

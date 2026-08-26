@@ -13,7 +13,7 @@ import {
   ShieldCheckIcon,
   TriangleAlertIcon,
   StethoscopeIcon,
-} from "lucide-react";
+} from "@/components/icons";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -110,8 +110,8 @@ export function SettingsWorkspace({
   return (
     <div className="space-y-7">
       <section>
-        <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
-          <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary/10">
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+          <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary-soft">
             <StethoscopeIcon className="size-3.5" aria-hidden />
           </span>
           Practice identity
@@ -125,15 +125,14 @@ export function SettingsWorkspace({
       </section>
 
       <div className="grid items-start gap-4 lg:grid-cols-[19rem_minmax(0,1fr)]">
-        <aside className="glass-strong relative overflow-hidden rounded-[1.65rem] p-6 lg:sticky lg:top-5">
-          <div className="ambient-orb pointer-events-none absolute -right-20 -top-24 size-52 opacity-50" aria-hidden />
+        <aside className="surface-elevated relative overflow-hidden rounded-[1.65rem] p-6 lg:sticky lg:top-5">
           <div className="relative">
-            <div className="w-fit rounded-full bg-[conic-gradient(from_210deg,transparent_0deg,var(--primary)_95deg,color-mix(in_oklab,var(--chart-2)_72%,transparent)_190deg,transparent_285deg)] p-[1px] shadow-[0_0_44px_-18px_var(--primary)]">
-              <span aria-hidden className="glass-inset grid size-24 place-items-center rounded-full border-4 border-background/60 text-2xl font-semibold tracking-[-0.06em] text-primary">
+            <div className="w-fit rounded-full border border-primary bg-card p-1">
+              <span aria-hidden className="surface-inset grid size-24 place-items-center rounded-full border-4 border-background text-2xl font-semibold tracking-[-0.06em] text-primary">
                 {initials || "DR"}
               </span>
             </div>
-            <span className="absolute left-[4.6rem] top-[4.6rem] size-4 rounded-full border-[3px] border-card bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.75)]" aria-hidden />
+            <span className="absolute left-[4.6rem] top-[4.6rem] size-4 rounded-full border-[3px] border-card bg-money" aria-hidden />
             <span className="sr-only">Account active</span>
 
             <div className="mt-5">
@@ -148,7 +147,7 @@ export function SettingsWorkspace({
               </p>
             </div>
 
-            <div className="mt-6 space-y-2.5 border-t border-white/8 pt-5 text-xs text-muted-foreground">
+            <div className="mt-6 space-y-2.5 border-t border-border pt-5 text-xs text-muted-foreground">
               <p className="flex items-center gap-2.5">
                 <MailIcon className="size-3.5 text-primary" aria-hidden />
                 <span className="truncate">{profile.email || "Email unavailable"}</span>
@@ -159,17 +158,17 @@ export function SettingsWorkspace({
               </p>
             </div>
 
-            <div className="mt-6 rounded-[1.1rem] border border-emerald-400/15 bg-emerald-400/7 p-3.5">
+            <div className="mt-6 rounded-[1.1rem] border border-money/30 bg-money-soft p-3.5">
               <p className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                <ShieldCheckIcon className="size-4 text-emerald-500" aria-hidden />
+                <ShieldCheckIcon className="size-4 text-money" aria-hidden />
                 India data residency
               </p>
-              <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">
+              <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
                 Patient records and private dictation audio remain in the Mumbai region.
               </p>
             </div>
 
-            <Button variant="ghost" size="lg" onClick={onSignOut} className="mt-5 w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive">
+            <Button variant="ghost" size="lg" onClick={onSignOut} className="mt-5 w-full justify-start text-destructive hover:bg-destructive-soft hover:text-destructive">
               <LogOutIcon aria-hidden />
               Sign out securely
             </Button>
@@ -177,10 +176,10 @@ export function SettingsWorkspace({
         </aside>
 
         <div className="space-y-4">
-      <Card className="glass-card gap-0 rounded-[1.65rem] border-white/10 bg-card/55 py-0">
-        <CardHeader className="border-b border-white/8 px-5 py-5 sm:px-6">
+      <Card className="surface-card gap-0 rounded-[1.65rem] border-border bg-card py-0">
+        <CardHeader className="border-b border-border px-5 py-5 sm:px-6">
           <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-[0.9rem] border border-primary/20 bg-primary/10 text-primary">
+            <span className="grid size-9 place-items-center rounded-[0.9rem] border border-primary/20 bg-primary-soft text-primary">
               <StethoscopeIcon className="size-4" aria-hidden />
             </span>
             <div>
@@ -232,8 +231,8 @@ export function SettingsWorkspace({
             </Alert>
           )}
 
-          <div className="flex justify-end border-t border-white/8 pt-5 sm:col-span-2">
-            <Button onClick={save} disabled={saving || !fullName.trim()} className="min-w-36 shadow-[0_12px_28px_-16px_var(--primary)]">
+          <div className="flex justify-end border-t border-border pt-5 sm:col-span-2">
+            <Button onClick={save} disabled={saving || !fullName.trim()} className="min-w-36">
               {saving ? <LoaderCircleIcon className="animate-spin" aria-hidden /> : <CheckIcon aria-hidden />}
               Save changes
             </Button>
@@ -241,10 +240,10 @@ export function SettingsWorkspace({
         </CardContent>
       </Card>
 
-      <Card className="glass-card gap-0 rounded-[1.65rem] border-white/10 bg-card/55 py-0">
-        <CardHeader className="border-b border-white/8 px-5 py-5 sm:px-6">
+      <Card className="surface-card gap-0 rounded-[1.65rem] border-border bg-card py-0">
+        <CardHeader className="border-b border-border px-5 py-5 sm:px-6">
           <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-[0.9rem] border border-primary/20 bg-primary/10 text-primary">
+            <span className="grid size-9 place-items-center rounded-[0.9rem] border border-primary/20 bg-primary-soft text-primary">
               <LanguagesIcon className="size-4" aria-hidden />
             </span>
             <div>
@@ -253,11 +252,11 @@ export function SettingsWorkspace({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="divide-y divide-white/8 p-0">
+        <CardContent className="divide-y divide-border p-0">
           <div className="flex items-center justify-between gap-4 px-5 py-5 sm:px-6">
             <div>
               <p className="flex items-center gap-2 text-sm font-medium"><PaletteIcon className="size-4 text-primary" aria-hidden />Interface theme</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Switch between light and dark mode.</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Follow your system or choose light or dark mode.</p>
             </div>
             <ThemeToggle />
           </div>
@@ -278,13 +277,13 @@ export function SettingsWorkspace({
                     onClick={() => toggleLanguage(language.code)}
                     disabled={isLastLanguage(language.code)}
                     title={isLastLanguage(language.code) ? "Dictation needs at least one language." : undefined}
-                    className="glass-inset flex min-h-14 w-full items-center justify-between gap-4 rounded-[1rem] px-3.5 py-2.5 text-left transition-colors hover:border-primary/20 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="surface-inset flex min-h-14 w-full items-center justify-between gap-4 rounded-[1rem] px-3.5 py-2.5 text-left transition-colors hover:border-primary/20 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <span>
                       <span className="block text-sm font-medium">{language.label}</span>
-                      <span className="mt-0.5 block text-[11px] text-muted-foreground">{language.detail} · {language.code}</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">{language.detail} · {language.code}</span>
                     </span>
-                    <span className={cn("relative h-6 w-11 shrink-0 rounded-full border transition-colors", selected ? "border-primary/40 bg-primary" : "border-white/10 bg-white/8")} aria-hidden>
+                    <span className={cn("relative h-6 w-11 shrink-0 rounded-full border transition-colors", selected ? "border-primary/40 bg-primary" : "border-border bg-secondary")} aria-hidden>
                       <span className={cn("absolute top-1/2 size-4 -translate-y-1/2 rounded-full bg-white shadow-sm transition-transform", selected ? "translate-x-6" : "translate-x-1")} />
                     </span>
                   </button>

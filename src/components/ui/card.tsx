@@ -2,19 +2,11 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-/**
- * Card — a paper slip on the desk.
- *
- * `.slip` supplies the material (solid card fill, hairline border, three-stop
- * cast shadow, inset light-catch). The parts below only supply rhythm, so a
- * 21st.dev block using `<Card>/<CardHeader>/<CardContent>` lands with the
- * right padding and the right depth without edits.
- */
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card"
-      className={cn("glass-panel text-card-foreground flex flex-col gap-5 py-5", className)}
+      className={cn("surface-panel text-card-foreground flex flex-col gap-4 py-5", className)}
       {...props}
     />
   );

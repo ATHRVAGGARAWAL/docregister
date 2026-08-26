@@ -49,7 +49,7 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
   return (
     <div className="no-scrollbar -mx-5 overflow-x-auto px-5 sm:mx-0 sm:px-0">
       <div
-        className="glass-card grid min-w-[42rem] grid-cols-4 overflow-hidden rounded-[1.75rem] sm:min-w-0"
+        className="surface-card grid min-w-[42rem] grid-cols-4 overflow-hidden rounded-[1.75rem] sm:min-w-0"
         role="list"
       >
         {tiles.map((tile, index) => (
@@ -68,16 +68,16 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
             {index > 0 && (
               <span
                 aria-hidden
-                className="absolute inset-y-5 left-0 w-px bg-gradient-to-b from-transparent via-border to-transparent"
+                className="absolute inset-y-5 left-0 w-px bg-border"
               />
             )}
             <div className="flex items-center gap-2">
               <span
                 aria-hidden
-                className="h-1.5 w-5 rounded-full opacity-80 shadow-[0_0_14px_currentColor] transition-all duration-300 group-hover:w-7"
+                className="h-1.5 w-5 rounded-full transition-all duration-300 group-hover:w-7"
                 style={{ background: tile.swatch, color: tile.swatch }}
               />
-              <p className="truncate text-[10px] font-semibold tracking-[0.13em] text-muted-foreground uppercase">
+              <p className="truncate text-xs font-semibold tracking-[0.13em] text-muted-foreground uppercase">
                 {tile.label}
               </p>
             </div>
@@ -91,7 +91,7 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
               />
             </p>
 
-            <p className="mt-2 truncate text-[10px] text-muted-foreground">{tile.hint}</p>
+            <p className="mt-2 truncate text-xs text-muted-foreground">{tile.hint}</p>
           </motion.div>
         ))}
       </div>

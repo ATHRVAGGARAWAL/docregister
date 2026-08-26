@@ -8,7 +8,7 @@ import {
   PillIcon,
   StethoscopeIcon,
   UserRoundIcon,
-} from "lucide-react";
+} from "@/components/icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { Badge } from "@/components/ui/badge";
@@ -34,9 +34,8 @@ export function RegisterTimeline({
 
   if (entries.length === 0) {
     return (
-      <div className="glass-card relative overflow-hidden rounded-[1.5rem] px-6 py-14 text-center">
-        <div className="pointer-events-none absolute inset-x-1/4 -top-20 h-36 rounded-full bg-primary/10 blur-3xl" aria-hidden />
-        <span className="relative mx-auto grid size-12 place-items-center rounded-2xl border border-white/10 bg-primary/10 text-primary shadow-[0_14px_30px_-18px_var(--primary)]">
+      <div className="surface-card relative overflow-hidden rounded-[1.5rem] px-6 py-14 text-center">
+        <span className="relative mx-auto grid size-12 place-items-center rounded-2xl border border-border bg-primary-soft text-primary">
           <NotebookPenIcon className="size-5" aria-hidden />
         </span>
         <p className="relative mt-4 text-sm font-semibold tracking-[-0.01em]">No matching visits found</p>
@@ -70,35 +69,26 @@ export function RegisterTimeline({
             >
               {showDay && (
                 <div className="mb-3 mt-7 flex items-center gap-3 first:mt-0">
-                  <p className="shrink-0 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  <p className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     {formatDayLong(day)}
                   </p>
-                  <span className="h-px flex-1 bg-gradient-to-r from-border/70 to-transparent" aria-hidden />
+                  <span className="h-px flex-1 bg-border" aria-hidden />
                 </div>
               )}
 
               <article
                 className={cn(
-                  "glass-card group relative isolate overflow-hidden rounded-[1.35rem] p-4 transition-all duration-300 sm:p-5",
-                  onOpenVisit && "hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-[0_24px_60px_-36px_var(--primary)]",
+                  "surface-card group relative isolate overflow-hidden rounded-[1.35rem] p-4 transition-all duration-300 sm:p-5",
+                  onOpenVisit && "hover:-translate-y-0.5 hover:border-primary/20",
                 )}
               >
                 <div
                   className={cn(
                     "pointer-events-none absolute inset-y-5 left-0 w-0.5 rounded-full",
-                    entry.status === "draft" ? "bg-warning/70" : "bg-primary/70",
+                    entry.status === "draft" ? "bg-warning" : "bg-primary",
                   )}
                   aria-hidden
                 />
-                <div
-                  className={cn(
-                    "pointer-events-none absolute -right-12 -top-16 size-40 rounded-full blur-3xl transition-opacity duration-300",
-                    entry.status === "draft" ? "bg-warning/8" : "bg-primary/8",
-                    "opacity-40 group-hover:opacity-80",
-                  )}
-                  aria-hidden
-                />
-
                 {onOpenVisit && (
                   <button
                     type="button"
@@ -120,10 +110,10 @@ export function RegisterTimeline({
 
                   <span
                     className={cn(
-                      "mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+                      "mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl border",
                       entry.status === "draft"
-                        ? "border-warning/25 bg-warning/10 text-warning"
-                        : "border-primary/20 bg-primary/10 text-primary",
+                        ? "border-warning/25 bg-warning-soft text-warning"
+                        : "border-primary/20 bg-primary-soft text-primary",
                     )}
                   >
                     {entry.status === "draft" ? (
@@ -160,11 +150,11 @@ export function RegisterTimeline({
                             </h3>
                           )}
                           {entry.status === "draft" ? (
-                            <Badge variant="warning" className="rounded-full border-warning/20 bg-warning/8 px-2.5">Needs review</Badge>
+                            <Badge variant="warning" className="rounded-full border-warning/20 bg-warning-soft px-2.5">Needs review</Badge>
                           ) : entry.is_new_patient ? (
-                            <Badge variant="default" className="rounded-full border-primary/20 bg-primary/8 px-2.5">First visit</Badge>
+                            <Badge variant="default" className="rounded-full border-primary/20 bg-primary-soft px-2.5 text-primary">First visit</Badge>
                           ) : (
-                            <Badge variant="secondary" className="rounded-full border-white/8 bg-white/5 px-2.5">
+                            <Badge variant="secondary" className="rounded-full border-border bg-secondary px-2.5">
                               Visit {entry.visit_number ?? "return"}
                             </Badge>
                           )}
@@ -182,7 +172,7 @@ export function RegisterTimeline({
                       </div>
 
                       {onOpenVisit && (
-                        <span className="hidden items-center gap-1 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground transition-colors group-hover:text-primary md:flex">
+                        <span className="hidden items-center gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground transition-colors group-hover:text-primary md:flex">
                           Open <ArrowUpRightIcon className="size-3.5" aria-hidden />
                         </span>
                       )}
@@ -192,7 +182,7 @@ export function RegisterTimeline({
                       <button
                         type="button"
                         onClick={() => onOpenDraft(entry)}
-                        className="pointer-events-auto relative z-20 mt-3 inline-flex min-h-9 touch-manipulation items-center rounded-xl border border-warning/25 bg-warning/10 px-3 text-xs font-semibold text-warning transition-colors hover:bg-warning/15 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [@media(pointer:coarse)]:min-h-11"
+                        className="pointer-events-auto relative z-20 mt-3 inline-flex min-h-9 touch-manipulation items-center rounded-xl border border-warning/25 bg-warning-soft px-3 text-xs font-semibold text-warning transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [@media(pointer:coarse)]:min-h-11"
                       >
                         Review this draft
                       </button>
@@ -200,7 +190,7 @@ export function RegisterTimeline({
 
                     <div className="mt-3 grid gap-2.5 text-sm sm:grid-cols-2">
                       <p className="flex min-w-0 items-start gap-2.5 leading-5 text-muted-foreground">
-                        <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-lg bg-primary/8 text-primary">
+                        <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
                           <StethoscopeIcon className="size-3.5" aria-hidden />
                         </span>
                         <span className={compact ? "line-clamp-1" : "line-clamp-2"}>
@@ -209,7 +199,7 @@ export function RegisterTimeline({
                       </p>
                       {!compact && entry.treatment && (
                         <p className="flex min-w-0 items-start gap-2.5 leading-5 text-muted-foreground">
-                          <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-lg bg-primary/8 text-primary">
+                          <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
                             <ClipboardPenLineIcon className="size-3.5" aria-hidden />
                           </span>
                           <span className="line-clamp-2">{entry.treatment}</span>
@@ -222,14 +212,14 @@ export function RegisterTimeline({
                         {entry.drugs.slice(0, compact ? 3 : 6).map((drug) => (
                           <li
                             key={drug}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-white/8 bg-white/[0.035] px-2.5 py-1.5 text-[0.6875rem] text-secondary-foreground"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs text-secondary-foreground"
                           >
                             <PillIcon className="size-3 text-primary/75" aria-hidden />
                             {drug}
                           </li>
                         ))}
                         {entry.drugs.length > (compact ? 3 : 6) && (
-                          <li className="px-1 py-1.5 text-[0.6875rem] text-muted-foreground">
+                          <li className="px-1 py-1.5 text-xs text-muted-foreground">
                             +{entry.drugs.length - (compact ? 3 : 6)} more
                           </li>
                         )}

@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { AudioLines, Lock, Mic, Search, SendHorizontal, Square, X } from "lucide-react";
+import { AudioLines, FilePenLine, Lock, Mic, Search, SendHorizontal, Square, X } from "@/components/icons";
 
-import { ClickSpark } from "@/components/reactbits/click-spark";
 import { Waveform } from "@/components/voice/waveform";
 import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/format";
@@ -65,10 +64,12 @@ export function VoiceDock({
   interimText,
   finalText,
   error,
+  liveTextUnavailable,
   onStart,
   onStop,
   onCancel,
   onAsk,
+  onManualEntry,
 }: {
   phase: CapturePhase;
   level: number;
@@ -79,10 +80,12 @@ export function VoiceDock({
   interimText: string;
   finalText: string;
   error: string | null;
+  liveTextUnavailable: boolean;
   onStart: () => void;
   onStop: () => void;
   onCancel: () => void;
   onAsk: (question: string) => void;
+  onManualEntry: () => void;
 }) {
   const [locked, setLocked] = useState(false);
   const [slide, setSlide] = useState(0);
@@ -229,7 +232,7 @@ export function VoiceDock({
   return (
     <div
       ref={dockRef}
-      className="voice-dock-frame pointer-events-none fixed right-0 bottom-[5rem] left-0 z-40 flex justify-center px-3 pb-3 sm:px-5 lg:bottom-2 lg:left-[17rem] lg:pb-[max(1rem,env(safe-area-inset-bottom))]"
+      className="voice-dock-frame pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] sm:px-5 lg:left-64"
     >
       <p className="sr-only" role="status" aria-live="polite">
         {activity}
@@ -239,18 +242,10 @@ export function VoiceDock({
         layout
         transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className={cn(
-          "glass-dock pointer-events-auto relative isolate w-full max-w-[42rem] overflow-visible rounded-[1.75rem] border border-white/10 p-2 shadow-[0_28px_80px_-32px_rgba(0,0,0,0.85)]",
+          "surface-dock pointer-events-auto relative isolate w-full max-w-[42rem] overflow-visible rounded-xl p-2",
           !listening && !busy && "voice-dock-idle grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2",
         )}
       >
-        <div
-          className={cn(
-            "pointer-events-none absolute inset-x-12 -top-px h-px bg-gradient-to-r from-transparent via-white/35 to-transparent",
-            listening ? "opacity-100" : "opacity-60",
-          )}
-          aria-hidden
-        />
-
         <AnimatePresence mode="popLayout" initial={false}>
           {/* ---- Listening ------------------------------------------------ */}
           {listening && (
@@ -263,25 +258,25 @@ export function VoiceDock({
               className="min-w-0 px-2 pt-2 sm:px-3"
             >
               <div className="flex items-center justify-between gap-3">
-                <span className="glass-inset tnum flex min-h-8 items-center gap-2 rounded-full px-3 text-xs font-semibold text-foreground">
+                <span className="surface-inset tnum flex min-h-8 items-center gap-2 rounded-full px-3 text-xs font-semibold text-foreground">
                   <span
-                    className="key-pulse relative size-2 rounded-full bg-destructive shadow-[0_0_14px_var(--destructive)]"
+                    className="key-pulse relative size-2 rounded-full bg-destructive"
                     aria-hidden
                   />
                   {formatDuration(elapsedMs)}
                 </span>
                 {locked && (
-                  <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/15 bg-primary/8 px-2.5 py-1.5 text-[0.6875rem] font-semibold text-primary">
+                  <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/20 bg-primary-soft px-2.5 py-1.5 text-xs font-semibold text-primary">
                     <Lock className="size-3" aria-hidden /> Hands-free
                   </span>
                 )}
               </div>
 
-              <div className="glass-inset relative mt-2 overflow-hidden rounded-2xl border-white/8 bg-background/25 px-3 py-2.5 sm:px-4">
+              <div className="surface-inset relative mt-2 overflow-hidden rounded-xl px-3 py-2.5 sm:px-4">
                 <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-primary" aria-hidden>
                   <Waveform spectrumRef={spectrumRef} active={phase === "listening"} />
                 </div>
-                <div className="relative h-12 bg-gradient-to-b from-background/45 via-background/65 to-background/45" aria-hidden />
+                <div className="relative h-12" aria-hidden />
               </div>
 
               <p
@@ -297,6 +292,12 @@ export function VoiceDock({
                   <span className="text-muted-foreground">Listening for the patient details…</span>
                 )}
               </p>
+
+              {liveTextUnavailable && (
+                <p className="mt-1.5 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-foreground" role="status">
+                  Live transcription is unavailable. Recording continues and the final transcript will still be processed.
+                </p>
+              )}
 
               {approachingLimit && (
                 /* A countdown the doctor has to act on inside ten seconds. It
@@ -350,7 +351,7 @@ export function VoiceDock({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="voice-dock-query glass-inset flex h-14 min-w-0 items-center gap-2 rounded-[1.15rem] border-white/8 bg-background/25 px-3"
+              className="voice-dock-query surface-inset flex h-14 min-w-0 items-center gap-2 rounded-lg px-3"
             >
               <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary/8 text-primary">
                 <Search className="size-4" aria-hidden />
@@ -365,7 +366,7 @@ export function VoiceDock({
               <button
                 type="submit"
                 disabled={!question.trim()}
-                className="grid size-9 shrink-0 touch-manipulation place-items-center rounded-xl border border-white/8 bg-white/5 text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-35 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11"
+                className="grid size-9 shrink-0 touch-manipulation place-items-center rounded-lg border border-border bg-background text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-35 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11"
               >
                 <SendHorizontal className="size-4" aria-hidden />
                 <span className="sr-only">Ask patient history</span>
@@ -375,9 +376,13 @@ export function VoiceDock({
         </AnimatePresence>
 
         {error && (
-          <p role="alert" className="col-span-full mt-2 rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive">
-            {error}
-          </p>
+          <div className="col-span-full mt-2 flex flex-col gap-2 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <p role="alert" className="text-xs text-destructive">{error}</p>
+            <Button type="button" size="sm" variant="outline" onClick={onManualEntry}>
+              <FilePenLine className="size-4" aria-hidden />
+              Enter manually
+            </Button>
+          </div>
         )}
 
         {/* ---- The key ---------------------------------------------------- */}
@@ -389,7 +394,7 @@ export function VoiceDock({
         >
           {listening && locked ? (
             <>
-              <Button variant="outline" size="icon" onClick={onCancel} className="size-11 rounded-full border-white/10 bg-white/5">
+              <Button variant="outline" size="icon" onClick={onCancel} className="size-11 rounded-full">
                 <X className="size-4" aria-hidden />
                 <span className="sr-only">Discard recording</span>
               </Button>
@@ -405,7 +410,7 @@ export function VoiceDock({
                 <button
                   type="button"
                   onClick={onStop}
-                  className="pressable grid size-16 place-items-center rounded-full border border-white/15 bg-destructive text-white shadow-[0_12px_34px_-12px_var(--destructive)] transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+                  className="pressable grid size-16 place-items-center rounded-full border border-destructive bg-destructive text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
                 >
                   <Square className="size-5 fill-current" aria-hidden />
                   <span className="sr-only">Stop recording and review this visit</span>
@@ -413,7 +418,7 @@ export function VoiceDock({
               </div>
             </>
           ) : busy ? (
-            <span className="relative grid size-12 place-items-center rounded-full border border-primary/20 bg-primary/10 text-primary shadow-[0_0_30px_-10px_var(--primary)]" aria-hidden>
+            <span className="relative grid size-12 place-items-center rounded-full border border-primary/20 bg-primary-soft text-primary" aria-hidden>
               <AudioLines className="size-5" />
             </span>
           ) : (
@@ -422,7 +427,7 @@ export function VoiceDock({
                 <motion.span
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 - slide / LOCK_DISTANCE }}
-                  className="absolute -top-12 flex flex-col items-center rounded-full border border-white/10 bg-background/70 px-3 py-1.5 text-[0.6875rem] font-medium text-muted-foreground shadow-lg backdrop-blur-md"
+                  className="surface-elevated absolute -top-12 flex flex-col items-center rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground"
                 >
                   <span className="flex items-center gap-1.5">
                     <Lock className="size-3.5" aria-hidden />
@@ -431,42 +436,7 @@ export function VoiceDock({
                 </motion.span>
               )}
 
-              {/* The spark reads as the key's contact point. It fires on
-                  pointerdown, so it lands with the thumb rather than with the
-                  release — and it still fires when the press becomes a slide,
-                  which never produces a click. It checks the reduced-motion
-                  query itself, so there is nothing to gate here. */}
-              <ClickSpark
-                sparkColor="var(--primary)"
-                sparkRadius={26}
-                sparkCount={10}
-                className="rounded-full"
-              >
-                <div className="relative grid place-items-center">
-                  <motion.span
-                    className={cn(
-                      "voice-aura pointer-events-none absolute rounded-full",
-                      listening ? "-inset-5" : "-inset-3",
-                    )}
-                    animate={
-                      reduceMotion
-                        ? { opacity: listening ? 0.45 : 0.2 }
-                        : {
-                            opacity: listening ? [0.3, 0.65, 0.3] : [0.14, 0.28, 0.14],
-                            scale: listening ? [1, 1.08 + level * 0.12, 1] : [1, 1.06, 1],
-                          }
-                    }
-                    transition={{ duration: listening ? 1.1 : 2.8, repeat: Infinity, ease: "easeInOut" }}
-                    aria-hidden
-                  />
-                  {!reduceMotion && listening && (
-                    <motion.span
-                      className="pointer-events-none absolute -inset-3 rounded-full border border-primary/35"
-                      animate={{ scale: [1, 1.6], opacity: [0.7, 0] }}
-                      transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
-                      aria-hidden
-                    />
-                  )}
+              <div className="relative grid place-items-center">
                   <button
                     type="button"
                     disabled={busy}
@@ -489,7 +459,7 @@ export function VoiceDock({
                       })`,
                     }}
                     className={cn(
-                      "relative grid place-items-center rounded-full border border-white/20 bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_14px_40px_-14px_var(--primary)] transition-[box-shadow] duration-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:opacity-50",
+                      "relative grid place-items-center rounded-full border border-primary bg-primary text-primary-foreground shadow-flat transition-[transform,background-color] duration-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:opacity-50",
                       listening ? "size-[4.5rem]" : "size-14",
                     )}
                     aria-label={
@@ -498,10 +468,9 @@ export function VoiceDock({
                         : "Record a visit. Tap to start hands-free, or hold to record while pressed."
                     }
                   >
-                    <Mic className={cn("drop-shadow-sm", listening ? "size-7" : "size-5")} aria-hidden />
+                    <Mic className={listening ? "size-7" : "size-5"} aria-hidden />
                   </button>
-                </div>
-              </ClickSpark>
+              </div>
             </div>
           )}
         </div>

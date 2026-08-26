@@ -46,6 +46,7 @@ export function parseDashboardUrlState(params: RawSearchParams): DashboardUrlSta
     rawView === "register" ||
     rawView === "patients" ||
     rawView === "recall" ||
+    rawView === "follow-ups" ||
     rawView === "accounts" ||
     rawView === "settings"
       ? rawView

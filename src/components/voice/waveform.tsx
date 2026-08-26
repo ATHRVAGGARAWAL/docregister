@@ -187,9 +187,7 @@ function WaveformCanvas({
       context.fillStyle = ink;
       context.fillRect(0, height / 2 - 0.5, width, 1);
 
-      // Add every capsule to one path and fill once. Besides looking smoother,
-      // this lets the canvas draw a restrained audio glow without paying for a
-      // shadow operation on every individual bar.
+      // Add every capsule to one path and fill once for a crisp, low-cost meter.
       context.beginPath();
 
       for (let i = 0; i < BARS; i++) {
@@ -212,10 +210,7 @@ function WaveformCanvas({
 
       context.fillStyle = ink;
       context.globalAlpha = active ? 0.9 : 0.28;
-      context.shadowColor = ink;
-      context.shadowBlur = active ? 8 : 0;
       context.fill();
-      context.shadowBlur = 0;
       context.globalAlpha = 1;
     };
 
@@ -291,7 +286,7 @@ function LevelMeter({
         <span
           key={index}
           className={cn(
-            "h-2 flex-1 rounded-full bg-current shadow-[0_0_8px_currentColor]",
+            "h-2 flex-1 rounded-full bg-current",
             index < step ? "opacity-100" : "opacity-20",
           )}
         />

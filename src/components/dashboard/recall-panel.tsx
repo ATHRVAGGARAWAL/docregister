@@ -10,7 +10,7 @@ import {
   TriangleAlert,
   UserRoundIcon,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -104,17 +104,16 @@ export function RecallPanel({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className="glass-strong relative overflow-hidden rounded-[1.65rem] p-4 shadow-[0_30px_90px_-50px_color-mix(in_oklab,var(--primary)_40%,transparent)] sm:p-6"
+      className="surface-elevated relative overflow-hidden rounded-[1.65rem] p-4 sm:p-6"
       aria-live="polite"
     >
-      <div className="ambient-orb pointer-events-none absolute -right-20 -top-24 size-48 opacity-35" aria-hidden />
       <header className="flex items-start justify-between gap-3">
         {/* Wraps rather than truncates. Everything below this line is an
             answer, and an answer can only be judged against the whole question
             — "what did I give Sunita last time" and "what did I give Sunita
             last time for her knee" have different right answers, and the second
             one is where the ellipsis fell. */}
-        <p className="glass-inset relative flex min-w-0 flex-1 items-start gap-2.5 rounded-[1rem] px-3.5 py-3 text-sm text-muted-foreground">
+        <p className="surface-inset relative flex min-w-0 flex-1 items-start gap-2.5 rounded-[1rem] px-3.5 py-3 text-sm text-muted-foreground">
           <Quote className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
           <span className="min-w-0 break-words">{question}</span>
         </p>
@@ -135,7 +134,7 @@ export function RecallPanel({
           including the large majority the classifier reads correctly, so it has
           to be findable without competing with the answer underneath it. */}
       {onRecordAsVisit && (
-        <div className="relative mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-white/8 bg-white/3 px-3 py-2.5">
+        <div className="relative mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-border bg-secondary px-3 py-2.5">
           <p className="text-muted-foreground text-xs">
             Meant to record a visit? Nothing was lost — the recording is saved.
           </p>
@@ -148,7 +147,7 @@ export function RecallPanel({
       {loading || !result ? (
         <div className="relative mt-6 grid min-h-36 place-items-center">
           <div className="text-center">
-            <span className="mx-auto grid size-11 place-items-center rounded-full border border-primary/20 bg-primary/10 text-primary shadow-[0_0_36px_-10px_var(--primary)]">
+            <span className="mx-auto grid size-11 place-items-center rounded-full border border-primary/20 bg-primary-soft text-primary">
               <Loader2 className="size-4 animate-spin" aria-hidden />
             </span>
             <p className="mt-3 text-sm text-muted-foreground">Looking through your register…</p>
@@ -157,8 +156,8 @@ export function RecallPanel({
       ) : (
         <>
           <div className="relative mt-5 pl-4 sm:pl-5">
-            <span className="absolute inset-y-1 left-0 w-px bg-gradient-to-b from-primary via-primary/45 to-transparent" aria-hidden />
-            <p className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+            <span className="absolute inset-y-1 left-0 w-px bg-primary" aria-hidden />
+            <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
               <SparklesIcon className="size-3.5" aria-hidden />
               Register answer
             </p>
@@ -172,7 +171,7 @@ export function RecallPanel({
               colour-only encoding the confidence badge below refuses. The word
               carries the meaning; the tint and the icon only reinforce it. */}
           {result.caveat && (
-            <p className="mt-3 flex items-start gap-2 rounded-xl border border-warning/20 bg-warning/8 px-3 py-2.5 text-xs text-warning" role="note">
+            <p className="mt-3 flex items-start gap-2 rounded-xl border border-warning/20 bg-warning-soft px-3 py-2.5 text-xs text-warning" role="note">
               <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
               <span>
                 <span className="font-medium">Caveat:</span> {result.caveat}
@@ -187,9 +186,9 @@ export function RecallPanel({
                 const patient = patientFromRecall(result);
                 if (patient) onOpenPatient(patient);
               }}
-              className="group mt-5 flex w-full items-center gap-3 rounded-[1.15rem] border border-primary/20 bg-primary/8 px-3.5 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-primary/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group mt-5 flex w-full items-center gap-3 rounded-[1.15rem] border border-primary/20 bg-primary-soft px-3.5 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <span className="grid size-10 shrink-0 place-items-center rounded-[0.9rem] border border-primary/20 bg-primary/12 text-primary shadow-[0_10px_24px_-16px_var(--primary)]">
+              <span className="grid size-10 shrink-0 place-items-center rounded-[0.9rem] border border-primary/20 bg-card text-primary">
                 <UserRoundIcon className="size-4" aria-hidden />
               </span>
               <span className="min-w-0 flex-1">
@@ -222,16 +221,16 @@ export function RecallPanel({
           {result.encounters.length > 0 && (
             <>
               <div className="mt-5 flex items-center justify-between gap-3">
-                <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   <CalendarDaysIcon className="size-3.5 text-primary" aria-hidden />
                   Evidence trail
                 </p>
-                <span className="tnum text-[10px] text-muted-foreground">{result.encounters.length} source{result.encounters.length === 1 ? "" : "s"}</span>
+                <span className="tnum text-xs text-muted-foreground">{result.encounters.length} source{result.encounters.length === 1 ? "" : "s"}</span>
               </div>
               <ol className="mt-2 grid gap-2 sm:grid-cols-2">
                 {result.encounters.slice(0, EVIDENCE_LIMIT).map((encounter) => (
-                  <li key={encounter.id} className="glass-inset rounded-[1rem] p-3 text-xs">
-                    <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                  <li key={encounter.id} className="surface-inset rounded-[1rem] p-3 text-xs">
+                    <p className="text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">
                       {formatDayLong(encounter.occurred_at.slice(0, 10))}
                     </p>
                     <p className="mt-1.5 line-clamp-2 font-medium leading-5 text-foreground">
@@ -256,7 +255,7 @@ export function RecallPanel({
 
           {/* Confidence is stated as a word, not encoded as a colour: "low"
               has to be readable as low even where the tint is not. */}
-          <p className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+          <p className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge variant={result.confidence === "high" ? "default" : "secondary"}>
               <span className="size-1.5 rounded-full bg-current opacity-70" aria-hidden />
               {result.confidence} confidence

@@ -14,7 +14,7 @@ import {
   ReceiptTextIcon,
   SearchIcon,
   WalletCardsIcon,
-} from "lucide-react";
+} from "@/components/icons";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -141,8 +141,8 @@ export function AccountsWorkspace() {
     <div className="space-y-7">
       <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
-            <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary/10">
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary-soft">
               <CalendarRangeIcon className="size-3.5" aria-hidden />
             </span>
             Practice finance
@@ -152,7 +152,7 @@ export function AccountsWorkspace() {
             A private, doctor-scoped view of cash flow without touching clinical records.
           </p>
         </div>
-        <Button size="lg" onClick={() => setEntryOpen(true)} className="rounded-xl shadow-[0_14px_32px_-16px_var(--primary)]">
+        <Button size="lg" onClick={() => setEntryOpen(true)} className="rounded-xl">
           <PlusIcon aria-hidden /> Add entry
         </Button>
       </section>
@@ -166,8 +166,8 @@ export function AccountsWorkspace() {
 
       <SummaryCards payload={data} loading={loading} />
 
-      <section className="glass-card overflow-hidden rounded-[1.65rem] border-white/10 bg-card/45">
-        <div className="border-b border-white/8 p-4 sm:p-5">
+      <section className="surface-card overflow-hidden rounded-[1.65rem] border-border bg-card">
+        <div className="border-b border-border p-4 sm:p-5">
           <form
             className="flex gap-2"
             onSubmit={(event) => {
@@ -182,13 +182,13 @@ export function AccountsWorkspace() {
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search category, person, method, or note"
                 aria-label="Search accounts"
-                className="glass-inset h-11 rounded-xl border-white/8 bg-background/20 pl-10 shadow-none"
+                className="surface-inset h-11 rounded-xl border-border bg-background pl-10 shadow-none"
               />
             </div>
-            <Button type="submit" size="lg" variant="outline" className="rounded-xl border-white/10 bg-white/5">Search</Button>
+            <Button type="submit" size="lg" variant="outline" className="rounded-xl border-border bg-secondary">Search</Button>
           </form>
 
-          <div className="mt-4 flex flex-col gap-3 border-t border-white/8 pt-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 xl:flex-row xl:items-center xl:justify-between">
             <BadgeTabs
               label="Entry type"
               items={KIND_TABS.map((item) => ({ ...item, badge: badges[item.value] }))}
@@ -202,7 +202,7 @@ export function AccountsWorkspace() {
                 value={status}
                 onChange={(value) => setStatus(value as typeof status)}
               />
-              <div className="glass-inset inline-flex items-center gap-1 rounded-full p-1" role="group" aria-label="Accounts date range">
+              <div className="surface-inset inline-flex items-center gap-1 rounded-full p-1" role="group" aria-label="Accounts date range">
                 {RANGES.map((range) => (
                   <button
                     key={range.days}
@@ -210,8 +210,8 @@ export function AccountsWorkspace() {
                     aria-pressed={days === range.days}
                     onClick={() => setDays(range.days)}
                     className={cn(
-                      "h-7 touch-manipulation rounded-full px-2.5 text-[11px] font-medium transition-colors [@media(pointer:coarse)]:min-h-11",
-                      days === range.days ? "bg-primary text-primary-foreground shadow-[0_8px_20px_-12px_var(--primary)]" : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                      "h-8 touch-manipulation rounded-full px-2.5 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-11",
+                      days === range.days ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground",
                     )}
                   >
                     {range.label}
@@ -239,9 +239,9 @@ export function AccountsWorkspace() {
 
 function SummaryCards({ payload, loading }: { payload: AccountsPayload; loading: boolean }) {
   const cards = [
-    { label: "Received", value: payload.summary.received_paise, hint: "Paid income", icon: ArrowDownLeftIcon, tone: "text-primary bg-primary/10" },
-    { label: "Pending", value: payload.summary.pending_paise, hint: "Still to collect", icon: Clock3Icon, tone: "text-money bg-money/10" },
-    { label: "Expenses", value: payload.summary.expenses_paise, hint: "Paid expenses", icon: ArrowUpRightIcon, tone: "text-destructive bg-destructive/10" },
+    { label: "Received", value: payload.summary.received_paise, hint: "Paid income", icon: ArrowDownLeftIcon, tone: "text-primary bg-primary-soft" },
+    { label: "Pending", value: payload.summary.pending_paise, hint: "Still to collect", icon: Clock3Icon, tone: "text-money bg-money-soft" },
+    { label: "Expenses", value: payload.summary.expenses_paise, hint: "Paid expenses", icon: ArrowUpRightIcon, tone: "text-destructive bg-destructive-soft" },
     { label: "Net", value: payload.summary.net_paise, hint: "Received minus expenses", icon: WalletCardsIcon, tone: "text-foreground bg-secondary" },
   ];
   // Two across from the narrowest screen up. These four numbers are one
@@ -258,17 +258,16 @@ function SummaryCards({ payload, loading }: { payload: AccountsPayload; loading:
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: index * 0.04 }}
         >
-          <Card className="glass-card group relative h-full gap-3 overflow-hidden rounded-[1.35rem] border-white/10 bg-card/45 py-4 transition-all duration-300 hover:-translate-y-1 hover:border-primary/20 hover:bg-card/65">
-            <span className="pointer-events-none absolute -right-10 -top-12 size-24 rounded-full bg-primary/7 blur-2xl transition-colors group-hover:bg-primary/12" aria-hidden />
+          <Card className="surface-card group relative h-full gap-3 overflow-hidden rounded-[1.35rem] border-border bg-card py-4 transition-all duration-300 hover:-translate-y-1 hover:border-primary/20 hover:bg-card">
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{card.label}</CardTitle>
-              <span className={cn("grid size-8 shrink-0 place-items-center rounded-[0.8rem] border border-white/10", card.tone)}><card.icon className="size-4" aria-hidden /></span>
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{card.label}</CardTitle>
+              <span className={cn("grid size-8 shrink-0 place-items-center rounded-[0.8rem] border border-border", card.tone)}><card.icon className="size-4" aria-hidden /></span>
             </CardHeader>
             <CardContent>
               <p className={cn("tnum text-xl font-semibold tracking-[-0.045em] sm:text-2xl", card.label === "Pending" && "text-money")}>
                 {loading ? "—" : formatPaise(card.value)}
               </p>
-              <p className="mt-1 text-[11px] text-muted-foreground">{card.hint}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{card.hint}</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -289,7 +288,7 @@ function BadgeTabs({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="glass-inset inline-flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-full p-1" role="group" aria-label={label}>
+    <div className="surface-inset inline-flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-full p-1" role="group" aria-label={label}>
       {items.map((item) => {
         const active = item.value === value;
         return (
@@ -300,7 +299,7 @@ function BadgeTabs({
             aria-pressed={active}
             className={cn(
               "relative inline-flex h-7 shrink-0 touch-manipulation items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-11",
-              active ? "bg-primary text-primary-foreground shadow-[0_8px_20px_-12px_var(--primary)]" : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+              active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground",
             )}
           >
             {item.label}
@@ -311,7 +310,7 @@ function BadgeTabs({
                   initial={{ scale: 0.7, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.7, opacity: 0 }}
-                  className="tnum rounded-full bg-white/12 px-1.5 py-0.5 text-[10px] leading-none text-current"
+                  className="tnum rounded-full bg-secondary px-1.5 py-0.5 text-xs leading-none text-current"
                 >
                   {item.badge}
                 </motion.span>
@@ -354,7 +353,7 @@ function Ledger({
       {entries.map((entry) => (
         <li
           key={entry.id}
-          className="glass-inset group relative overflow-hidden rounded-[1.2rem] p-4 transition-[border-color,background-color,transform] duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:bg-white/6"
+          className="surface-inset group relative overflow-hidden rounded-[1.2rem] p-4 transition-[border-color,background-color,transform] duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:bg-secondary"
         >
           <span
             className={cn(
@@ -365,7 +364,7 @@ function Ledger({
           />
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
-              <span className={cn("grid size-9 shrink-0 place-items-center rounded-[0.85rem] border border-white/10", entry.kind === "income" ? "bg-money/10 text-money" : "bg-destructive/10 text-destructive")}>
+              <span className={cn("grid size-9 shrink-0 place-items-center rounded-[0.85rem] border border-border", entry.kind === "income" ? "bg-money-soft text-money" : "bg-destructive-soft text-destructive")}>
                 {entry.kind === "income" ? <ArrowDownLeftIcon className="size-4" aria-hidden /> : <ArrowUpRightIcon className="size-4" aria-hidden />}
               </span>
               <div className="min-w-0">
@@ -379,8 +378,8 @@ function Ledger({
               {entry.kind === "expense" ? "−" : "+"}{formatPaise(entry.amount_paise)}
             </p>
           </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/8 pt-3">
-            <p className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+            <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               <span>{formatEntryDate(entry.occurred_at)}</span>
               {entry.payment_method && <><span aria-hidden>·</span><span>{PAYMENT_LABELS[entry.payment_method]}</span></>}
             </p>
@@ -393,8 +392,8 @@ function Ledger({
 }
 
 function StatusCell({ entry, onMarkPaid }: { entry: AccountEntry; onMarkPaid: (entry: AccountEntry) => void }) {
-  if (entry.status === "paid") return <Badge variant="secondary" className="border-emerald-400/15 bg-emerald-400/10 text-emerald-500"><CheckIcon aria-hidden />Paid</Badge>;
-  return <Button type="button" size="sm" variant="ghost" className="h-7 text-xs text-money hover:bg-money/10 hover:text-money" onClick={() => onMarkPaid(entry)}><Clock3Icon aria-hidden />Mark paid</Button>;
+  if (entry.status === "paid") return <Badge variant="secondary" className="border-money/30 bg-money-soft text-money"><CheckIcon aria-hidden />Paid</Badge>;
+  return <Button type="button" size="sm" variant="ghost" className="h-7 text-xs text-money hover:bg-money-soft hover:text-money" onClick={() => onMarkPaid(entry)}><Clock3Icon aria-hidden />Mark paid</Button>;
 }
 
 function AccountEntrySheet({
@@ -459,11 +458,10 @@ function AccountEntrySheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="glass-strong overflow-hidden border-white/10 bg-card/75 sm:max-w-lg">
-        <div className="ambient-orb pointer-events-none absolute -right-24 -top-24 size-52 opacity-45" aria-hidden />
-        <SheetHeader className="relative border-b border-white/8 pr-14 sm:px-6 sm:pt-6 sm:pb-4">
+      <SheetContent className="surface-elevated overflow-hidden border-border bg-card sm:max-w-lg">
+        <SheetHeader className="relative border-b border-border pr-14 sm:px-6 sm:pt-6 sm:pb-4">
           <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-[0.95rem] border border-primary/20 bg-primary/12 text-primary shadow-[0_12px_26px_-18px_var(--primary)]">
+            <span className="grid size-10 place-items-center rounded-[0.95rem] border border-primary/20 bg-primary-soft text-primary">
               <BanknoteIcon className="size-4.5" aria-hidden />
             </span>
             <div>
@@ -474,9 +472,9 @@ function AccountEntrySheet({
         </SheetHeader>
         <form onSubmit={submit} className="contents">
           <div className="relative min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5 sm:px-6">
-            <div className="glass-inset grid grid-cols-2 gap-1 rounded-full p-1" role="group" aria-label="Entry type">
+            <div className="surface-inset grid grid-cols-2 gap-1 rounded-full p-1" role="group" aria-label="Entry type">
               {(["income", "expense"] as const).map((value) => (
-                <button key={value} type="button" aria-pressed={kind === value} onClick={() => changeKind(value)} className={cn("h-9 touch-manipulation rounded-full text-sm font-medium capitalize transition-colors [@media(pointer:coarse)]:min-h-11", kind === value ? "bg-primary text-primary-foreground shadow-[0_9px_22px_-13px_var(--primary)]" : "text-muted-foreground hover:bg-white/5 hover:text-foreground")}>{value}</button>
+                <button key={value} type="button" aria-pressed={kind === value} onClick={() => changeKind(value)} className={cn("h-9 touch-manipulation rounded-full text-sm font-medium capitalize transition-colors [@media(pointer:coarse)]:min-h-11", kind === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")}>{value}</button>
               ))}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -485,16 +483,16 @@ function AccountEntrySheet({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Category" htmlFor="account-category"><Input id="account-category" required maxLength={120} value={category} onChange={(event) => setCategory(event.target.value)} list="account-categories" /><datalist id="account-categories">{(kind === "income" ? ["Consultation", "Procedure", "Certificate", "Other income"] : ["Supplies", "Rent", "Utilities", "Staff", "Equipment", "Other expense"]).map((item) => <option key={item} value={item} />)}</datalist></Field>
-              <Field label="Status" htmlFor="account-status"><select id="account-status" value={status} onChange={(event) => setStatus(event.target.value as AccountEntryStatus)} className="glass-inset h-10 w-full rounded-lg px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11"><option value="paid">Paid</option><option value="pending">Pending</option></select></Field>
+              <Field label="Status" htmlFor="account-status"><select id="account-status" value={status} onChange={(event) => setStatus(event.target.value as AccountEntryStatus)} className="surface-inset h-10 w-full rounded-lg px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11"><option value="paid">Paid</option><option value="pending">Pending</option></select></Field>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Payment method" htmlFor="account-method"><select id="account-method" value={method} onChange={(event) => setMethod(event.target.value as AccountPaymentMethod | "")} className="glass-inset h-10 w-full rounded-lg px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11"><option value="">Not specified</option>{Object.entries(PAYMENT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+              <Field label="Payment method" htmlFor="account-method"><select id="account-method" value={method} onChange={(event) => setMethod(event.target.value as AccountPaymentMethod | "")} className="surface-inset h-10 w-full rounded-lg px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11"><option value="">Not specified</option>{Object.entries(PAYMENT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
               <Field label="Person or business" htmlFor="account-counterparty"><Input id="account-counterparty" maxLength={300} value={counterparty} onChange={(event) => setCounterparty(event.target.value)} placeholder={kind === "income" ? "Patient or payer" : "Vendor or payee"} /></Field>
             </div>
             <Field label="Note" htmlFor="account-note"><Textarea id="account-note" maxLength={2000} rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional details" /></Field>
             {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           </div>
-          <SheetFooter className="relative border-white/8 bg-card/45 sm:px-6">
+          <SheetFooter className="relative border-border bg-card sm:px-6">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
             <Button type="submit" disabled={saving || !amount.trim() || !category.trim()}>{saving ? <LoaderCircleIcon className="animate-spin" aria-hidden /> : <BanknoteIcon aria-hidden />}Save entry</Button>
           </SheetFooter>

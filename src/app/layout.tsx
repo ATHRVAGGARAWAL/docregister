@@ -29,16 +29,15 @@ export const metadata: Metadata = {
   applicationName: "docregister",
   // A doctor's register is not something to hand to a crawler.
   robots: { index: false, follow: false },
-  appleWebApp: { capable: true, title: "docregister", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "docregister", statusBarStyle: "black" },
   formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
-  // Matches `--background` in each theme so the browser chrome does not leave a
-  // mismatched strip above the page.
+  // Keep browser chrome aligned with the exact page background in either mode.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#eef3f8" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b0d18" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
   ],
   // The dock sits on the home-indicator edge and reads env(safe-area-inset-*),
   // which stays 0 unless the viewport covers the display cutouts.
@@ -69,13 +68,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="flex min-h-full flex-col overflow-x-hidden">
         <ThemeSync />
-        {/* One switch for every `motion/react` animation in the app.
-            `globals.css` has a `prefers-reduced-motion` block, but it only
-            throttles *CSS* animation — Motion animates from JavaScript, so it
-            sailed straight past. `voice-dock`, `waveform` and `click-spark` each
-            check the preference by hand; `Reveal`, `AnimatedItem` and the
-            dashboard hero did not, which meant a doctor who asked their phone for
-            less motion still got a slide and a scale on every register row. */}
+        {/* One switch covers every `motion/react` transition; the CSS media
+            query handles stylesheet animation and the waveform has its own
+            reduced-motion level meter. */}
         <MotionConfig reducedMotion="user">{children}</MotionConfig>
       </body>
     </html>

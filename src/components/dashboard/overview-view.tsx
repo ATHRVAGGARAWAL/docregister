@@ -6,7 +6,7 @@ import {
   HistoryIcon,
   Mic2Icon,
   SparklesIcon,
-} from "lucide-react";
+} from "@/components/icons";
 
 import { MixChart } from "@/components/charts/mix-chart";
 import { VolumeChart } from "@/components/charts/volume-chart";
@@ -57,7 +57,7 @@ export function OverviewView({
     <div className="space-y-9 sm:space-y-11">
       <section className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
         <div>
-          <p className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+          <p className="flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
             <CalendarDaysIcon className="size-3.5 text-primary" strokeWidth={1.8} aria-hidden />
             {todayLabel()}
           </p>
@@ -71,9 +71,9 @@ export function OverviewView({
         <Button
           size="lg"
           onClick={onStartDictation}
-          className="group h-12 rounded-full px-5 shadow-[0_14px_36px_-16px_var(--primary)] sm:w-auto"
+          className="group h-12 rounded-full px-5 sm:w-auto"
         >
-          <span className="relative grid size-7 place-items-center rounded-full bg-primary-foreground/12">
+          <span className="relative grid size-7 place-items-center rounded-full border border-primary-foreground">
             <Mic2Icon className="size-4 transition-transform duration-300 group-hover:scale-110" aria-hidden />
           </span>
           Dictate a visit
@@ -91,7 +91,7 @@ export function OverviewView({
       <section aria-labelledby="clinic-trends-title">
         <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <p className="text-[10px] font-semibold tracking-[0.16em] text-primary uppercase">
+            <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">
               Practice intelligence
             </p>
             <h2
@@ -105,7 +105,7 @@ export function OverviewView({
             </p>
           </div>
           <div
-            className="glass-inset inline-flex w-fit rounded-full p-1"
+            className="surface-inset inline-flex w-fit rounded-full p-1"
             role="group"
             aria-label="Analytics range"
           >
@@ -116,10 +116,10 @@ export function OverviewView({
                 onClick={() => onRangeChange(option.days)}
                 aria-pressed={range === option.days}
                 className={cn(
-                  "h-8 min-w-12 touch-manipulation rounded-full px-3 text-[10px] font-semibold tracking-[0.08em] transition-[background-color,color,box-shadow] duration-300 [@media(pointer:coarse)]:min-h-11",
+                  "h-8 min-w-12 touch-manipulation rounded-full px-3 text-xs font-semibold tracking-[0.08em] transition-colors duration-200 [@media(pointer:coarse)]:min-h-11",
                   range === option.days
-                    ? "bg-primary text-primary-foreground shadow-[0_6px_16px_-8px_var(--primary)]"
-                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground",
                 )}
               >
                 {option.label}
@@ -147,7 +147,7 @@ export function OverviewView({
         <section aria-labelledby="recent-visits-title">
           <div className="mb-4 flex items-end justify-between gap-3">
             <div>
-              <p className="text-[10px] font-semibold tracking-[0.16em] text-primary uppercase">
+              <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">
                 Today&rsquo;s register
               </p>
               <h2
@@ -178,18 +178,14 @@ export function OverviewView({
           />
         </section>
 
-        <aside className="glass-strong group relative isolate h-fit min-h-72 overflow-hidden rounded-[2rem] p-6 sm:p-7">
-          <span
-            aria-hidden
-            className="pointer-events-none absolute -right-20 -bottom-24 -z-10 size-64 rounded-full bg-primary/16 blur-3xl transition-transform duration-700 group-hover:scale-110"
-          />
+        <aside className="surface-elevated group relative isolate h-fit min-h-72 overflow-hidden rounded-[1.5rem] p-6 sm:p-7">
           <div className="flex items-center justify-between">
-            <span className="grid size-11 place-items-center rounded-[1.1rem] border border-primary/20 bg-primary/12 text-primary shadow-[0_10px_28px_-18px_var(--primary)]">
+            <span className="grid size-11 place-items-center rounded-[1.1rem] border border-primary/20 bg-primary-soft text-primary">
               <HistoryIcon className="size-5" strokeWidth={1.7} aria-hidden />
             </span>
-            <SparklesIcon className="size-4 text-primary/60" strokeWidth={1.5} aria-hidden />
+            <SparklesIcon className="size-4 text-primary" strokeWidth={1.5} aria-hidden />
           </div>
-          <p className="mt-8 text-[10px] font-semibold tracking-[0.16em] text-primary uppercase">
+          <p className="mt-8 text-xs font-semibold tracking-[0.16em] text-primary uppercase">
             Clinical recall
           </p>
           <h2 className="mt-2 max-w-xs text-xl font-semibold leading-7 tracking-[-0.035em] text-foreground">
@@ -200,7 +196,7 @@ export function OverviewView({
           </p>
           <Button
             variant="outline"
-            className="mt-7 w-full rounded-full border-white/10 bg-foreground/[0.035] shadow-none hover:bg-primary/10 hover:text-primary"
+            className="mt-7 w-full rounded-full border-border bg-secondary shadow-none hover:bg-primary-soft hover:text-primary"
             onClick={onOpenRecall}
           >
             Search patient history

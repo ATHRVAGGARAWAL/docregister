@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "@/components/icons";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +50,7 @@ export function MedicationEditor({
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
           Medicines
         </p>
         <Button
@@ -65,7 +65,7 @@ export function MedicationEditor({
       </div>
 
       {value.length === 0 ? (
-        <p className="glass-inset mt-2 rounded-xl border-white/8 bg-background/20 px-3 py-5 text-center text-xs text-muted-foreground">
+        <p className="surface-inset mt-2 rounded-xl border-border bg-background px-3 py-5 text-center text-xs text-muted-foreground">
           No medicines added.
         </p>
       ) : (
@@ -75,12 +75,12 @@ export function MedicationEditor({
             return (
               <li
                 key={index}
-                className="glass-card relative overflow-hidden rounded-2xl border-white/8 bg-card/30 p-3.5 [&_[data-slot=input]]:rounded-xl [&_[data-slot=input]]:bg-background/25 [&_[data-slot=textarea]]:rounded-xl [&_[data-slot=textarea]]:bg-background/25"
+                className="surface-card relative overflow-hidden rounded-2xl border-border bg-card p-3.5 [&_[data-slot=input]]:rounded-xl [&_[data-slot=input]]:bg-background [&_[data-slot=textarea]]:rounded-xl [&_[data-slot=textarea]]:bg-background"
               >
                 <div className="pointer-events-none absolute -right-12 -top-14 size-32 rounded-full bg-primary/8 blur-3xl" aria-hidden />
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="relative flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <span className="tnum grid size-6 place-items-center rounded-lg bg-primary/10 text-[0.625rem] text-primary">
+                    <span className="tnum grid size-6 place-items-center rounded-lg bg-primary-soft text-xs text-primary">
                       {String(index + 1).padStart(2, "0")}
                     </span>
                     Medicine
@@ -261,7 +261,7 @@ function MedicationField({
       <Label
         htmlFor={reviewFieldId(fieldKey)}
         className={cn(
-          "mb-1.5 flex text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
+          "mb-1.5 flex text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground",
           flagged && !reviewed && "text-warning",
         )}
       >

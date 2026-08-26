@@ -1,6 +1,5 @@
 "use client";
 
-import { useId } from "react";
 import { useReducedMotion } from "motion/react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
@@ -27,7 +26,6 @@ export function MixChart({
   );
   const all = totals.fresh + totals.repeat;
   const newShare = all > 0 ? Math.round((totals.fresh / all) * 100) : 0;
-  const rawId = useId().replace(/:/g, "");
   const reduceMotion = useReducedMotion();
 
   return (
@@ -39,8 +37,8 @@ export function MixChart({
           : "No visits in this window yet"
       }
       series={[
-        { key: "new_patients", label: "New", color: NEW, shape: "line" },
-        { key: "returning_patients", label: "Returning", color: RETURNING, shape: "line" },
+        { key: "new_patients", label: "New", color: NEW, shape: "line", marker: "circle" },
+        { key: "returning_patients", label: "Returning", color: RETURNING, shape: "line", dashed: true, marker: "diamond" },
       ]}
       loading={loading}
       columns={[
@@ -59,26 +57,13 @@ export function MixChart({
       <div className="h-48 w-full sm:h-60">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 16, right: 16, bottom: 0, left: -34 }}>
-            <defs>
-              <linearGradient id={`${rawId}-new`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={NEW} stopOpacity={0.42} />
-                <stop offset="58%" stopColor={NEW} stopOpacity={0.1} />
-                <stop offset="100%" stopColor={NEW} stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id={`${rawId}-returning`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={RETURNING} stopOpacity={0.42} />
-                <stop offset="58%" stopColor={RETURNING} stopOpacity={0.1} />
-                <stop offset="100%" stopColor={RETURNING} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-
             <XAxis
               dataKey="day"
               tickFormatter={formatDayShort}
               tickLine={false}
               axisLine={false}
               minTickGap={30}
-              tick={{ fill: "var(--axis)", fontSize: 10, fontWeight: 500 }}
+              tick={{ fill: "var(--axis)", fontSize: 12, fontWeight: 500 }}
               dy={8}
             />
             <YAxis
@@ -86,7 +71,7 @@ export function MixChart({
               allowDecimals={false}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: "var(--axis)", fontSize: 10 }}
+              tick={{ fill: "var(--axis)", fontSize: 12 }}
               tickCount={4}
             />
 
@@ -126,9 +111,10 @@ export function MixChart({
               strokeWidth={2.5}
               strokeLinecap="round"
               strokeLinejoin="round"
-              fill={`url(#${rawId}-returning)`}
-              dot={false}
-              activeDot={<GlowDot color={RETURNING} />}
+              fill="transparent"
+              strokeDasharray="6 5"
+              dot={<DiamondMarker color={RETURNING} />}
+              activeDot={<DiamondMarker color={RETURNING} active />}
               isAnimationActive={!reduceMotion}
               animationDuration={950}
               animationEasing="ease-out"
@@ -140,9 +126,9 @@ export function MixChart({
               strokeWidth={2.5}
               strokeLinecap="round"
               strokeLinejoin="round"
-              fill={`url(#${rawId}-new)`}
-              dot={false}
-              activeDot={<GlowDot color={NEW} />}
+              fill="transparent"
+              dot={<CircleMarker color={NEW} />}
+              activeDot={<CircleMarker color={NEW} active />}
               isAnimationActive={!reduceMotion}
               animationDuration={800}
               animationEasing="ease-out"
@@ -154,11 +140,25 @@ export function MixChart({
   );
 }
 
-function GlowDot({ cx = 0, cy = 0, color }: { cx?: number; cy?: number; color: string }) {
+function CircleMarker({ cx = 0, cy = 0, color, active = false }: { cx?: number; cy?: number; color: string; active?: boolean }) {
   return (
-    <g>
-      <circle cx={cx} cy={cy} r={10} fill={color} opacity={0.14} />
-      <circle cx={cx} cy={cy} r={4} fill={color} stroke="var(--card)" strokeWidth={2} />
-    </g>
+    <circle cx={cx} cy={cy} r={active ? 4.5 : 2.75} fill="var(--card)" stroke={color} strokeWidth={active ? 2.5 : 2} />
+  );
+}
+
+function DiamondMarker({ cx = 0, cy = 0, color, active = false }: { cx?: number; cy?: number; color: string; active?: boolean }) {
+  const size = active ? 7 : 5;
+  return (
+    <rect
+      x={cx - size / 2}
+      y={cy - size / 2}
+      width={size}
+      height={size}
+      rx={1}
+      fill="var(--card)"
+      stroke={color}
+      strokeWidth={active ? 2.5 : 2}
+      transform={`rotate(45 ${cx} ${cy})`}
+    />
   );
 }

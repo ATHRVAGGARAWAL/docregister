@@ -5,10 +5,10 @@ button, says *"Sunita Devi, 42, viral fever, paracetamol 650 SOS"* — in Hindi,
 Punjabi, English or all three in one sentence — and it
 becomes a structured, reviewable register entry.
 
-Three features sit on top of that: **historical recall** ("what did I prescribe
-Sunita last time?"), a **daily analytics** view (volume and new vs
-returning), a dedicated **Accounts ledger**, and a UI built for a phone held in
-one hand between patients.
+The workspace also includes **historical recall** ("what did I prescribe
+Sunita last time?"), daily analytics, a searchable patient directory, a
+dedicated Accounts ledger, scheduled **Follow-ups**, and manual visit entry for
+rooms or devices where dictation is unavailable.
 
 ---
 
@@ -28,8 +28,8 @@ evidence behind every structured field is always one tap away.
 | Layer | Choice | Why this one |
 |---|---|---|
 | Framework | **Next.js 16** (App Router, React 19, TypeScript) | One deployable for UI and API. Server Components mean the first paint carries real numbers instead of four skeletons on a clinic's mobile connection. |
-| Styling | **Tailwind CSS v4** + hand-written glass tiers | v4's `@theme` puts the design tokens in CSS, where the chart palette and the UI palette can be validated against the same surface. Blur is hand-written — see below. |
-| Animation | **Motion** (`motion/react`) | Layout animations and `AnimatePresence` on compositor-only properties. The ambient "frame-sequenced" drift is CSS `@keyframes` on `transform`, so it never touches the main thread. |
+| Styling | **Tailwind CSS v4** + local 21st.dev Geist adaptations | v4's `@theme` keeps the solid black/white palette, component tokens, and chart palette in one auditable CSS source. |
+| Animation | **Motion** (`motion/react`) | Short, functional state transitions with a global reduced-motion policy; no ambient or decorative animation. |
 | Charts | **Recharts 3** | SVG, composable, and it accepts a custom `shape` — needed to render the 2px surface gap in the stacked column chart as genuine negative space rather than a fake surface-coloured stroke. |
 | Database / Auth / Storage | **Supabase** (Postgres, ap-south-1) | Row Level Security is the multi-tenant boundary, enforced in the database rather than by every query remembering `where clinic_id = …`. Auth, private object storage and Postgres in one India-region project. |
 | STT | **Sarvam AI** (`saaras:v3`), ElevenLabs fallback | The engine actually built for code-mixed Indian clinical speech. Its `codemix` mode keeps Hinglish intact instead of forcing it to one language; `translit` gives a romanised transcript a doctor can skim on a phone. Providers sit behind one interface (`src/lib/stt/`) so a swap is one file. |
@@ -62,8 +62,8 @@ docregister/
 ├── src/
 │   ├── app/
 │   │   ├── page.tsx                    Server component: doctor + analytics + today's register
-│   │   ├── layout.tsx                  Fonts, metadata, the one ambient aurora layer
-│   │   ├── globals.css                 Design system: glass tiers, validated palettes, motion
+│   │   ├── layout.tsx                  Fonts, metadata, theme bootstrap
+│   │   ├── globals.css                 Solid-surface design tokens and motion policy
 │   │   ├── login/page.tsx              Magic-link sign-in
 │   │   ├── auth/callback/route.ts      PKCE code exchange
 │   │   └── api/
@@ -75,9 +75,12 @@ docregister/
 │   │       ├── recall/                 parse → SQL → summarise
 │   │       └── analytics/daily/        daily buckets in IST
 │   ├── components/
-│   │   ├── dashboard/                  shell, visit hero, stat rail, timeline, recall panel
+│   │   ├── dashboard/                  shell, navigation, views, detail surfaces
 │   │   ├── charts/                     chart chrome, volume area, new-vs-returning stack
-│   │   └── voice/                      dock, waveform, review sheet
+│   │   ├── follow-ups/                 queue, patient search, completion workflow
+│   │   ├── icons/                      original 24×24 product icon system
+│   │   ├── ui/                         local 21st.dev-inspired shared primitives
+│   │   └── voice/                      dock, waveform, manual entry, review sheet
 │   ├── hooks/use-voice-capture.ts      the capture state machine
 │   ├── lib/
 │   │   ├── audio/                      recorder (dual capture) + live socket
@@ -223,35 +226,27 @@ npm run build
 
 ## Notes on the UI
 
-**Paper, not glass.** There are exactly three surfaces — `.slip`, `.slip-flat`
-and `.well` — and none of them blurs. The design started with `backdrop-filter`
-and moved off it: blur costs per painted pixel and compounds when layers stack,
-which a mid-range Android in a clinic pays for on every scroll. What separates
-the tiers now is elevation and a hairline border, both of which cost nothing and
-survive `prefers-contrast: more`, where the depth tokens flatten to none and the
-borders take over.
+**Solid, system-native surfaces.** Page backgrounds are exactly white or black.
+Grouped content uses opaque `#f5f5f7` / `#1c1c1e` surfaces with hairline
+separators, while Apple blue is reserved for focus and primary action. The
+default appearance follows the operating system and can be overridden with the
+System / Light / Dark control.
 
-**The chart colours were computed, not eyeballed.** The series palette is
-separate from the UI inks, which are stepped for type on a card and sit too dark
-and too low-chroma to work as adjacent categorical marks. The two series in use
-— `--chart-1` and `--chart-2` — are 106° apart in hue and 0.135 apart in
-lightness, which is what keeps them separable under deuteranopia once the hue
-cue collapses, and both clear 3:1 against the card. Colour follows the entity,
-never its rank, so changing the range never repaints a series.
+**Locally maintained components and icons.** Shared controls adapt selected
+21st.dev Geist patterns into this repository; no design code or visual assets
+are fetched at runtime. Functional glyphs use the original 24×24 icon set in
+`src/components/icons`, and the document-plus-waveform geometry is shared by the
+app lockup and install icons.
 
-`globals.css` defines three further slots that are unused and **not** validated
-as a set; check them before rendering any of them. The gate figures that were
-printed here previously did not match the tokens they described.
-
-**Not boxy, on purpose.** No 12-column grid of equal cards: a full-bleed visit
-figure with a hand-drawn sparkline, a horizontally-scrolling stat rail, two
-charts, then the day's visits as a timeline on a single hairline spine. Four
-equal boxes on a phone is exactly the industrial dashboard look this app avoids.
+**Compact clinical hierarchy.** Desktop uses a persistent sidebar and dense
+tables or grouped lists. Mobile uses one top menu for every workspace and keeps
+the safe-area-aware bottom edge for the voice dock. Review and detail surfaces
+remain accessible Radix dialogs with sticky actions and explicit focus handling.
 
 **Accessibility is not colour alone.** Uncertain extracted fields carry a dot
 *and* the words "check this". A legend appears for two or more series and never
-for one. Every chart has a reachable table view. `prefers-contrast: more` drops
-the elevation tokens and thickens the borders, and `prefers-reduced-motion` is
+for one. Every chart has a reachable table view. `prefers-contrast: more`
+strengthens the separators, and `prefers-reduced-motion` is
 honoured in both channels it can reach: the CSS block covers stylesheet
 animation, and `<MotionConfig reducedMotion="user">` in the root layout covers
 everything animated from JavaScript — which is most of it.

@@ -32,6 +32,15 @@ export interface RegisterEntry {
   drugs: string[];
 }
 
+/** The durable result returned after the human-reviewed commit transaction. */
+export interface CommitOutcome {
+  encounterId: string;
+  patientId: string;
+  visitNumber: number | null;
+  isNewPatient: boolean | null;
+  alreadyCommitted: boolean;
+}
+
 export interface PatientHistoryPrescription {
   id: string;
   drug_name: string;

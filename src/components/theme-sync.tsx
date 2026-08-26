@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect } from "react";
 
-import { applyStoredTheme } from "@/lib/theme";
+import { applyStoredTheme } from "@/lib/theme-client";
 
 /**
  * Restores the theme class that React clears on its development remount.

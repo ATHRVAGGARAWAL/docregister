@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "project": {
+    "name": "docregister",
+    "productType": "clinical-workflow",
+    "stack": ["nextjs", "react", "tailwind-v4"]
+  },
+  "sources": {
+    "tokens": ["src/app/globals.css"],
+    "components": ["src/components/ui"],
+    "assets": [],
+    "instructions": ["AGENTS.md", "CLAUDE.md"]
+  },
+  "design": {
+    "colorMode": "light-and-dark",
+    "colors": {
+      "--background": { "value": "#ffffff / #000000", "source": "src/app/globals.css" },
+      "--foreground": { "value": "#1d1d1f / #f5f5f7", "source": "src/app/globals.css" },
+      "--card": { "value": "#f5f5f7 / #1c1c1e", "source": "src/app/globals.css" },
+      "--primary": { "value": "#0071e3 / #0a84ff", "source": "src/app/globals.css" },
+      "--border": { "value": "#d2d2d7 / #38383a", "source": "src/app/globals.css" },
+      "--destructive": { "value": "#d70015 / #ff453a", "source": "src/app/globals.css" },
+      "--warning": { "value": "#9a4b00 / #ff9f0a", "source": "src/app/globals.css" },
+      "--money": { "value": "#147d3f / #30d158", "source": "src/app/globals.css" }
+    },
+    "typography": {
+      "--font-sans": {
+        "value": "system UI, Geist fallback",
+        "source": "src/app/globals.css"
+      },
+      "--font-mono": {
+        "value": "system monospace, Geist Mono fallback",
+        "source": "src/app/globals.css"
+      }
+    },
+    "spacing": {
+      "controlHeight": "40px desktop / 44px touch",
+      "contentDensity": "compact"
+    },
+    "radius": {
+      "--radius": { "value": "0.75rem", "source": "src/app/globals.css" }
+    },
+    "shadows": {
+      "--shadow-raise": { "value": "var(--elev-raise)", "source": "src/app/globals.css" },
+      "--shadow-flat": { "value": "var(--elev-flat)", "source": "src/app/globals.css" }
+    },
+    "motion": {
+      "--ease-fluid": {
+        "value": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "source": "src/app/globals.css"
+      }
+    },
+    "density": "compact"
+  },
+  "components": {
+    "installed": [
+      "alert",
+      "badge",
+      "button",
+      "card",
+      "empty-state",
+      "icon-button",
+      "input",
+      "label",
+      "list-row",
+      "pagination",
+      "search-field",
+      "segmented-control",
+      "select",
+      "separator",
+      "sheet",
+      "switch",
+      "table",
+      "tabs",
+      "textarea",
+      "theme-switcher"
+    ],
+    "preferredPrimitives": ["radix-ui", "native-html"],
+    "patterns": ["geist-controls", "grouped-lists", "dense-data-tables", "opaque-overlays"]
+  },
+  "constraints": {
+    "must": [
+      "Use pure #ffffff and #000000 page backgrounds.",
+      "Use only opaque structural surfaces and Apple-blue primary actions.",
+      "Keep metadata at 12px or larger and touch targets at 44px or larger.",
+      "Support system, light, and dark preferences without a first-paint flash.",
+      "Use reduced-motion fallbacks and visible keyboard focus."
+    ],
+    "avoid": [
+      "Gradients, ambient decoration, frosted surfaces, colored shadows, and decorative motion.",
+      "Low-contrast borders, translucent cards, and oversized marketing-style spacing.",
+      "Remote runtime assets or remotely hosted component code."
+    ]
+  },
+  "decisions": [
+    "Local UI primitives adapt the 21st.dev Geist library while retaining project APIs.",
+    "Radix remains responsible for dialog focus management and tab semantics.",
+    "Native controls are preferred when they provide equal accessibility with less runtime code."
+  ],
+  "evidence": [
+    { "fact": "design.tokens", "source": "src/app/globals.css" },
+    { "fact": "components.installed", "source": "src/components/ui" },
+    { "fact": "reference.library", "source": "https://21st.dev/@shugar/library/geist" },
+    { "fact": "project.instructions", "source": "AGENTS.md" }
+  ],
+  "generatedAt": "2026-08-26"
+}

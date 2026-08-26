@@ -4,14 +4,14 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const alertVariants = cva(
-  "relative grid w-full grid-cols-[auto_1fr] items-start gap-x-3 rounded-2xl border px-4 py-3.5 text-sm backdrop-blur-xl",
+  "relative grid w-full grid-cols-[auto_1fr] items-start gap-x-3 rounded-xl border px-4 py-3 text-sm",
   {
     variants: {
       variant: {
-        default: "border-border/70 bg-card/40 text-foreground shadow-flat",
+        default: "border-border bg-card text-foreground",
         destructive:
-          "border-destructive/25 bg-destructive/10 text-destructive shadow-[0_12px_30px_-24px_var(--destructive)] [&>svg]:text-destructive",
-        success: "border-primary/25 bg-primary/10 text-foreground shadow-[0_12px_30px_-24px_var(--primary)] [&>svg]:text-primary",
+          "border-destructive bg-destructive-soft text-foreground [&>svg]:text-destructive",
+        success: "border-money bg-money-soft text-foreground [&>svg]:text-money",
       },
     },
     defaultVariants: { variant: "default" },
@@ -58,7 +58,7 @@ function AlertDescription({ className, ...props }: React.ComponentProps<"div">) 
     <div
       data-slot="alert-description"
       className={cn(
-        "col-start-2 text-xs leading-relaxed text-current/80 [&_p]:leading-relaxed",
+        "col-start-2 text-xs leading-relaxed text-muted-foreground [&_p]:leading-relaxed",
         className,
       )}
       {...props}

@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { CalendarDaysIcon } from "lucide-react";
+import { CalendarDaysIcon, CircleAlertIcon, ClipboardPenLineIcon } from "@/components/icons";
 
 import { AccountsWorkspace } from "@/components/accounts/accounts-workspace";
 import { AppNavigation, type AppView } from "@/components/dashboard/app-navigation";
+import { FollowUpWorkspace } from "@/components/follow-ups/follow-up-workspace";
 import { type DashboardUrlState, type RegisterStatus } from "@/lib/url-state";
 import { OverviewView } from "@/components/dashboard/overview-view";
 import { RecallWorkspace } from "@/components/dashboard/recall-workspace";
@@ -22,6 +23,7 @@ import { PatientDirectory } from "@/components/patients/patient-directory";
 import { PatientHistorySheet } from "@/components/patients/patient-history-sheet";
 import { ReviewSheet } from "@/components/voice/review-sheet";
 import { VoiceDock } from "@/components/voice/voice-dock";
+import { ManualVisitFlow } from "@/components/voice/manual-visit-flow";
 import {
   type CaptureDraft,
   type CaptureTranscript,
@@ -29,16 +31,23 @@ import {
   useVoiceCapture,
 } from "@/hooks/use-voice-capture";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import type { AnalyticsPayload, RegisterEntry } from "@/lib/types";
+import type { AnalyticsPayload, CommitOutcome, RegisterEntry } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { BrandMark } from "@/components/brand/brand-mark";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 const viewTitles: Record<AppView, string> = {
   overview: "Overview",
   register: "Patient register",
   patients: "Patient directory",
   recall: "Patient recall",
+  "follow-ups": "Follow-ups",
   accounts: "Accounts",
   settings: "Settings",
 };
@@ -67,6 +76,10 @@ export function Dashboard({
   const [range, setRange] = useState(30);
   const [loadingRange, setLoadingRange] = useState(false);
   const [accessToken, setAccessToken] = useState<string | undefined>();
+  const [manualVisitOpen, setManualVisitOpen] = useState(false);
+  const [followUpContext, setFollowUpContext] = useState<CommitOutcome | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const signingOut = useRef(false);
 
   const [question, setQuestion] = useState<string | null>(null);
   const [recall, setRecall] = useState<RecallResult | null>(null);
@@ -126,13 +139,25 @@ export function Dashboard({
 
   useEffect(() => {
     let cancelled = false;
-    getSupabaseBrowserClient()
-      .auth.getSession()
+    const client = getSupabaseBrowserClient();
+    client.auth
+      .getSession()
       .then(({ data }) => {
         if (!cancelled) setAccessToken(data.session?.access_token);
       });
+
+    const { data: authListener } = client.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
+      setAccessToken(session?.access_token);
+      if (event === "SIGNED_OUT" && !signingOut.current) setSessionExpired(true);
+    });
+
+    const showExpired = () => setSessionExpired(true);
+    window.addEventListener("docregister:session-expired", showExpired);
     return () => {
       cancelled = true;
+      authListener.subscription.unsubscribe();
+      window.removeEventListener("docregister:session-expired", showExpired);
     };
   }, []);
 
@@ -406,10 +431,7 @@ export function Dashboard({
   }
 
   const onCommitted = useCallback(() => {
-    capture.reset();
-    setRecoveredDraft(null);
     setDiscardedDraftId(null);
-    setView("register");
     router.refresh();
     void loadRange(range);
     void loadRegister(registerDays, registerStatus, registerQuery, registerOffset);
@@ -419,7 +441,6 @@ export function Dashboard({
     // the shared hourly bucket for nothing.
     if (patientsLoaded.current) void loadPatientDirectory(patientsQuery);
   }, [
-    capture,
     loadPatientDirectory,
     loadRange,
     loadRegister,
@@ -431,6 +452,30 @@ export function Dashboard({
     registerStatus,
     router,
   ]);
+
+  const finishCommittedReview = useCallback(() => {
+    capture.reset();
+    setRecoveredDraft(null);
+  }, [capture]);
+
+  const scheduleCommittedFollowUp = useCallback((outcome: CommitOutcome) => {
+    setFollowUpContext(outcome);
+    finishCommittedReview();
+    setManualVisitOpen(false);
+    setView("follow-ups");
+  }, [finishCommittedReview]);
+
+  const viewRegisterAfterCommit = useCallback(() => {
+    finishCommittedReview();
+    setManualVisitOpen(false);
+    setView("register");
+  }, [finishCommittedReview]);
+
+  const startNextVisit = useCallback(() => {
+    finishCommittedReview();
+    setManualVisitOpen(false);
+    void capture.start();
+  }, [capture, finishCommittedReview]);
 
   const onDiscard = useCallback(async () => {
     const id = recoveredDraft?.encounterId ?? capture.draft?.encounterId;
@@ -468,6 +513,7 @@ export function Dashboard({
     // either way, and `proxy.ts` will bounce an unauthenticated request back to
     // /login on the next navigation.
     try {
+      signingOut.current = true;
       await getSupabaseBrowserClient().auth.signOut();
     } catch (error) {
       console.error("[dashboard] sign out failed", error);
@@ -477,30 +523,29 @@ export function Dashboard({
   }
 
   return (
-    <div className="relative isolate min-h-dvh overflow-x-clip">
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <span className="ambient-orb -top-32 -left-28 size-[30rem] opacity-50" />
-        <span className="ambient-orb top-[28%] -right-44 size-[34rem] opacity-35 [animation-delay:-4s]" />
-        <span className="absolute inset-x-[12%] top-0 h-px bg-gradient-to-r from-transparent via-primary/25 to-transparent" />
-      </div>
+    <div className="min-h-dvh overflow-x-clip bg-background">
       <AppNavigation
         active={view}
         doctorName={profile.fullName}
         speciality={profile.speciality}
         role={profile.role}
-        onChange={changeView}
+        onChange={(next) => {
+          setFollowUpContext(null);
+          changeView(next);
+        }}
+        onManualEntry={() => setManualVisitOpen(true)}
+        onSignOut={() => void signOut()}
       />
 
-      <div className="lg:pl-[17rem]">
-        <header className="sticky top-0 z-30 px-3 pt-3 sm:px-5 sm:pt-4 lg:px-8">
-          <div className="glass-strong mx-auto flex h-16 max-w-[94rem] items-center justify-between gap-4 rounded-2xl px-3.5 sm:px-5">
+      <div className="lg:pl-64">
+        <header className="sticky top-0 z-20 hidden border-b border-border bg-background lg:block">
+          <div className="mx-auto flex h-14 max-w-[94rem] items-center justify-between gap-4 px-8">
             <div className="flex min-w-0 items-center gap-3">
-              <BrandMark compact className="lg:hidden" />
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold tracking-[-0.025em] lg:text-base">
+                <p className="truncate text-sm font-semibold tracking-[-0.025em]">
                   {viewTitles[view]}
                 </p>
-                <p className="hidden items-center gap-1.5 text-[10px] font-medium tracking-[0.08em] text-muted-foreground uppercase sm:flex">
+                <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                   <CalendarDaysIcon className="size-3 text-primary" aria-hidden />
                   {new Intl.DateTimeFormat("en-IN", {
                     day: "numeric",
@@ -512,16 +557,16 @@ export function Dashboard({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="hidden items-center gap-2 rounded-full border border-primary/15 bg-primary/8 px-3 py-1.5 text-[10px] font-semibold tracking-[0.08em] text-primary uppercase md:flex">
-                <span className="size-1.5 rounded-full bg-primary shadow-[0_0_10px_var(--primary)]" />
-                Clinic live
-              </span>
+              <Button type="button" variant="outline" size="sm" onClick={() => setManualVisitOpen(true)}>
+                <ClipboardPenLineIcon className="size-4" aria-hidden />
+                Manual entry
+              </Button>
               <ThemeToggle />
             </div>
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[94rem] px-4 pb-[calc(var(--dock-height,9rem)+7rem)] pt-7 sm:px-6 sm:pt-9 lg:px-8 lg:pb-[calc(var(--dock-height,9rem)+3rem)]">
+        <main className="mx-auto w-full max-w-[94rem] px-4 pb-[calc(var(--dock-height,7rem)+1.5rem)] pt-20 sm:px-6 lg:px-8 lg:pt-6">
           {(discardedDraftId || draftError) && (
             <Alert
               variant={draftError ? "destructive" : "default"}
@@ -637,6 +682,19 @@ export function Dashboard({
                   onRecordAsVisit={spokenQuestion ? recordSpokenAsVisit : undefined}
                 />
               )}
+              {view === "follow-ups" && (
+                <FollowUpWorkspace
+                  initialPatientId={followUpContext?.patientId}
+                  initialEncounterId={followUpContext?.encounterId}
+                  encounterContext={followUpContext ? {
+                    encounterId: followUpContext.encounterId,
+                    patientId: followUpContext.patientId,
+                    visitNumber: followUpContext.visitNumber ?? undefined,
+                    isNewPatient: followUpContext.isNewPatient ?? undefined,
+                    alreadyCommitted: followUpContext.alreadyCommitted,
+                  } : null}
+                />
+              )}
               {view === "accounts" && <AccountsWorkspace />}
               {view === "settings" && (
                 <SettingsWorkspace
@@ -660,6 +718,7 @@ export function Dashboard({
         interimText={capture.interimText}
         finalText={capture.finalText}
         error={capture.error}
+        liveTextUnavailable={capture.liveTextUnavailable}
         onStart={() => void capture.start()}
         onStop={() => void capture.stop()}
         onCancel={capture.cancel}
@@ -669,6 +728,7 @@ export function Dashboard({
           setSpokenQuestion(null);
           void ask(text);
         }}
+        onManualEntry={() => setManualVisitOpen(true)}
       />
 
       {(capture.phase === "review" && capture.draft || recoveredDraft) && (
@@ -676,8 +736,21 @@ export function Dashboard({
           draft={(recoveredDraft ?? capture.draft)!}
           onCommitted={onCommitted}
           onDiscard={() => void onDiscard()}
+          onDismissAfterCommit={finishCommittedReview}
+          onScheduleFollowUp={scheduleCommittedFollowUp}
+          onViewRegister={viewRegisterAfterCommit}
+          onStartNext={startNextVisit}
         />
       )}
+
+      <ManualVisitFlow
+        open={manualVisitOpen}
+        onOpenChange={setManualVisitOpen}
+        onCommitted={onCommitted}
+        onScheduleFollowUp={scheduleCommittedFollowUp}
+        onViewRegister={viewRegisterAfterCommit}
+        onStartNext={startNextVisit}
+      />
 
       <PatientHistorySheet
         patient={chartPatient}
@@ -739,7 +812,43 @@ export function Dashboard({
           void loadRegister(registerDays, registerStatus, registerQuery, registerOffset);
         }}
       />
+
+      <SessionExpiredDialog
+        open={sessionExpired}
+        onContinue={() => {
+          router.replace("/login");
+          router.refresh();
+        }}
+      />
     </div>
+  );
+}
+
+function SessionExpiredDialog({ open, onContinue }: { open: boolean; onContinue: () => void }) {
+  return (
+    <Sheet open={open}>
+      <SheetContent
+        showClose={false}
+        className="surface-elevated sm:max-w-md"
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        onPointerDownOutside={(event) => event.preventDefault()}
+      >
+        <SheetHeader className="px-6 pb-3 pt-7 text-center">
+          <span className="mx-auto mb-3 grid size-11 place-items-center rounded-full bg-warning/12 text-warning">
+            <CircleAlertIcon className="size-5" aria-hidden />
+          </span>
+          <SheetTitle>Session expired</SheetTitle>
+          <SheetDescription className="text-sm">
+            Sign in again to continue. Any draft already saved for recovery will still be available.
+          </SheetDescription>
+        </SheetHeader>
+        <div className="px-6 pb-6">
+          <Button type="button" size="lg" className="w-full" onClick={onContinue}>
+            Return to sign in
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -769,6 +878,9 @@ async function getJson(input: string, init?: RequestInit): Promise<unknown> {
     payload = null;
   }
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new Event("docregister:session-expired"));
+    }
     const error = (payload as { error?: unknown } | null)?.error;
     throw new Error(typeof error === "string" ? error : `Request failed (${response.status})`);
   }

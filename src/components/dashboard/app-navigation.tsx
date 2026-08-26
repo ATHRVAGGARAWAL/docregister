@@ -1,26 +1,49 @@
 "use client";
 
+import { useState } from "react";
+
 import {
+  ClipboardClockIcon,
   ClipboardListIcon,
+  ClipboardPenLineIcon,
   HistoryIcon,
   LandmarkIcon,
   LayoutDashboardIcon,
+  LogOutIcon,
   Settings2Icon,
   ShieldCheckIcon,
   UsersRoundIcon,
-} from "lucide-react";
-
-import { BrandLockup } from "@/components/brand/brand-mark";
+} from "@/components/icons";
+import { BrandLockup, BrandMark } from "@/components/brand/brand-mark";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
-export type AppView = "overview" | "register" | "patients" | "recall" | "accounts" | "settings";
+export type AppView =
+  | "overview"
+  | "register"
+  | "patients"
+  | "recall"
+  | "follow-ups"
+  | "accounts"
+  | "settings";
 
 const items = [
   { id: "overview", label: "Overview", icon: LayoutDashboardIcon },
   { id: "register", label: "Register", icon: ClipboardListIcon },
   { id: "patients", label: "Patients", icon: UsersRoundIcon },
   { id: "recall", label: "Recall", icon: HistoryIcon },
+  { id: "follow-ups", label: "Follow-ups", icon: ClipboardClockIcon },
   { id: "accounts", label: "Accounts", icon: LandmarkIcon },
   { id: "settings", label: "Settings", icon: Settings2Icon },
 ] as const;
@@ -31,13 +54,18 @@ export function AppNavigation({
   speciality,
   role,
   onChange,
+  onManualEntry,
+  onSignOut,
 }: {
   active: AppView;
   doctorName: string;
   speciality: string | null;
   role: string;
   onChange: (view: AppView) => void;
+  onManualEntry: () => void;
+  onSignOut: () => void;
 }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
   const initials = doctorName
     .replace(/^(dr\.?|prof\.?)\s+/i, "")
     .split(/\s+/)
@@ -48,138 +76,172 @@ export function AppNavigation({
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[17rem] p-4 lg:block">
-        <div className="glass-dock relative flex h-full flex-col overflow-hidden rounded-[2rem] p-3">
-          <span
-            aria-hidden
-            className="pointer-events-none absolute -top-20 -left-20 size-56 rounded-full bg-primary/12 blur-3xl"
-          />
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-background lg:flex lg:flex-col">
+        <div className="border-b border-border px-5 py-5">
+          <BrandLockup subtitle="Clinical workspace" />
+        </div>
 
-          <div className="relative px-2 py-2.5">
-            <BrandLockup subtitle="Voice clinical intelligence" />
+        <ProfileBlock
+          doctorName={doctorName}
+          speciality={speciality}
+          role={role}
+          initials={initials}
+          className="mx-4 mt-4"
+        />
+
+        <NavigationList active={active} onChange={onChange} className="flex-1 px-3 py-4" />
+
+        <div className="space-y-3 border-t border-border p-4">
+          <Button type="button" className="w-full justify-start" onClick={onManualEntry}>
+            <ClipboardPenLineIcon className="size-4" aria-hidden />
+            Enter visit manually
+          </Button>
+          <div className="flex items-center justify-between gap-3">
+            <ThemeToggle />
+            <Button type="button" variant="ghost" size="icon" onClick={onSignOut} aria-label="Sign out">
+              <LogOutIcon className="size-4" aria-hidden />
+            </Button>
           </div>
-
-          <div className="glass-inset relative mt-5 rounded-[1.4rem] p-3.5">
-            <div className="flex items-center gap-3">
-              <span className="relative grid size-11 shrink-0 place-items-center rounded-[1rem] border border-primary/20 bg-primary/10 text-sm font-semibold tracking-[-0.03em] text-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]">
-                {initials || "DR"}
-                <span
-                  aria-hidden
-                  className="absolute right-0 bottom-0 size-3 rounded-full border-2 border-card bg-primary shadow-[0_0_12px_color-mix(in_oklab,var(--primary)_65%,transparent)]"
-                />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-semibold tracking-[-0.015em] text-foreground">
-                  {doctorName}
-                </p>
-                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                  {speciality || "Independent practice"}
-                </p>
-              </div>
-            </div>
-            <Badge
-              variant="outline"
-              className="mt-3 rounded-full border-primary/15 bg-primary/8 px-2.5 py-1 text-[9px] font-semibold tracking-[0.12em] text-primary uppercase"
-            >
-              {role} workspace
-            </Badge>
-          </div>
-
-          <nav
-            className="relative my-4 flex flex-1 flex-col justify-center gap-1.5"
-            aria-label="Primary navigation"
-          >
-            {items.map((item) => {
-              const selected = item.id === active;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => onChange(item.id)}
-                  aria-current={selected ? "page" : undefined}
-                  className={cn(
-                    "group relative flex h-12 items-center gap-3 rounded-[1rem] px-3 text-[13px] font-medium transition-[transform,background-color,color,box-shadow] duration-300 ease-out hover:translate-x-1 focus-visible:translate-x-1",
-                    selected
-                      ? "bg-primary/12 text-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.08),0_12px_28px_-20px_var(--primary)]"
-                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
-                  )}
-                >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "absolute inset-y-3 left-0 w-0.5 rounded-full bg-primary transition-opacity duration-300",
-                      selected ? "opacity-100" : "opacity-0",
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      "grid size-8 place-items-center rounded-[0.8rem] transition-[transform,background-color,color] duration-300 group-hover:scale-110",
-                      selected ? "bg-primary text-primary-foreground" : "bg-foreground/5",
-                    )}
-                  >
-                    <item.icon className="size-4" strokeWidth={1.8} aria-hidden />
-                  </span>
-                  <span>{item.label}</span>
-                  {selected && (
-                    <span className="ml-auto size-1.5 rounded-full bg-primary shadow-[0_0_12px_var(--primary)]" aria-hidden />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="relative rounded-[1.25rem] border border-primary/12 bg-primary/[0.06] p-3.5">
-            <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.02em] text-foreground">
-              <ShieldCheckIcon className="size-3.5 text-primary" strokeWidth={1.8} aria-hidden />
-              India data residency
-            </div>
-            <p className="mt-1.5 text-[10px] leading-4 text-muted-foreground">
-              Encrypted patient records remain in the Mumbai region.
-            </p>
-          </div>
+          <p className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+            <ShieldCheckIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+            Encrypted records stay in the Mumbai region.
+          </p>
         </div>
       </aside>
 
-      <nav
-        className="glass-dock fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom))] z-50 grid h-[4.1rem] grid-cols-6 rounded-[1.55rem] p-1.5 lg:hidden"
-        aria-label="Primary navigation"
-      >
-        {items.map((item) => {
-          const selected = item.id === active;
-          return (
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background px-4 lg:hidden">
+          <SheetTrigger asChild>
             <button
-              key={item.id}
               type="button"
-              onClick={() => onChange(item.id)}
-              aria-current={selected ? "page" : undefined}
-              aria-label={item.label}
-              className={cn(
-                "group relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-[1rem] px-0.5 text-[9px] font-medium transition-[transform,background-color,color] duration-300 ease-out active:scale-95",
-                selected
-                  ? "bg-primary/14 text-primary"
-                  : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
-              )}
+              className="pressable grid size-11 place-items-center rounded-lg text-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Open workspace menu"
             >
-              <item.icon
-                className={cn(
-                  "size-[18px] transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-110",
-                  selected && "-translate-y-0.5",
-                )}
-                strokeWidth={selected ? 2.1 : 1.7}
-                aria-hidden
-              />
-              <span className="max-w-full truncate">{item.label}</span>
-              <span
-                aria-hidden
-                className={cn(
-                  "absolute bottom-0.5 h-0.5 rounded-full bg-primary transition-[width,opacity] duration-300",
-                  selected ? "w-3 opacity-100" : "w-0 opacity-0",
-                )}
-              />
+              <span className="grid gap-1" aria-hidden>
+                <span className="h-px w-5 bg-current" />
+                <span className="h-px w-5 bg-current" />
+                <span className="h-px w-5 bg-current" />
+              </span>
             </button>
-          );
-        })}
-      </nav>
+          </SheetTrigger>
+          <BrandMark compact />
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+            {items.find((item) => item.id === active)?.label}
+          </span>
+        </header>
+
+        <SheetContent side="left" className="w-[min(90vw,22rem)] rounded-none border-r border-border bg-background p-0" showClose>
+          <SheetHeader className="border-b border-border px-5 pb-4 pt-5 text-left">
+            <BrandLockup subtitle="Clinical workspace" />
+            <SheetTitle className="sr-only">Workspace menu</SheetTitle>
+            <SheetDescription className="sr-only">Choose a workspace or account action.</SheetDescription>
+          </SheetHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <ProfileBlock
+              doctorName={doctorName}
+              speciality={speciality}
+              role={role}
+              initials={initials}
+              className="mx-4 mt-4"
+            />
+            <NavigationList
+              active={active}
+              onChange={(next) => {
+                onChange(next);
+                setMobileOpen(false);
+              }}
+              className="px-3 py-4"
+              closeItems
+            />
+          </div>
+
+          <div className="space-y-3 border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <SheetClose asChild>
+              <Button type="button" className="w-full justify-start" onClick={onManualEntry}>
+                <ClipboardPenLineIcon className="size-4" aria-hidden />
+                Enter visit manually
+              </Button>
+            </SheetClose>
+            <div>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Appearance</p>
+              <ThemeToggle />
+            </div>
+            <SheetClose asChild>
+              <Button type="button" variant="outline" className="w-full justify-start" onClick={onSignOut}>
+                <LogOutIcon className="size-4" aria-hidden />
+                Sign out
+              </Button>
+            </SheetClose>
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
+  );
+}
+
+function NavigationList({
+  active,
+  onChange,
+  className,
+  closeItems = false,
+}: {
+  active: AppView;
+  onChange: (view: AppView) => void;
+  className?: string;
+  closeItems?: boolean;
+}) {
+  return (
+    <nav className={cn("space-y-1", className)} aria-label="Primary navigation">
+      {items.map((item) => {
+        const selected = item.id === active;
+        const control = (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onChange(item.id)}
+            aria-current={selected ? "page" : undefined}
+            className={cn(
+              "pressable flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              selected ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+            )}
+          >
+            <item.icon className="size-4.5 shrink-0" aria-hidden />
+            <span>{item.label}</span>
+          </button>
+        );
+
+        return closeItems ? <SheetClose key={item.id} asChild>{control}</SheetClose> : control;
+      })}
+    </nav>
+  );
+}
+
+function ProfileBlock({
+  doctorName,
+  speciality,
+  role,
+  initials,
+  className,
+}: {
+  doctorName: string;
+  speciality: string | null;
+  role: string;
+  initials: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("surface-inset rounded-xl p-3", className)}>
+      <div className="flex items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+          {initials || "DR"}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{doctorName}</p>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">{speciality || "Independent practice"}</p>
+        </div>
+      </div>
+      <Badge variant="outline" className="mt-3 text-xs">{role} workspace</Badge>
+    </div>
   );
 }

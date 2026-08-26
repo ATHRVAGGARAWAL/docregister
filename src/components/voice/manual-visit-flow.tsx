@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, FilePenLine, Loader2 } from "lucide-react";
+import { ArrowRight, FilePenLine, Loader2 } from "@/components/icons";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ import {
   type ReviewDraft,
   type ReviewMedication,
 } from "@/lib/encounters/review";
+import type { CommitOutcome } from "@/lib/types";
 
 const FIRST_MEDICATION: ReviewMedication = {
   drug_name: "",
@@ -45,10 +46,16 @@ export function ManualVisitFlow({
   open,
   onOpenChange,
   onCommitted,
+  onScheduleFollowUp,
+  onViewRegister,
+  onStartNext,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCommitted: () => void;
+  onCommitted: (outcome: CommitOutcome) => void;
+  onScheduleFollowUp?: (outcome: CommitOutcome) => void;
+  onViewRegister?: () => void;
+  onStartNext?: () => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -151,9 +158,19 @@ export function ManualVisitFlow({
     return (
       <ReviewSheet
         draft={draft}
-        onCommitted={() => {
+        onCommitted={onCommitted}
+        onDismissAfterCommit={close}
+        onScheduleFollowUp={(outcome) => {
           close();
-          onCommitted();
+          onScheduleFollowUp?.(outcome);
+        }}
+        onViewRegister={() => {
+          close();
+          onViewRegister?.();
+        }}
+        onStartNext={() => {
+          close();
+          onStartNext?.();
         }}
         onDiscard={() => {
           void fetch(`/api/encounters/${draft.encounterId}`, { method: "DELETE" });
@@ -170,10 +187,10 @@ export function ManualVisitFlow({
         if (!next) close();
       }}
     >
-      <SheetContent className="glass-strong overflow-hidden border-white/10 bg-card/90 sm:max-w-2xl">
-        <SheetHeader className="relative border-b border-white/8 px-5 pb-4 pt-5 sm:px-6">
+      <SheetContent className="surface-elevated overflow-hidden sm:max-w-2xl">
+        <SheetHeader className="border-b border-border px-5 pb-4 pt-5 sm:px-6">
           <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-[0_14px_30px_-18px_var(--primary)]">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary-soft text-primary">
               <FilePenLine className="size-4" aria-hidden />
             </span>
             <div>
@@ -189,9 +206,9 @@ export function ManualVisitFlow({
 
         <form onSubmit={prepareReview} className="contents">
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
-            <section className="glass-inset rounded-2xl border-white/8 bg-background/20 p-4">
+            <section className="surface-inset rounded-xl p-4">
               <div className="mb-4 flex items-center gap-3">
-                <span className="tnum grid size-7 place-items-center rounded-full bg-primary/10 text-[0.6875rem] font-semibold text-primary">01</span>
+                <span className="tnum grid size-7 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">01</span>
                 <div>
                   <h3 className="text-sm font-semibold tracking-[-0.015em]">Patient identity</h3>
                   <p className="text-xs text-muted-foreground">Enough detail to find or create the correct chart.</p>
@@ -205,7 +222,7 @@ export function ManualVisitFlow({
                     onChange={(event) => setName(event.target.value)}
                     autoComplete="off"
                     autoFocus
-                    className="h-11 rounded-xl bg-background/30"
+                    className="h-11"
                   />
                 </FormField>
                 <FormField label="Phone" htmlFor="manual-patient-phone">
@@ -216,7 +233,7 @@ export function ManualVisitFlow({
                     inputMode="tel"
                     autoComplete="tel"
                     placeholder="Optional, helps find the right chart"
-                    className="h-11 rounded-xl bg-background/30"
+                    className="h-11"
                   />
                 </FormField>
                 <FormField label="Age" htmlFor="manual-patient-age">
@@ -225,7 +242,7 @@ export function ManualVisitFlow({
                     value={age}
                     onChange={(event) => setAge(event.target.value)}
                     inputMode="numeric"
-                    className="tnum h-11 rounded-xl bg-background/30"
+                    className="tnum h-11"
                   />
                 </FormField>
                 <FormField label="Sex" htmlFor="manual-patient-sex">
@@ -233,7 +250,7 @@ export function ManualVisitFlow({
                     id="manual-patient-sex"
                     value={sex}
                     onChange={(event) => setSex(event.target.value as PatientSex | "")}
-                    className="glass-inset h-11 w-full rounded-xl border-white/8 bg-background/30 px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/35"
+                    className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/20"
                   >
                     <option value="">Not stated</option>
                     {PATIENT_SEX_OPTIONS.map((option) => (
@@ -246,9 +263,9 @@ export function ManualVisitFlow({
               </div>
             </section>
 
-            <section className="glass-inset rounded-2xl border-white/8 bg-background/20 p-4">
+            <section className="surface-inset rounded-xl p-4">
               <div className="mb-4 flex items-center gap-3">
-                <span className="tnum grid size-7 place-items-center rounded-full bg-primary/10 text-[0.6875rem] font-semibold text-primary">02</span>
+                <span className="tnum grid size-7 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">02</span>
                 <div>
                   <h3 className="text-sm font-semibold tracking-[-0.015em]">Clinical note</h3>
                   <p className="text-xs text-muted-foreground">Summarise the assessment and care plan.</p>
@@ -261,7 +278,7 @@ export function ManualVisitFlow({
                     value={diagnosis}
                     onChange={(event) => setDiagnosis(event.target.value)}
                     rows={2}
-                    className="resize-none rounded-xl bg-background/30"
+                    className="resize-none"
                   />
                 </FormField>
 
@@ -271,15 +288,15 @@ export function ManualVisitFlow({
                     value={treatment}
                     onChange={(event) => setTreatment(event.target.value)}
                     rows={3}
-                    className="resize-none rounded-xl bg-background/30"
+                    className="resize-none"
                   />
                 </FormField>
               </div>
             </section>
 
-            <section className="glass-inset rounded-2xl border-white/8 bg-background/20 p-4">
+            <section className="surface-inset rounded-xl p-4">
               <div className="mb-4 flex items-center gap-3">
-                <span className="tnum grid size-7 place-items-center rounded-full bg-primary/10 text-[0.6875rem] font-semibold text-primary">03</span>
+                <span className="tnum grid size-7 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">03</span>
                 <div>
                   <h3 className="text-sm font-semibold tracking-[-0.015em]">Prescription</h3>
                   <p className="text-xs text-muted-foreground">Add only the medicines discussed in this visit.</p>
@@ -289,7 +306,7 @@ export function ManualVisitFlow({
             </section>
           </div>
 
-          <SheetFooter className="flex-col items-stretch gap-2 border-white/8 bg-background/20 px-4 sm:px-6">
+          <SheetFooter className="flex-col items-stretch gap-2 px-4 sm:px-6">
             {failure && (
               <p role="alert" className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive">
                 {failure}
@@ -330,7 +347,7 @@ function FormField({
     <div>
       <Label
         htmlFor={htmlFor}
-        className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+        className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground"
       >
         {label}
         {required && <span className="ml-1 text-primary">required</span>}

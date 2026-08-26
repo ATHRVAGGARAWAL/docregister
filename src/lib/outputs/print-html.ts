@@ -28,23 +28,25 @@ function shell(title: string, body: string, filename: string): string {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>${escapeHtml(title)}</title>
   <style>
-    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     * { box-sizing: border-box; }
-    body { color: #17211b; margin: 0; background: #f4f5f1; }
-    main { width: min(760px, calc(100% - 32px)); margin: 32px auto; padding: 32px; background: #fff; border: 1px solid #d8ded7; }
-    header { border-bottom: 2px solid #193d2c; padding-bottom: 18px; margin-bottom: 22px; }
+    body { color: #1d1d1f; margin: 0; background: #fff; }
+    main { width: min(760px, calc(100% - 32px)); margin: 32px auto; padding: 32px; background: #fff; border: 1px solid #d2d2d7; border-radius: 14px; }
+    header { border-bottom: 1px solid #1d1d1f; padding-bottom: 18px; margin-bottom: 22px; }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .mark { width: 32px; height: 32px; padding: 5px; border-radius: 8px; color: #fff; background: #1d1d1f; }
     h1 { margin: 0; font-size: 24px; letter-spacing: -.02em; }
     h2 { font-size: 15px; margin: 24px 0 8px; }
     p { margin: 5px 0; line-height: 1.45; }
-    .muted { color: #667269; font-size: 12px; }
+    .muted { color: #6e6e73; font-size: 12px; }
     .row { display: flex; justify-content: space-between; gap: 24px; }
-    .rule { border-top: 1px solid #d8ded7; margin: 20px 0; }
+    .rule { border-top: 1px solid #d2d2d7; margin: 20px 0; }
     table { border-collapse: collapse; width: 100%; font-size: 13px; }
-    th, td { border-bottom: 1px solid #d8ded7; padding: 9px 6px; text-align: left; vertical-align: top; }
-    th { color: #667269; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    th, td { border-bottom: 1px solid #d2d2d7; padding: 9px 6px; text-align: left; vertical-align: top; }
+    th { color: #6e6e73; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
     td:last-child, th:last-child { text-align: right; }
     .toolbar { display: flex; justify-content: flex-end; gap: 8px; margin: 0 auto 14px; width: min(760px, calc(100% - 32px)); }
-    button { border: 1px solid #9cad9f; background: #fff; padding: 8px 14px; border-radius: 5px; cursor: pointer; }
+    button { min-height: 40px; border: 1px solid #0071e3; background: #0071e3; color: #fff; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; }
     @media print {
       body { background: #fff; }
       main { width: auto; margin: 0; padding: 0; border: 0; }
@@ -66,7 +68,7 @@ function header(payload: VisitDetailsPayload, heading: string): string {
   const clinician = encounter.clinician;
   return `<header>
     <div class="row">
-      <div><h1>${escapeHtml(heading)}</h1><p class="muted">docregister · clinical record</p></div>
+      <div class="brand"><svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4"/><path d="M3 13h4l1.6-3 2.3 6 2-4 1.8 2.6 1.7-3.1L18 13h3"/></svg><div><h1>${escapeHtml(heading)}</h1><p class="muted">docregister · clinical record</p></div></div>
       <div style="text-align:right"><p><strong>${escapeHtml(clinician?.full_name || "Clinic doctor")}</strong></p><p class="muted">${escapeHtml(clinician?.speciality || "")}</p></div>
     </div>
     <div class="rule"></div>

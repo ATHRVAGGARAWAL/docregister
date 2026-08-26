@@ -7,7 +7,7 @@ import {
   LoaderCircleIcon,
   SearchIcon,
   UsersRoundIcon,
-} from "lucide-react";
+} from "@/components/icons";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
@@ -67,8 +67,8 @@ export function PatientDirectory({
     <div className="space-y-7">
       <section className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
-          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
-            <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary/10">
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary-soft">
               <UsersRoundIcon className="size-3.5" aria-hidden />
             </span>
             Clinical index
@@ -80,7 +80,7 @@ export function PatientDirectory({
             Every chart, organised for a fast glance between consultations.
           </p>
         </div>
-        <p className="glass-inset flex w-fit items-center gap-2 rounded-full px-3.5 py-2 text-left text-xs font-medium text-muted-foreground sm:text-right">
+        <p className="surface-inset flex w-fit items-center gap-2 rounded-full px-3.5 py-2 text-left text-xs font-medium text-muted-foreground sm:text-right">
           {loading && !blank && (
             <LoaderCircleIcon className="size-3.5 animate-spin" aria-hidden />
           )}
@@ -100,8 +100,7 @@ export function PatientDirectory({
         </p>
       </section>
 
-      <section className="glass-strong relative overflow-hidden rounded-[1.5rem] p-3 sm:p-4">
-        <div className="ambient-orb pointer-events-none absolute -right-14 -top-16 size-36 opacity-45" aria-hidden />
+      <section className="surface-elevated relative overflow-hidden rounded-[1.5rem] p-3 sm:p-4">
         <form
           onSubmit={(event) => {
             // Nothing to submit — the debounce has already asked, or is about
@@ -121,7 +120,7 @@ export function PatientDirectory({
               placeholder="Search by name, or the last digits of a phone number"
               aria-label="Search patients"
               maxLength={120}
-              className="glass-inset h-13 rounded-[1.1rem] border-white/10 bg-background/25 pl-11 pr-4 text-[15px] shadow-none placeholder:text-muted-foreground/65"
+              className="surface-inset h-13 rounded-[1.1rem] border-border bg-background pl-11 pr-4 text-[15px] shadow-none placeholder:text-muted-foreground/65"
             />
           </div>
         </form>
@@ -138,7 +137,7 @@ export function PatientDirectory({
         )}
 
         {loading && blank ? (
-          <div className="glass-card grid min-h-56 place-items-center rounded-[1.5rem]">
+          <div className="surface-card grid min-h-56 place-items-center rounded-[1.5rem]">
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <LoaderCircleIcon className="size-4 animate-spin" aria-hidden />
               Loading patients…
@@ -155,14 +154,13 @@ export function PatientDirectory({
                     type="button"
                     onClick={() => onOpenPatient(patient)}
                     className={cn(
-                      "glass-card group relative flex min-h-44 w-full flex-col overflow-hidden rounded-[1.4rem] p-4 text-left",
-                      "transition-[transform,border-color,background-color,box-shadow] duration-300 hover:-translate-y-1 hover:border-primary/25 hover:bg-card/80 hover:shadow-[0_24px_70px_-34px_color-mix(in_oklab,var(--primary)_45%,transparent)]",
+                      "surface-card group relative flex min-h-44 w-full flex-col overflow-hidden rounded-[1.4rem] p-4 text-left",
+                      "transition-[transform,border-color,background-color] duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-card",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     )}
                   >
-                    <span className="pointer-events-none absolute -right-12 -top-12 size-28 rounded-full bg-primary/8 blur-2xl transition-colors group-hover:bg-primary/14" aria-hidden />
                     <span className="relative flex w-full items-start gap-3">
-                      <span aria-hidden className="relative grid size-12 shrink-0 place-items-center rounded-[1rem] border border-primary/20 bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklab,var(--primary)_28%,transparent),transparent_68%)] text-sm font-semibold tracking-[-0.03em] text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_10px_30px_-18px_var(--primary)]">
+                      <span aria-hidden className="relative grid size-12 shrink-0 place-items-center rounded-[1rem] border border-primary/20 bg-primary-soft text-sm font-semibold tracking-[-0.03em] text-primary">
                         {patientInitials(patient.full_name)}
                         <span className="absolute -bottom-1 -right-1 size-3 rounded-full border-2 border-card bg-emerald-400" aria-hidden />
                       </span>
@@ -176,7 +174,7 @@ export function PatientDirectory({
                           <span className="tnum">{maskPhone(patient.phone) ?? "No phone"}</span>
                         </span>
                       </span>
-                      <span className="grid size-8 shrink-0 place-items-center rounded-full border border-white/10 bg-white/5 text-muted-foreground transition-all group-hover:border-primary/25 group-hover:bg-primary/12 group-hover:text-primary">
+                      <span className="grid size-8 shrink-0 place-items-center rounded-full border border-border bg-secondary text-muted-foreground transition-all group-hover:border-primary/25 group-hover:bg-primary-soft group-hover:text-primary">
                         <ArrowUpRightIcon className="size-3.5" aria-hidden />
                       </span>
                     </span>
@@ -186,11 +184,11 @@ export function PatientDirectory({
                         <span className="tnum block text-2xl font-semibold tracking-[-0.05em]">
                           {formatCount(patient.visit_count ?? 0)}
                         </span>
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                           recorded visit{patient.visit_count === 1 ? "" : "s"}
                         </span>
                       </span>
-                      <span className="flex items-center justify-end gap-1.5 text-right text-[11px] text-muted-foreground">
+                      <span className="flex items-center justify-end gap-1.5 text-right text-xs text-muted-foreground">
                         <CalendarClockIcon className="size-3.5 text-primary/75" aria-hidden />
                         <LastSeen occurredAt={patient.last_visit} />
                       </span>
@@ -214,8 +212,8 @@ export function PatientDirectory({
 function EmptyDirectory({ query }: { query: string }) {
   const searching = query.trim().length > 0;
   return (
-    <div className="glass-card rounded-[1.5rem] border-dashed px-6 py-14 text-center">
-      <span className="mx-auto grid size-12 place-items-center rounded-[1rem] border border-white/10 bg-primary/10 text-primary shadow-[0_12px_30px_-18px_var(--primary)]">
+    <div className="surface-card rounded-[1.5rem] border-dashed px-6 py-14 text-center">
+      <span className="mx-auto grid size-12 place-items-center rounded-[1rem] border border-border bg-primary-soft text-primary">
         <UsersRoundIcon className="size-5" aria-hidden />
       </span>
       <p className="mt-4 text-sm font-medium">

@@ -1,8 +1,7 @@
 "use client";
 
-import { useId } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowDownRight, ArrowUpRight, ActivityIcon } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ActivityIcon } from "@/components/icons";
 
 import { CountUp } from "@/components/reactbits/count-up";
 import { formatCount, formatDayShort } from "@/lib/format";
@@ -27,20 +26,11 @@ export function VisitHero({
       initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.99 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-      className="glass-strong relative isolate grid min-h-[20rem] overflow-hidden rounded-[2.25rem] md:grid-cols-[minmax(15rem,0.72fr)_minmax(22rem,1.28fr)]"
+      className="surface-elevated grid min-h-[18rem] overflow-hidden rounded-[1.25rem] md:grid-cols-[minmax(15rem,0.72fr)_minmax(22rem,1.28fr)]"
     >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -top-40 -right-20 -z-10 size-[30rem] rounded-full bg-primary/18 blur-[100px]"
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -bottom-48 left-1/4 -z-10 size-[26rem] rounded-full bg-chart-2/10 blur-[110px]"
-      />
-
-      <div className="relative flex flex-col justify-between p-6 sm:p-8 md:border-r md:border-white/8">
+      <div className="flex flex-col justify-between p-5 sm:p-6 md:border-r md:border-border">
         <div>
-          <p className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
+          <p className="flex items-center gap-2 text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase">
             <span className="relative flex size-2" aria-hidden>
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-40" />
               <span className="relative inline-flex size-2 rounded-full bg-primary" />
@@ -50,7 +40,7 @@ export function VisitHero({
           <p className="mt-5 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground">
             Today&rsquo;s visits
           </p>
-          <p className="tnum mt-1 text-[4.5rem] font-semibold leading-[0.9] tracking-[-0.075em] text-foreground sm:text-[5.6rem]">
+          <p className="tnum mt-1 text-[4rem] font-semibold leading-[0.9] tracking-[-0.07em] text-foreground sm:text-[5rem]">
             <CountUp to={todayVisits} duration={1} format={formatCount} />
           </p>
         </div>
@@ -59,10 +49,10 @@ export function VisitHero({
           {delta !== null && (
             <span
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold shadow-[inset_0_1px_0_rgb(255_255_255/0.08)]",
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold",
                 up
-                  ? "border-primary/20 bg-primary/10 text-primary"
-                  : "border-destructive/20 bg-destructive/10 text-destructive",
+                  ? "border-primary/20 bg-primary-soft text-primary"
+                  : "border-destructive/20 bg-destructive-soft text-destructive",
               )}
             >
               {up ? (
@@ -76,21 +66,21 @@ export function VisitHero({
               </span>
             </span>
           )}
-          <span className="text-[11px] text-muted-foreground">compared with yesterday</span>
+          <span className="text-xs text-muted-foreground">compared with yesterday</span>
         </div>
       </div>
 
-      <div className="relative flex min-h-[17rem] flex-col justify-between p-6 sm:p-8">
+      <div className="flex min-h-[16rem] flex-col justify-between p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[10px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
+            <p className="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase">
               Clinical tempo
             </p>
-            <p className="mt-1.5 max-w-sm text-sm leading-6 text-foreground/75">
+            <p className="mt-1.5 max-w-sm text-sm leading-6 text-muted-foreground">
               A quiet view of patient flow across the latest twelve clinic days.
             </p>
           </div>
-          <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-primary/15 bg-primary/10 text-primary">
+          <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary-soft text-primary">
             <ActivityIcon className="size-[18px]" strokeWidth={1.8} aria-hidden />
           </span>
         </div>
@@ -101,9 +91,6 @@ export function VisitHero({
 }
 
 function VisitSparkline({ points }: { points: DailyPoint[] }) {
-  const rawId = useId();
-  const id = rawId.replace(/:/g, "");
-
   if (points.length < 2) {
     return (
       <div className="mt-8 grid min-h-32 place-items-center rounded-[1.5rem] border border-dashed border-border/60 text-xs text-muted-foreground">
@@ -134,29 +121,11 @@ function VisitSparkline({ points }: { points: DailyPoint[] }) {
         role="img"
         aria-label={`Visits over the last ${points.length} days, ${formatCount(values[0])} to ${formatCount(values.at(-1))}`}
       >
-        <defs>
-          <linearGradient id={`${id}-area`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.42" />
-            <stop offset="55%" stopColor="var(--primary)" stopOpacity="0.12" />
-            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id={`${id}-line`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="var(--chart-2)" />
-            <stop offset="100%" stopColor="var(--primary)" />
-          </linearGradient>
-          <filter id={`${id}-glow`} x="-80%" y="-80%" width="260%" height="260%">
-            <feGaussianBlur stdDeviation="5" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        <path d={area} fill={`url(#${id}-area)`} />
+        <path d={area} fill="var(--primary)" fillOpacity={0.08} />
         <path
           d={line}
           fill="none"
-          stroke={`url(#${id}-line)`}
+          stroke="var(--primary)"
           strokeWidth={3}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -168,7 +137,6 @@ function VisitSparkline({ points }: { points: DailyPoint[] }) {
           r={8}
           fill="var(--primary)"
           fillOpacity={0.18}
-          filter={`url(#${id}-glow)`}
         />
         <circle
           cx={end.x}
@@ -180,9 +148,9 @@ function VisitSparkline({ points }: { points: DailyPoint[] }) {
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      <figcaption className="mt-1 flex items-center justify-between text-[10px] font-medium tracking-[0.04em] text-muted-foreground uppercase">
+      <figcaption className="mt-1 flex items-center justify-between text-xs font-medium tracking-[0.04em] text-muted-foreground uppercase">
         <span>{formatDayShort(points[0].day)}</span>
-        <span className="tnum rounded-full border border-border/60 bg-foreground/[0.03] px-2.5 py-1 tracking-normal normal-case">
+        <span className="tnum rounded-full border border-border bg-secondary px-2.5 py-1 tracking-normal normal-case">
           peak {formatCount(max)}
         </span>
         <span>{formatDayShort(points.at(-1)!.day)}</span>
