@@ -348,7 +348,7 @@ export function ReviewSheet({
           aria-label on the container would win over it and announce a second,
           slightly different name for the same dialog. */}
       <SheetContent
-        className="sm:max-w-2xl"
+        className="glass-strong overflow-hidden border-white/10 bg-card/92 sm:max-w-2xl"
         // Escape and an outside tap are the two accidental paths to losing a
         // reviewed visit; the explicit Discard button in the footer is
         // unaffected by either. Outside-tap is refused outright rather than
@@ -359,14 +359,23 @@ export function ReviewSheet({
         }}
         onPointerDownOutside={(event) => event.preventDefault()}
       >
-        <SheetHeader>
-          <SheetTitle>Review &amp; confirm</SheetTitle>
-          <SheetDescription>Check the clinical details before they enter the register.</SheetDescription>
+        <SheetHeader className="border-b border-white/8 px-5 pb-4 pt-5 sm:px-6">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-[0_14px_30px_-18px_var(--primary)]">
+              <ShieldCheck className="size-4" aria-hidden />
+            </span>
+            <div>
+              <SheetTitle className="text-lg font-semibold tracking-[-0.025em]">Review &amp; confirm</SheetTitle>
+              <SheetDescription className="mt-1 leading-5">
+                Check every clinical detail before it enters the patient register.
+              </SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
 
-        <Alert variant="default" role="note" className="mx-5 mb-3 w-auto shrink-0">
+        <Alert variant="default" role="note" className="glass-inset mx-4 mb-3 mt-3 w-auto shrink-0 rounded-2xl border-primary/15 bg-primary/6 sm:mx-6">
           <ShieldCheck className="mt-0.5 size-4 text-primary" aria-hidden />
-          <AlertTitle>Not saved yet</AlertTitle>
+          <AlertTitle className="text-xs font-semibold">Not saved yet</AlertTitle>
           <AlertDescription>
             Transcription and extraction are suggestions. You remain the final reviewer.
           </AlertDescription>
@@ -376,9 +385,9 @@ export function ReviewSheet({
           /* Warning stock: solid tinted card, full-strength border, and an icon.
              The three cues are redundant on purpose — this banner is the only
              thing standing between a bad transcription and a medical record. */
-          <div className="border-warning/35 bg-warning/10 mx-5 mb-3 flex shrink-0 gap-2.5 rounded-lg border px-3.5 py-2.5">
-            <AlertTriangle className="text-warning mt-0.5 size-4 shrink-0" aria-hidden />
-            <ul className="text-foreground space-y-0.5 text-xs">
+          <div className="glass-inset mx-4 mb-3 flex shrink-0 gap-2.5 rounded-2xl border border-warning/25 bg-warning/8 px-3.5 py-3 sm:mx-6">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+            <ul className="space-y-0.5 text-xs leading-5 text-foreground">
               {degraded && (
                 <li>
                   Transcribed by the backup engine — accuracy on mixed-language speech
@@ -394,11 +403,11 @@ export function ReviewSheet({
         )}
 
         {draft.transcriptId && (
-          <div className="mx-5 mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
-            <p className="text-xs text-muted-foreground">
+          <div className="glass-inset mx-4 mb-3 flex items-center justify-between gap-3 rounded-2xl border-white/8 bg-background/20 px-3.5 py-2.5 sm:mx-6">
+            <p className="text-[0.6875rem] leading-4 text-muted-foreground">
               Audio is retained temporarily if the transcription needs another pass.
             </p>
-            <Button type="button" variant="outline" size="sm" onClick={retryFromAudio} disabled={retrying}>
+            <Button type="button" variant="outline" size="sm" onClick={retryFromAudio} disabled={retrying} className="rounded-xl border-white/10 bg-white/5">
               {retrying ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
               {retrying ? "Retrying…" : "Retry from audio"}
             </Button>
@@ -414,133 +423,155 @@ export function ReviewSheet({
           />
         )}
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-5 sm:px-6">
           {/* ---- Patient ---------------------------------------------------- */}
-          <Field label="Patient" flagged={uncertain.has("patient_name")}>
-            <Input
-              id={reviewFieldId("patient_name")}
-              value={name}
-              onChange={(event) => {
-                setName(event.target.value);
-                markReviewed("patient_name");
-              }}
-              autoComplete="off"
-            />
-          </Field>
-
-          {(patientCandidates.length > 0 || asNew || matching) && (
-            <PatientPicker
-              candidates={patientCandidates}
-              selectedId={patient?.id ?? null}
-              asNew={asNew}
-              onSelect={(match) => {
-                setPatient(match);
-                setAsNew(false);
-              }}
-              onSelectNew={() => {
-                setAsNew(true);
-                setPatient(null);
-              }}
-              onViewHistory={(match) => {
-                setPatient(match);
-                setAsNew(false);
-                setHistoryPatient(match);
-              }}
-              matching={matching}
-            />
-          )}
-
-          {asNew && (
-            <div className="grid gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 sm:grid-cols-2">
-              <Field label="New chart phone">
-                <Input
-                  id="review-new-patient-phone"
-                  value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
-                  inputMode="tel"
-                  autoComplete="tel"
-                  placeholder="Optional, helps avoid duplicate charts"
-                />
-              </Field>
-              <Field label="Sex">
-                <select
-                  id="review-new-patient-sex"
-                  value={sex}
-                  onChange={(event) => setSex(event.target.value as PatientSex | "")}
-                  className="well text-foreground h-10 w-full px-3 text-sm outline-none"
-                >
-                  <option value="">Not stated</option>
-                  {PATIENT_SEX_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </Field>
+          <section className="glass-inset space-y-4 rounded-2xl border-white/8 bg-background/18 p-4">
+            <div className="flex items-center gap-2">
+              <span className="tnum grid size-6 place-items-center rounded-lg bg-primary/10 text-[0.625rem] font-semibold text-primary">01</span>
+              <h3 className="text-sm font-semibold tracking-[-0.015em]">Patient &amp; chart</h3>
             </div>
-          )}
 
-          <div className="max-w-48">
-            <Field label="Age" flagged={uncertain.has("age_years")}>
+            <Field label="Patient" flagged={uncertain.has("patient_name")}>
               <Input
-                id={reviewFieldId("age_years")}
-                value={age}
+                id={reviewFieldId("patient_name")}
+                value={name}
                 onChange={(event) => {
-                  setAge(event.target.value);
-                  markReviewed("age_years");
+                  setName(event.target.value);
+                  markReviewed("patient_name");
                 }}
-                inputMode="numeric"
-                className="tnum"
+                autoComplete="off"
+                className="h-11 rounded-xl bg-background/25"
               />
             </Field>
-          </div>
 
-          {/* A textarea, not an input, because this is the confirmation screen.
-              A real spoken diagnosis — "Type 2 diabetes mellitus, poorly
-              controlled; hypertension" — overflows a single line on a phone and
-              a one-line input hides the overflow, so the doctor would be signing
-              off on text they cannot see. It grows instead of scrolling. */}
-          <Field label="Diagnosis" flagged={uncertain.has("diagnosis")}>
-            <Textarea
-              id={reviewFieldId("diagnosis")}
-              value={diagnosis}
-              onChange={(event) => {
-                setDiagnosis(event.target.value);
-                markReviewed("diagnosis");
-              }}
-              rows={2}
-              className="resize-none"
-            />
-          </Field>
+            {(patientCandidates.length > 0 || asNew || matching) && (
+              <PatientPicker
+                candidates={patientCandidates}
+                selectedId={patient?.id ?? null}
+                asNew={asNew}
+                onSelect={(match) => {
+                  setPatient(match);
+                  setAsNew(false);
+                }}
+                onSelectNew={() => {
+                  setAsNew(true);
+                  setPatient(null);
+                }}
+                onViewHistory={(match) => {
+                  setPatient(match);
+                  setAsNew(false);
+                  setHistoryPatient(match);
+                }}
+                matching={matching}
+              />
+            )}
 
-          <Field label="Treatment" flagged={uncertain.has("treatment")}>
-            <Textarea
-              id={reviewFieldId("treatment")}
-              value={treatment}
-              onChange={(event) => {
-                setTreatment(event.target.value);
-                markReviewed("treatment");
-              }}
-              rows={2}
-              className="resize-none"
-            />
-          </Field>
+            {asNew && (
+              <div className="grid gap-3 rounded-2xl border border-primary/15 bg-primary/6 p-3 sm:grid-cols-2">
+                <Field label="New chart phone">
+                  <Input
+                    id="review-new-patient-phone"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="Optional, helps avoid duplicate charts"
+                    className="h-11 rounded-xl bg-background/25"
+                  />
+                </Field>
+                <Field label="Sex">
+                  <select
+                    id="review-new-patient-sex"
+                    value={sex}
+                    onChange={(event) => setSex(event.target.value as PatientSex | "")}
+                    className="glass-inset h-11 w-full rounded-xl border-white/8 bg-background/25 px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/35"
+                  >
+                    <option value="">Not stated</option>
+                    {PATIENT_SEX_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+            )}
+
+            <div className="max-w-48">
+              <Field label="Age" flagged={uncertain.has("age_years")}>
+                <Input
+                  id={reviewFieldId("age_years")}
+                  value={age}
+                  onChange={(event) => {
+                    setAge(event.target.value);
+                    markReviewed("age_years");
+                  }}
+                  inputMode="numeric"
+                  className="tnum h-11 rounded-xl bg-background/25"
+                />
+              </Field>
+            </div>
+          </section>
+
+          <section className="glass-inset space-y-4 rounded-2xl border-white/8 bg-background/18 p-4">
+            <div className="flex items-center gap-2">
+              <span className="tnum grid size-6 place-items-center rounded-lg bg-primary/10 text-[0.625rem] font-semibold text-primary">02</span>
+              <h3 className="text-sm font-semibold tracking-[-0.015em]">Clinical assessment</h3>
+            </div>
+
+            {/* A textarea, not an input, because this is the confirmation screen.
+                A real spoken diagnosis — "Type 2 diabetes mellitus, poorly
+                controlled; hypertension" — overflows a single line on a phone and
+                a one-line input hides the overflow, so the doctor would be signing
+                off on text they cannot see. It grows instead of scrolling. */}
+            <Field label="Diagnosis" flagged={uncertain.has("diagnosis")}>
+              <Textarea
+                id={reviewFieldId("diagnosis")}
+                value={diagnosis}
+                onChange={(event) => {
+                  setDiagnosis(event.target.value);
+                  markReviewed("diagnosis");
+                }}
+                rows={2}
+                className="resize-none rounded-xl bg-background/25"
+              />
+            </Field>
+
+            <Field label="Treatment" flagged={uncertain.has("treatment")}>
+              <Textarea
+                id={reviewFieldId("treatment")}
+                value={treatment}
+                onChange={(event) => {
+                  setTreatment(event.target.value);
+                  markReviewed("treatment");
+                }}
+                rows={2}
+                className="resize-none rounded-xl bg-background/25"
+              />
+            </Field>
+          </section>
 
           {/* ---- Prescription ------------------------------------------------ */}
-          <MedicationEditor
-            value={drugs}
-            onChange={setDrugs}
-            flaggedKeys={uncertain}
-            reviewedKeys={reviewedKeys}
-            onFieldChange={markReviewed}
-          />
+          <section className="glass-inset rounded-2xl border-white/8 bg-background/18 p-4">
+            <div className="mb-4 flex items-center gap-2">
+              <span className="tnum grid size-6 place-items-center rounded-lg bg-primary/10 text-[0.625rem] font-semibold text-primary">03</span>
+              <h3 className="text-sm font-semibold tracking-[-0.015em]">Prescription</h3>
+            </div>
+            <MedicationEditor
+              value={drugs}
+              onChange={setDrugs}
+              flaggedKeys={uncertain}
+              reviewedKeys={reviewedKeys}
+              onFieldChange={markReviewed}
+            />
+          </section>
 
           {/* The evidence behind every field above. Provider output, never
               rewritten by the model that produced the structure. */}
-          <div>
+          <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-3.5">
             <button
               type="button"
               onClick={() => setShowTranscript((open) => !open)}
               aria-expanded={showTranscript}
-              className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
+              className="touch-manipulation rounded-lg text-xs font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-2"
             >
               {showTranscript ? "Hide" : "Show"} what you said
             </button>
@@ -552,7 +583,7 @@ export function ReviewSheet({
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden"
                 >
-                  <p className="well text-foreground mt-2 p-3 text-xs leading-relaxed">
+                  <p className="glass-inset mt-2 rounded-xl border-white/8 bg-background/25 p-3 text-xs leading-relaxed text-foreground">
                     {rawText}
                     {romanText && romanText !== rawText && (
                       <span className="text-muted-foreground mt-2 block">{romanText}</span>
@@ -564,23 +595,24 @@ export function ReviewSheet({
           </div>
         </div>
 
-        <SheetFooter className="flex-col items-stretch gap-2">
-          <p className="text-muted-foreground text-[11px]" aria-live="polite">
+        <SheetFooter className="flex-col items-stretch gap-2 border-white/8 bg-background/25 px-4 sm:px-6">
+          <p className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground" aria-live="polite">
+            <span className={cn("size-1.5 rounded-full", autosaveState === "error" || autosaveState === "conflict" ? "bg-destructive" : "bg-primary")} aria-hidden />
             {autosaveState === "saving" && "Saving draft…"}
             {autosaveState === "saved" && "Draft saved for recovery"}
             {autosaveState === "error" && "Autosave failed — your edits remain on screen"}
             {autosaveState === "conflict" && "This draft changed elsewhere — reload before saving"}
           </p>
           {failure && (
-            <p role="alert" className="text-destructive text-xs">
+            <p role="alert" className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive">
               {failure}
             </p>
           )}
           <div className="flex gap-3">
-            <Button variant="outline" size="lg" onClick={onDiscard}>
+            <Button variant="outline" size="lg" onClick={onDiscard} className="rounded-xl border-white/10 bg-white/5">
               Discard
             </Button>
-            <Button size="lg" onClick={save} disabled={saving} className="flex-1">
+            <Button size="lg" onClick={save} disabled={saving} className="flex-1 rounded-xl shadow-[0_14px_34px_-16px_var(--primary)]">
               {saving ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : (
@@ -692,10 +724,10 @@ function PatientPicker({
 
   return (
     <fieldset>
-      <legend className="text-muted-foreground text-xs">
+      <legend className="text-xs font-medium text-foreground">
         Which chart is this? Nothing is linked until you choose.
       </legend>
-      <p className="mt-1 text-[11px] text-muted-foreground">
+      <p className="mt-1 text-[0.6875rem] leading-4 text-muted-foreground">
         Open a chart to review the patient&rsquo;s complete recorded history before linking this visit.
         {matching && <span className="ml-2">Searching…</span>}
       </p>
@@ -703,9 +735,9 @@ function PatientPicker({
       {indistinguishable && (
         <p
           role="alert"
-          className="border-destructive/40 bg-destructive/10 text-foreground mt-2 flex gap-2 rounded-lg border px-3 py-2 text-xs leading-relaxed"
+          className="mt-2 flex gap-2 rounded-xl border border-destructive/25 bg-destructive/8 px-3 py-2.5 text-xs leading-relaxed text-foreground"
         >
-          <AlertTriangle className="text-destructive mt-0.5 size-3.5 shrink-0" aria-hidden />
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-destructive" aria-hidden />
           <span>
             Two charts share this name and neither has a phone number or age on file.
             Confirm with the patient before saving, or start a new chart.
@@ -754,15 +786,15 @@ function ReviewNavigator({
   const nextIndex = items.findIndex((item) => !reviewedKeys.has(item.key));
   const targetIndex = nextIndex >= 0 ? nextIndex : Math.min(activeIndex, items.length - 1);
   return (
-    <section aria-label="Fields to review" className="mx-5 mb-3 rounded-lg border border-warning/35 bg-warning/10 p-3">
+    <section aria-label="Fields to review" className="glass-inset mx-4 mb-3 rounded-2xl border border-warning/20 bg-warning/8 p-3.5 sm:mx-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-medium">Review flagged details</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <p className="text-xs font-semibold">Review flagged details</p>
+          <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">
             {reviewedKeys.size} of {items.length} checked
           </p>
         </div>
-        <Button type="button" size="sm" variant="outline" onClick={() => onFocus(targetIndex)}>
+        <Button type="button" size="sm" variant="outline" onClick={() => onFocus(targetIndex)} className="rounded-xl border-warning/20 bg-warning/8 text-warning hover:bg-warning/12">
           {nextIndex >= 0 ? "Review next" : "Review again"}
         </Button>
       </div>
@@ -773,10 +805,10 @@ function ReviewNavigator({
               type="button"
               onClick={() => onFocus(index)}
               className={cn(
-                "rounded-full border px-2 py-1 text-[11px]",
+                "min-h-7 touch-manipulation rounded-full border px-2.5 py-1 text-[0.6875rem] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [@media(pointer:coarse)]:min-h-11",
                 reviewedKeys.has(item.key)
-                  ? "border-primary/30 text-primary"
-                  : "border-warning/45 text-warning",
+                  ? "border-primary/20 bg-primary/8 text-primary"
+                  : "border-warning/30 bg-background/20 text-warning",
               )}
             >
               {reviewedKeys.has(item.key) ? "✓ " : ""}{item.label}
@@ -850,20 +882,20 @@ function PatientOption({
   return (
     <div
       className={cn(
-        "pressable flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 transition-colors",
+        "pressable flex w-full items-center gap-2 rounded-2xl border px-3 py-3 transition-all duration-200",
         // `:has()` rather than a JS focus handler: the ring belongs to the row,
         // the focus belongs to the input inside it, and the browser already
         // knows how to connect the two.
         "has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background",
         checked
-          ? "border-primary/45 bg-primary/12 shadow-press"
-          : "border-border bg-card shadow-flat hover:bg-secondary",
+          ? "border-primary/35 bg-primary/10 shadow-[0_12px_30px_-22px_var(--primary)]"
+          : "border-white/8 bg-white/[0.025] hover:border-white/15 hover:bg-white/5",
       )}
     >
       <label
         className={cn(
-          "flex cursor-pointer items-center gap-3",
-          onOpenHistory ? "shrink-0" : "min-w-0 flex-1",
+          "flex cursor-pointer touch-manipulation items-center gap-3",
+          onOpenHistory ? "size-11 shrink-0 justify-center" : "min-w-0 flex-1",
         )}
       >
         <input
@@ -882,7 +914,7 @@ function PatientOption({
           aria-hidden
           className={cn(
             "grid size-4 shrink-0 place-items-center rounded-full border transition-colors",
-            checked ? "border-primary bg-primary" : "border-border",
+            checked ? "border-primary bg-primary shadow-[0_0_12px_-3px_var(--primary)]" : "border-border bg-background/30",
           )}
         >
           {checked && <span className="bg-primary-foreground size-1.5 rounded-full" />}
@@ -897,7 +929,7 @@ function PatientOption({
             onSelect();
             onOpenHistory();
           }}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-h-11 min-w-0 flex-1 touch-manipulation items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {patientDetails}
           <span className="hidden shrink-0 items-center gap-1 text-xs font-medium text-primary sm:flex">
@@ -924,7 +956,7 @@ function Field({
     <label className="block">
       <Label
         asChild
-        className="text-muted-foreground mb-1.5 text-[11px] tracking-[0.12em] uppercase"
+        className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
       >
         <span>
           {label}

@@ -1,9 +1,16 @@
 "use client";
 
-import { ArrowLeftIcon, ArrowRightIcon, CalendarRangeIcon, LoaderCircleIcon, SearchIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CalendarRangeIcon,
+  CircleCheckBigIcon,
+  ClipboardClockIcon,
+  LoaderCircleIcon,
+  SearchIcon,
+} from "lucide-react";
 
 import { RegisterTimeline } from "@/components/dashboard/register-timeline";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,108 +85,144 @@ export function RegisterWorkspace({
   const page = registerPageRange(totalCount, offset, entries.length || limit);
 
   return (
-    <div className="space-y-6">
-      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <CalendarRangeIcon className="size-3.5" aria-hidden />
-            Searchable visit history
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">
-            Patient register
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Confirmed visits and drafts that still need your review.
-          </p>
-        </div>
-        <div className="text-left sm:text-right">
-          <p className="tnum text-2xl font-semibold text-foreground">{headlineCount}</p>
-          <p className="text-xs text-muted-foreground">
-            {status === "draft" ? "pending" : status === "committed" ? "confirmed" : "matching"} visit{headlineCount === 1 ? "" : "s"}
-            {showingPartial ? ` · showing ${entries.length}` : ""}
-          </p>
-          {draftCount > 0 && (
-            <p className="mt-1 flex items-center justify-end gap-2 text-xs text-warning">
-              <Badge variant="warning">{draftCount} pending review</Badge>
+    <div className="space-y-5 sm:space-y-7">
+      <section className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-card/35 p-5 shadow-[0_24px_70px_-42px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:p-7">
+        <div
+          className="pointer-events-none absolute -right-20 -top-28 size-72 rounded-full bg-primary/12 blur-3xl"
+          aria-hidden
+        />
+        <div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+          <div className="max-w-xl">
+            <p className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-primary">
+              <span className="grid size-7 place-items-center rounded-full border border-primary/20 bg-primary/10">
+                <CalendarRangeIcon className="size-3.5" aria-hidden />
+              </span>
+              Clinical timeline
             </p>
-          )}
+            <h1 className="mt-4 text-3xl font-semibold tracking-[-0.045em] text-foreground sm:text-4xl">
+              Patient register
+            </h1>
+            <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
+              Every consultation, transcription and pending review in one calm,
+              searchable timeline.
+            </p>
+          </div>
+
+          <dl className="glass-inset grid grid-cols-3 divide-x divide-border/60 rounded-2xl px-1 py-3 sm:min-w-[22rem]">
+            <div className="px-3 sm:px-5">
+              <dt className="text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Matching
+              </dt>
+              <dd className="tnum mt-1 text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
+                {headlineCount}
+              </dd>
+            </div>
+            <div className="px-3 sm:px-5">
+              <dt className="flex items-center gap-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                <CircleCheckBigIcon className="size-3 text-primary" aria-hidden />
+                Confirmed
+              </dt>
+              <dd className="tnum mt-1 text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
+                {committedCount}
+              </dd>
+            </div>
+            <div className="px-3 sm:px-5">
+              <dt className="flex items-center gap-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                <ClipboardClockIcon className="size-3 text-warning" aria-hidden />
+                Review
+              </dt>
+              <dd className="tnum mt-1 text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
+                {draftCount}
+              </dd>
+            </div>
+          </dl>
         </div>
+        {showingPartial && (
+          <p className="relative mt-4 text-xs text-muted-foreground">
+            Showing {entries.length} of {headlineCount} matching visits on this page.
+          </p>
+        )}
       </section>
 
-      <section className="rounded-xl border border-border bg-card p-4 shadow-flat sm:p-5">
+      <section className="glass-panel rounded-[1.5rem] p-3 sm:p-4">
         <form
           onSubmit={(event) => {
             event.preventDefault();
             onSearch();
           }}
-          className="flex gap-2"
+          className="flex flex-col gap-2 sm:flex-row"
         >
           <div className="relative flex-1">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <SearchIcon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
               placeholder="Search patient, diagnosis, treatment or medicine"
               aria-label="Search register"
-              className="h-11 pl-10"
+              className="glass-inset h-12 rounded-xl border-white/10 bg-background/25 pl-11 shadow-none"
             />
           </div>
-          <Button type="submit" size="lg" disabled={loading}>
+          <Button type="submit" size="lg" disabled={loading} className="h-12 rounded-xl px-6">
             {loading && <LoaderCircleIcon className="animate-spin" aria-hidden />}
             Search
           </Button>
         </form>
 
-        <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="no-scrollbar flex gap-1 overflow-x-auto" role="group" aria-label="Register date range">
-            {RANGES.map((option) => (
-              <button
-                key={option.days}
-                type="button"
-                onClick={() => onDaysChange(option.days)}
-                aria-pressed={days === option.days}
-                className={cn(
-                  "h-8 shrink-0 rounded-md px-3 text-xs font-medium transition-colors",
-                  days === option.days
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+        <div className="mt-3 flex flex-col gap-3 border-t border-white/10 pt-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="no-scrollbar glass-inset flex max-w-full gap-1 overflow-x-auto rounded-xl p-1" role="group" aria-label="Register date range">
+              {RANGES.map((option) => (
+                <button
+                  key={option.days}
+                  type="button"
+                  onClick={() => onDaysChange(option.days)}
+                  aria-pressed={days === option.days}
+                  className={cn(
+                    "min-h-9 shrink-0 touch-manipulation rounded-lg px-3 text-xs font-medium transition-all duration-200 [@media(pointer:coarse)]:min-h-11",
+                    days === option.days
+                      ? "bg-foreground text-background shadow-sm"
+                      : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
 
-          <div className="no-scrollbar flex gap-1 overflow-x-auto" role="group" aria-label="Register status">
-            {STATUSES.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => onStatusChange(option.value)}
-                aria-pressed={status === option.value}
-                className={cn(
-                  "h-8 shrink-0 rounded-md border px-3 text-xs font-medium transition-colors",
-                  status === option.value
-                    ? "border-primary/25 bg-primary/10 text-primary"
-                    : "border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground",
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
+            <div className="no-scrollbar glass-inset flex max-w-full gap-1 overflow-x-auto rounded-xl p-1" role="group" aria-label="Register status">
+              {STATUSES.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onStatusChange(option.value)}
+                  aria-pressed={status === option.value}
+                  className={cn(
+                    "min-h-9 shrink-0 touch-manipulation rounded-lg border px-3 text-xs font-medium transition-all duration-200 [@media(pointer:coarse)]:min-h-11",
+                    status === option.value
+                      ? "border-primary/25 bg-primary/12 text-primary shadow-[0_8px_24px_-16px_var(--primary)]"
+                      : "border-transparent text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {draftCount > 0 && (
-            <Button type="button" variant="outline" size="sm" onClick={onReviewNext}>
+            <Button type="button" variant="outline" size="sm" onClick={onReviewNext} className="h-10 rounded-xl border-warning/20 bg-warning/8 text-warning hover:bg-warning/12">
               Review next <ArrowRightIcon aria-hidden />
             </Button>
           )}
         </div>
       </section>
 
-      <section aria-busy={loading}>
+      <section aria-busy={loading} aria-labelledby="register-results-title">
+        <h2 id="register-results-title" className="sr-only">
+          Visit log
+        </h2>
         {loading ? (
-          <div className="grid min-h-56 place-items-center rounded-xl border border-border bg-card">
+          <div className="glass-card grid min-h-64 place-items-center rounded-[1.5rem]">
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <LoaderCircleIcon className="size-4 animate-spin" aria-hidden />
               Loading register…
@@ -198,7 +241,7 @@ export function RegisterWorkspace({
       </section>
 
       {!loading && !error && totalCount > 0 && (
-        <nav className="flex items-center justify-between" aria-label="Register pages">
+        <nav className="glass-inset flex items-center justify-between rounded-2xl px-3 py-2 sm:px-4" aria-label="Register pages">
           <p className="text-xs text-muted-foreground">
             Showing {page.from}–{page.to} of {totalCount}
           </p>

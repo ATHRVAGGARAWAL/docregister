@@ -1,7 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2Icon, ClipboardClockIcon, Loader2Icon, PlusIcon } from "lucide-react";
+import {
+  CalendarDaysIcon,
+  CheckCircle2Icon,
+  ClipboardClockIcon,
+  Loader2Icon,
+  PhoneIcon,
+  PlusIcon,
+  UserRoundIcon,
+} from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -110,21 +118,83 @@ export function FollowUpWorkspace({
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,25rem)]">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><ClipboardClockIcon className="size-4 text-primary" aria-hidden />Follow-up queue</CardTitle>
-          <CardDescription>Open recalls stay visible until someone marks them complete.</CardDescription>
+    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)]">
+      <Card className="glass-card gap-0 overflow-hidden rounded-[1.65rem] border-white/10 bg-card/50 py-0">
+        <CardHeader className="border-b border-white/8 px-5 py-5 sm:px-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 place-items-center rounded-[0.95rem] border border-primary/20 bg-primary/10 text-primary shadow-[0_12px_26px_-18px_var(--primary)]">
+                <ClipboardClockIcon className="size-4.5" aria-hidden />
+              </span>
+              <div>
+                <CardTitle className="text-base tracking-[-0.02em]">Follow-up queue</CardTitle>
+                <CardDescription className="mt-1">Open recalls, ordered for the next patient touchpoint.</CardDescription>
+              </div>
+            </div>
+            <span className="glass-inset tnum rounded-full px-2.5 py-1 text-[11px] font-semibold text-primary">{items.length} open</span>
+          </div>
         </CardHeader>
-        <CardContent>
-          {error && <Alert variant="destructive" className="mb-4"><AlertTitle>Couldn’t update follow-ups</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-          {status === "loading" ? <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2Icon className="size-4 animate-spin" aria-hidden />Loading follow-ups…</p> : items.length === 0 ? <p className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">No open follow-ups. Schedule one after a visit when a patient needs a return date.</p> : <ul className="divide-y divide-border">{items.map((item) => <li key={item.id} className="flex items-start justify-between gap-4 py-4 first:pt-0"><div className="min-w-0"><p className="font-medium">{item.patient_name ?? "Patient"}</p><p className="mt-1 text-sm text-foreground">{item.reason}</p><p className="mt-1 text-xs text-muted-foreground">Due {formatDueDate(item.due_at)}{item.notes ? ` · ${item.notes}` : ""}</p></div><Button type="button" size="sm" variant="outline" onClick={() => void complete(item.id)}><CheckCircle2Icon className="size-4" aria-hidden />Complete</Button></li>)}</ul>}
+        <CardContent className="p-4 sm:p-5">
+          {error && <Alert variant="destructive" role="alert" className="mb-4 rounded-[1rem]"><AlertTitle>Couldn’t update follow-ups</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+          {status === "loading" ? (
+            <div className="grid min-h-52 place-items-center">
+              <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2Icon className="size-4 animate-spin" aria-hidden />Loading follow-ups…</p>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="glass-inset grid min-h-52 place-items-center rounded-[1.25rem] border-dashed p-6 text-center">
+              <div>
+                <span className="mx-auto grid size-11 place-items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 text-emerald-500"><CheckCircle2Icon className="size-5" aria-hidden /></span>
+                <p className="mt-3 text-sm font-medium text-foreground">Queue is clear</p>
+                <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted-foreground">Schedule a return date after a visit and it will stay visible here until completed.</p>
+              </div>
+            </div>
+          ) : (
+            <ul className="space-y-2.5">
+              {items.map((item) => (
+                <li key={item.id} className="glass-inset group relative overflow-hidden rounded-[1.2rem] p-4 transition-colors hover:border-primary/20">
+                  <span className="absolute inset-y-4 left-0 w-0.5 rounded-r-full bg-gradient-to-b from-primary to-primary/20" aria-hidden />
+                  <div className="flex items-start gap-3">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-[0.9rem] border border-white/10 bg-white/5 text-primary">
+                      <UserRoundIcon className="size-4" aria-hidden />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold tracking-[-0.015em]">{item.patient_name ?? "Patient"}</p>
+                          <p className="mt-1 text-sm leading-5 text-foreground/90">{item.reason}</p>
+                        </div>
+                        <Button type="button" size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground hover:text-emerald-500" onClick={() => void complete(item.id)}><CheckCircle2Icon className="size-3.5" aria-hidden />Complete</Button>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-1.5 font-medium text-primary"><CalendarDaysIcon className="size-3.5" aria-hidden />Due {formatDueDate(item.due_at)}</span>
+                        {item.patient_phone && <span className="flex items-center gap-1.5"><PhoneIcon className="size-3.5" aria-hidden />{item.patient_phone}</span>}
+                      </div>
+                      {item.notes && <p className="mt-2 rounded-lg bg-white/4 px-2.5 py-2 text-xs leading-5 text-muted-foreground">{item.notes}</p>}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><PlusIcon className="size-4 text-primary" aria-hidden />Schedule follow-up</CardTitle><CardDescription>Use the patient id from the confirmed chart. A follow-up can be tied to the saved visit.</CardDescription></CardHeader>
-        <CardContent><form className="space-y-4" onSubmit={(event) => void createFollowUp(event)}><div className="space-y-2"><Label htmlFor="follow-up-patient">Patient ID</Label><Input id="follow-up-patient" required value={patientId} onChange={(event) => setPatientId(event.target.value)} placeholder="Patient UUID" /></div><div className="space-y-2"><Label htmlFor="follow-up-date">Due date</Label><Input id="follow-up-date" type="date" required value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></div><div className="space-y-2"><Label htmlFor="follow-up-reason">Reason</Label><Input id="follow-up-reason" required maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Review blood pressure" /></div><div className="space-y-2"><Label htmlFor="follow-up-notes">Notes <span className="font-normal text-muted-foreground">(optional)</span></Label><Textarea id="follow-up-notes" maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Bring home readings" /></div><Button type="submit" disabled={status === "saving" || !patientId.trim()}>{status === "saving" ? <Loader2Icon className="size-4 animate-spin" aria-hidden /> : <PlusIcon className="size-4" aria-hidden />}Schedule</Button></form></CardContent>
+      <Card className="glass-strong relative gap-0 overflow-hidden rounded-[1.65rem] border-white/10 bg-card/55 py-0 xl:sticky xl:top-5">
+        <div className="ambient-orb pointer-events-none absolute -right-20 -top-20 size-44 opacity-45" aria-hidden />
+        <CardHeader className="relative border-b border-white/8 px-5 py-5 sm:px-6">
+          <span className="mb-3 grid size-10 place-items-center rounded-[0.95rem] border border-primary/20 bg-primary/12 text-primary shadow-[0_12px_26px_-18px_var(--primary)]"><PlusIcon className="size-4.5" aria-hidden /></span>
+          <CardTitle className="text-base tracking-[-0.02em]">Schedule follow-up</CardTitle>
+          <CardDescription className="mt-1 leading-5">Create a clear return cue tied to the patient and, when available, the confirmed visit.</CardDescription>
+        </CardHeader>
+        <CardContent className="relative p-5 sm:p-6">
+          <form className="space-y-4" onSubmit={(event) => void createFollowUp(event)}>
+            <div className="space-y-2"><Label htmlFor="follow-up-patient">Patient ID</Label><Input id="follow-up-patient" required value={patientId} onChange={(event) => setPatientId(event.target.value)} placeholder="Patient UUID" /></div>
+            <div className="space-y-2"><Label htmlFor="follow-up-date">Due date</Label><Input id="follow-up-date" type="date" required value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="follow-up-reason">Reason</Label><Input id="follow-up-reason" required maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Review blood pressure" /></div>
+            <div className="space-y-2"><Label htmlFor="follow-up-notes">Notes <span className="font-normal text-muted-foreground">(optional)</span></Label><Textarea id="follow-up-notes" maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Bring home readings" /></div>
+            <Button type="submit" size="lg" className="w-full rounded-xl shadow-[0_14px_30px_-16px_var(--primary)]" disabled={status === "saving" || !patientId.trim()}>{status === "saving" ? <Loader2Icon className="size-4 animate-spin" aria-hidden /> : <PlusIcon className="size-4" aria-hidden />}Schedule return</Button>
+          </form>
+        </CardContent>
       </Card>
     </div>
   );

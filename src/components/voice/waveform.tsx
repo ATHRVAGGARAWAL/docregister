@@ -5,9 +5,9 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 
 /** Bars in the animated canvas. */
-const BARS = 36;
+const BARS = 48;
 /** Segments in the reduced-motion meter. */
-const STEPS = 12;
+const STEPS = 16;
 /**
  * How often the meter re-reads the analyser. Four times a second is fast enough
  * to track a sentence starting and stopping and slow enough that the cost of
@@ -178,8 +178,19 @@ function WaveformCanvas({
       const spectrum = spectrumRef.current;
       if (decayRef.current.length !== BARS) decayRef.current = new Array(BARS).fill(0);
 
-      const barWidth = 3;
-      const gap = (width - BARS * barWidth) / (BARS - 1);
+      const barWidth = Math.max(2, Math.min(3.5, width / (BARS * 2.05)));
+      const gap = Math.max(1.5, (width - BARS * barWidth) / (BARS - 1));
+
+      // A barely-there centre line keeps the display legible in a silent room
+      // without pretending that audio is arriving.
+      context.globalAlpha = active ? 0.12 : 0.08;
+      context.fillStyle = ink;
+      context.fillRect(0, height / 2 - 0.5, width, 1);
+
+      // Add every capsule to one path and fill once. Besides looking smoother,
+      // this lets the canvas draw a restrained audio glow without paying for a
+      // shadow operation on every individual bar.
+      context.beginPath();
 
       for (let i = 0; i < BARS; i++) {
         let target = 0;
@@ -192,17 +203,19 @@ function WaveformCanvas({
         decayRef.current[i] = target > previous ? target : previous * 0.86;
 
         const value = decayRef.current[i];
-        const barHeight = Math.max(2, value * height * 0.9);
+        const barHeight = Math.max(2, value * height * 0.86);
         const x = i * (barWidth + gap);
         const y = (height - barHeight) / 2;
 
-        context.fillStyle = ink;
-        context.globalAlpha = 0.25 + value * 0.75;
-        context.beginPath();
         context.roundRect(x, y, barWidth, barHeight, barWidth / 2);
-        context.fill();
       }
 
+      context.fillStyle = ink;
+      context.globalAlpha = active ? 0.9 : 0.28;
+      context.shadowColor = ink;
+      context.shadowBlur = active ? 8 : 0;
+      context.fill();
+      context.shadowBlur = 0;
       context.globalAlpha = 1;
     };
 
@@ -215,7 +228,7 @@ function WaveformCanvas({
     };
   }, [active, color, spectrumRef]);
 
-  return <canvas ref={canvasRef} className="text-primary h-10 w-full" aria-hidden />;
+  return <canvas ref={canvasRef} className="h-12 w-full text-primary" aria-hidden />;
 }
 
 /**
@@ -272,13 +285,13 @@ function LevelMeter({
     <div
       aria-hidden
       style={color ? { color } : undefined}
-      className="text-primary flex h-10 w-full items-center gap-1"
+      className="flex h-12 w-full items-center gap-1 text-primary"
     >
       {Array.from({ length: STEPS }, (_, index) => (
         <span
           key={index}
           className={cn(
-            "h-2.5 flex-1 rounded-full bg-current",
+            "h-2 flex-1 rounded-full bg-current shadow-[0_0_8px_currentColor]",
             index < step ? "opacity-100" : "opacity-20",
           )}
         />

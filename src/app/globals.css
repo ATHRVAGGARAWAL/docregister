@@ -3,224 +3,116 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ===========================================================================
-   docregister — "Register"
-
-   A tactile paper-and-hardware system. Two rules govern everything below.
-
-   1. NO GRADIENTS. Not in surfaces, not in text, not in chart fills, not in
-      masks. Every fill in this app is a single solid colour. Depth is produced
-      the way it is on a real desk: by *light and shadow* over flat material.
-      A raised card is a solid slab with an inset highlight where the light
-      catches its top edge and a cast shadow beneath it. A text field is the
-      same slab pushed *into* the surface, so its shadows invert. This is the
-      whole trick, and it is why the UI can read as physical without a single
-      colour transition.
-
-   2. TOKENS ARE SEMANTIC, NEVER LITERAL. `--card`, not `--warm-white-2`.
-      The palette lives in `:root` / `.dark` and everything else consumes it
-      through Tailwind's theme namespace. This is the shadcn / 21st.dev
-      registry contract: a component pasted in from 21st.dev references
-      `bg-card` and `text-muted-foreground` and lands already themed.
-   =========================================================================== */
-
 :root {
-  --radius: 0.75rem;
+  --radius: 1rem;
+  --background: oklch(0.965 0.012 245);
+  --foreground: oklch(0.18 0.032 264);
+  --card: oklch(0.995 0.006 245);
+  --card-foreground: oklch(0.18 0.032 264);
+  --popover: oklch(0.99 0.008 245);
+  --popover-foreground: oklch(0.18 0.032 264);
+  --primary: oklch(0.47 0.12 177);
+  --primary-foreground: oklch(0.99 0.012 180);
+  --secondary: oklch(0.925 0.018 250);
+  --secondary-foreground: oklch(0.25 0.035 264);
+  --muted: oklch(0.93 0.014 248);
+  --muted-foreground: oklch(0.48 0.032 258);
+  --accent: oklch(0.62 0.17 290);
+  --accent-foreground: oklch(0.99 0.006 280);
+  --destructive: oklch(0.52 0.19 25);
+  --destructive-foreground: oklch(0.985 0.01 25);
+  --warning: oklch(0.48 0.13 75);
+  --money: oklch(0.47 0.13 145);
+  --border: oklch(0.82 0.024 248 / 0.72);
+  --input: oklch(0.93 0.018 248 / 0.78);
+  --ring: oklch(0.47 0.12 177);
+  --chart-1: oklch(0.62 0.15 177);
+  --chart-2: oklch(0.62 0.17 289);
+  --chart-3: oklch(0.7 0.15 74);
+  --chart-4: oklch(0.62 0.19 24);
+  --chart-5: oklch(0.62 0.13 230);
+  --grid: oklch(0.72 0.025 250 / 0.28);
+  --axis: oklch(0.48 0.025 255);
 
-  /* --- Surfaces ---------------------------------------------------------
-     The desk is a warm manila. Cards are *lighter* than the desk, never
-     darker — that is what makes them read as sitting on top of it rather than
-     cut out of it, and it is the one thing a flat design usually gets wrong. */
-  --background: oklch(0.978 0.003 85);
-  --foreground: oklch(0.21 0.014 70);
+  --glass-surface: oklch(1 0 0 / 0.58);
+  --glass-surface-strong: oklch(0.99 0.008 245 / 0.82);
+  --glass-surface-soft: oklch(0.99 0.008 245 / 0.38);
+  --glass-edge: oklch(1 0 0 / 0.74);
+  --glass-highlight: oklch(1 0 0 / 0.58);
+  --glass-shadow: oklch(0.28 0.06 265 / 0.13);
+  --ambient-a: oklch(0.75 0.16 178 / 0.22);
+  --ambient-b: oklch(0.72 0.16 292 / 0.18);
+  --ambient-c: oklch(0.82 0.13 225 / 0.16);
 
-  --card: oklch(0.998 0.001 90);
-  --card-foreground: oklch(0.21 0.014 70);
-
-  --popover: oklch(0.998 0.001 90);
-  --popover-foreground: oklch(0.21 0.014 70);
-
-  /* --- Ink --------------------------------------------------------------- */
-  --primary: oklch(0.49 0.102 178);
-  --primary-foreground: oklch(0.988 0.008 180);
-
-  --secondary: oklch(0.952 0.006 85);
-  --secondary-foreground: oklch(0.28 0.014 70);
-
-  --muted: oklch(0.955 0.005 85);
-  --muted-foreground: oklch(0.49 0.014 75);
-
-  --accent: oklch(0.935 0.02 180);
-  --accent-foreground: oklch(0.35 0.075 180);
-
-  --destructive: oklch(0.545 0.19 27);
-  --destructive-foreground: oklch(0.985 0.01 27);
-
-  --warning: oklch(0.52 0.12 72);
-
-  /* Money gets its own ink and never shares it with anything else. A doctor
-     scanning this screen is looking for rupees; a hue reserved to that one
-     meaning is what makes them findable without reading. */
-  --money: oklch(0.49 0.105 65);
-
-  --border: oklch(0.895 0.006 82);
-  --input: oklch(0.955 0.005 82);
-  --ring: oklch(0.49 0.102 178);
-
-  /* --- Chart series -------------------------------------------------------
-     A separate, validated set — NOT the UI inks above, which are stepped for
-     type on a near-white card and sit too dark and too low-chroma to work as
-     adjacent categorical marks.
-
-     Assigned by entity, never by rank: filtering the date range must never
-     repaint a series.
-
-     Only --chart-1 and --chart-2 are in use, and that pair is the one the
-     gates below were actually computed for. Gated against --card,
-     oklch(0.998 0.001 90):
-
-       lightness band  PASS  0.47 and 0.605
-       hue separation  PASS  106 degrees apart
-       deutan risk     teal/violet is the confusable pair, so they are held
-                       0.135 apart in L — under deuteranopia the hue cue
-                       collapses and lightness is the only channel left
-       contrast        PASS  both >= 3:1 on the surface (chart-1 is 3.60:1)
-
-     The claims that used to be here were checked and three of them were
-     false, which is worse than having none: a chroma floor of 0.115 that
-     --chart-5 (0.08) does not meet, a "worst adjacent pair 106 degrees" that
-     is really 37 (chart-3 at H 62 against chart-4 at H 25), and a gate
-     surface of oklch(0.992) that does not exist in this file. Nobody noticed
-     because 3, 4 and 5 have never been rendered.
-
-     Note also that --chart-1 light is marginally outside sRGB (linear red
-     ≈ −0.013), so the browser gamut-maps it and the delivered chroma is a
-     little under the nominal 0.115. Fine for a single series against a near
-     white card; it would matter if it were ever paired with another teal.
-
-     --chart-3/4/5 are unused. They are kept as slots for a third and fourth
-     series rather than deleted, but they have NOT been validated as a set —
-     validate them before rendering any of them. */
-  --chart-1: oklch(0.605 0.115 182); /* new patients   */
-  --chart-2: oklch(0.47 0.15 288); /* returning      */
-  --chart-3: oklch(0.585 0.13 62); /* available slot */
-  --chart-4: oklch(0.54 0.16 25);
-  --chart-5: oklch(0.52 0.08 230);
-
-  /* Chart chrome. One step off the surface, hairline, never dashed —
-     a dashed gridline reads as a data series. */
-  --grid: oklch(0.895 0.007 85);
-  --axis: oklch(0.58 0.012 78);
-
-  /* --- Depth ------------------------------------------------------------
-     Four states of the same material.
-
-     RAISE — a paper slip lying on the desk. Light from above, so a near-white
-     inset line along the top edge, then a three-stop cast shadow (contact,
-     mid, ambient). Three stops rather than one is what separates "physical"
-     from "drop-shadowed rectangle".
-
-     PRESS — the same slip pushed into the desk. The shadows move inside and
-     a highlight appears *below* the opening, because that lower lip is now
-     the surface catching the light. Every text field uses this.
-
-     KEY / KEY-DOWN — the microphone. A key standing proud of its housing,
-     with a dark inset along its bottom edge reading as the moulded seam, and
-     the collapsed version for when a thumb is on it. */
   --elev-raise:
-    0 1px 2px oklch(0.25 0.02 70 / 0.05), 0 10px 28px -16px oklch(0.25 0.02 70 / 0.16);
-
-  --elev-flat: 0 1px 2px oklch(0.25 0.02 70 / 0.06);
-
-  --elev-press:
-    inset 0 1px 2px oklch(0.25 0.02 70 / 0.07), 0 1px 0 oklch(1 0 0 / 0.8);
-
+    0 1px 0 oklch(1 0 0 / 0.74) inset,
+    0 20px 55px -32px var(--glass-shadow),
+    0 8px 24px -18px var(--glass-shadow);
+  --elev-flat: 0 1px 0 oklch(1 0 0 / 0.64) inset, 0 10px 30px -24px var(--glass-shadow);
+  --elev-press: inset 0 1px 1px oklch(0.3 0.04 265 / 0.08), 0 1px 0 oklch(1 0 0 / 0.58);
   --elev-key:
-    inset 0 1px 0 0 oklch(1 0 0 / 0.3), inset 0 -2px 0 0 oklch(0.2 0.04 180 / 0.32),
-    0 2px 2px -1px oklch(0.25 0.02 70 / 0.2), 0 8px 14px -6px oklch(0.25 0.02 70 / 0.28),
-    0 18px 30px -16px oklch(0.25 0.02 70 / 0.32);
-
-  --elev-key-down:
-    inset 0 2px 5px -1px oklch(0.16 0.04 180 / 0.45), inset 0 1px 0 0 oklch(1 0 0 / 0.12),
-    0 1px 1px -0.5px oklch(0.25 0.02 70 / 0.24);
-
+    inset 0 1px 0 oklch(1 0 0 / 0.55),
+    0 0 0 1px oklch(0.78 0.13 178 / 0.3),
+    0 8px 20px -8px oklch(0.45 0.18 178 / 0.55),
+    0 20px 54px -15px oklch(0.45 0.18 178 / 0.36);
+  --elev-key-down: inset 0 3px 8px oklch(0.25 0.1 178 / 0.36), 0 4px 12px -6px oklch(0.4 0.14 178 / 0.4);
   color-scheme: light;
 }
 
 .dark {
-  /* Graphite. The desk goes dark but the *ordering* is preserved: cards stay
-     lighter than the surface they sit on, so raise still reads as raise. */
-  --background: oklch(0.17 0.008 260);
-  --foreground: oklch(0.935 0.006 250);
+  --background: oklch(0.115 0.028 265);
+  --foreground: oklch(0.955 0.012 245);
+  --card: oklch(0.19 0.035 263);
+  --card-foreground: oklch(0.955 0.012 245);
+  --popover: oklch(0.17 0.034 263);
+  --popover-foreground: oklch(0.955 0.012 245);
+  --primary: oklch(0.78 0.145 177);
+  --primary-foreground: oklch(0.13 0.045 183);
+  --secondary: oklch(0.225 0.036 263);
+  --secondary-foreground: oklch(0.93 0.012 245);
+  --muted: oklch(0.22 0.032 263);
+  --muted-foreground: oklch(0.71 0.035 250);
+  --accent: oklch(0.75 0.16 290);
+  --accent-foreground: oklch(0.15 0.035 280);
+  --destructive: oklch(0.7 0.18 24);
+  --destructive-foreground: oklch(0.15 0.035 25);
+  --warning: oklch(0.82 0.14 78);
+  --money: oklch(0.79 0.14 145);
+  --border: oklch(0.88 0.025 250 / 0.13);
+  --input: oklch(0.16 0.032 263 / 0.76);
+  --ring: oklch(0.78 0.145 177);
+  --chart-1: oklch(0.78 0.14 177);
+  --chart-2: oklch(0.73 0.17 289);
+  --chart-3: oklch(0.82 0.14 75);
+  --chart-4: oklch(0.73 0.18 25);
+  --chart-5: oklch(0.72 0.12 226);
+  --grid: oklch(0.82 0.035 250 / 0.1);
+  --axis: oklch(0.64 0.03 250);
 
-  --card: oklch(0.215 0.009 258);
-  --card-foreground: oklch(0.935 0.006 250);
+  --glass-surface: oklch(0.2 0.038 263 / 0.58);
+  --glass-surface-strong: oklch(0.175 0.038 263 / 0.84);
+  --glass-surface-soft: oklch(0.21 0.04 263 / 0.34);
+  --glass-edge: oklch(0.96 0.03 245 / 0.13);
+  --glass-highlight: oklch(0.96 0.03 245 / 0.09);
+  --glass-shadow: oklch(0.02 0.02 270 / 0.58);
+  --ambient-a: oklch(0.66 0.16 178 / 0.2);
+  --ambient-b: oklch(0.55 0.2 292 / 0.22);
+  --ambient-c: oklch(0.58 0.16 225 / 0.16);
 
-  --popover: oklch(0.225 0.009 258);
-  --popover-foreground: oklch(0.935 0.006 250);
-
-  --primary: oklch(0.735 0.115 178);
-  --primary-foreground: oklch(0.2 0.04 180);
-
-  --secondary: oklch(0.255 0.009 258);
-  --secondary-foreground: oklch(0.93 0.006 250);
-
-  --muted: oklch(0.25 0.009 258);
-  --muted-foreground: oklch(0.705 0.012 255);
-
-  --accent: oklch(0.285 0.025 190);
-  --accent-foreground: oklch(0.88 0.05 180);
-
-  --destructive: oklch(0.645 0.175 25);
-  --destructive-foreground: oklch(0.18 0.03 25);
-
-  --warning: oklch(0.78 0.12 78);
-
-  --money: oklch(0.79 0.115 78);
-
-  --border: oklch(0.3 0.01 258);
-  --input: oklch(0.245 0.01 258);
-  --ring: oklch(0.735 0.115 178);
-
-  /* Re-stepped upward for a dark surface. Same entities, same hues, same
-     deutan lightness split — teal and violet stay 0.11 apart in L. */
-  --chart-1: oklch(0.73 0.125 182);
-  --chart-2: oklch(0.62 0.15 290);
-  --chart-3: oklch(0.77 0.135 72);
-  --chart-4: oklch(0.67 0.17 25);
-  --chart-5: oklch(0.68 0.095 230);
-
-  --grid: oklch(0.29 0.009 258);
-  --axis: oklch(0.62 0.012 255);
-
-  /* On a dark material the light catch is a faint sheen rather than a white
-     line, and the cast shadow has to go much deeper to register at all. */
   --elev-raise:
-    0 1px 2px oklch(0 0 0 / 0.3), 0 12px 30px -18px oklch(0 0 0 / 0.72);
-
-  --elev-flat: 0 1px 2px oklch(0 0 0 / 0.32);
-
-  --elev-press: inset 0 1px 2px oklch(0 0 0 / 0.42), 0 1px 0 oklch(1 0 0 / 0.04);
-
+    inset 0 1px 0 oklch(1 0 0 / 0.1),
+    0 28px 70px -34px oklch(0 0 0 / 0.82),
+    0 10px 32px -22px oklch(0 0 0 / 0.72);
+  --elev-flat: inset 0 1px 0 oklch(1 0 0 / 0.075), 0 12px 34px -25px oklch(0 0 0 / 0.8);
+  --elev-press: inset 0 2px 6px oklch(0 0 0 / 0.4), 0 1px 0 oklch(1 0 0 / 0.06);
   --elev-key:
-    inset 0 1px 0 0 oklch(1 0 0 / 0.28), inset 0 -2px 0 0 oklch(0.15 0.04 180 / 0.4),
-    0 2px 3px -1px oklch(0 0 0 / 0.5), 0 10px 18px -8px oklch(0 0 0 / 0.55),
-    0 20px 34px -18px oklch(0 0 0 / 0.6);
-
-  --elev-key-down:
-    inset 0 2px 6px -1px oklch(0.1 0.03 180 / 0.6), inset 0 1px 0 0 oklch(1 0 0 / 0.1),
-    0 1px 1px -0.5px oklch(0 0 0 / 0.4);
-
+    inset 0 1px 0 oklch(1 0 0 / 0.36),
+    0 0 0 1px oklch(0.86 0.12 178 / 0.26),
+    0 10px 26px -9px oklch(0.57 0.2 178 / 0.7),
+    0 26px 70px -18px oklch(0.53 0.2 178 / 0.48);
+  --elev-key-down: inset 0 4px 10px oklch(0.03 0.04 180 / 0.58), 0 4px 14px -7px oklch(0.55 0.18 178 / 0.52);
   color-scheme: dark;
 }
-
-/* ---------------------------------------------------------------------------
-   Theme namespace — what makes `bg-card`, `shadow-raise`, `text-money` exist.
-
-   `inline` matters: it emits `var(--card)` at the use site rather than
-   resolving the value at build time, so the `.dark` overrides above actually
-   take effect instead of being compiled away.
-   --------------------------------------------------------------------------- */
 
 @theme inline {
   --color-background: var(--background);
@@ -244,7 +136,6 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -252,149 +143,366 @@
   --color-chart-5: var(--chart-5);
   --color-grid: var(--grid);
   --color-axis: var(--axis);
-
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 0.45rem);
+  --radius-md: calc(var(--radius) - 0.25rem);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 10px);
-
-  /* The depth system, exposed as `shadow-raise` / `shadow-press` / `shadow-key`
-     / `shadow-key-down` / `shadow-flat`. */
+  --radius-xl: calc(var(--radius) + 0.35rem);
+  --radius-2xl: calc(var(--radius) + 0.85rem);
+  --radius-3xl: calc(var(--radius) + 1.35rem);
   --shadow-raise: var(--elev-raise);
   --shadow-flat: var(--elev-flat);
   --shadow-press: var(--elev-press);
   --shadow-key: var(--elev-key);
   --shadow-key-down: var(--elev-key-down);
-
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-
-  /* One easing curve for everything that is not a spring. Mixing curves is the
-     fastest way to make a UI feel assembled rather than designed. */
+  --font-sans: var(--font-geist-sans), "SF Pro Display", "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), "SFMono-Regular", Consolas, monospace;
   --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
 }
-
-/* ---------------------------------------------------------------------------
-   Base
-   --------------------------------------------------------------------------- */
 
 @layer base {
   * {
     border-color: var(--border);
   }
 
-  html,
-  body {
+  html {
     min-height: 100%;
+    background: var(--background);
+    scroll-behavior: smooth;
   }
 
   body {
-    background-color: var(--background);
+    min-height: 100%;
+    overflow-x: hidden;
     color: var(--foreground);
     font-family: var(--font-sans);
+    background:
+      radial-gradient(circle at 10% -8%, var(--ambient-a), transparent 35rem),
+      radial-gradient(circle at 92% 5%, var(--ambient-b), transparent 38rem),
+      radial-gradient(circle at 58% 105%, var(--ambient-c), transparent 42rem),
+      linear-gradient(145deg, color-mix(in oklch, var(--background) 94%, black), var(--background));
+    background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
-  /* Every figure in this app is a ledger figure, so every figure is monospaced
-     and tabular — a column of rupees has to align on the decimal the way it
-     would in a real register. Applied by element rather than by utility so it
-     cannot be forgotten at a call site. */
+  body::before {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    content: "";
+    opacity: 0.17;
+    background-image:
+      linear-gradient(oklch(1 0 0 / 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(1 0 0 / 0.025) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: linear-gradient(to bottom, black, transparent 72%);
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   .tnum {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
+    letter-spacing: -0.035em;
   }
 
   ::selection {
-    background: var(--accent);
-    color: var(--accent-foreground);
+    background: color-mix(in oklch, var(--primary) 34%, transparent);
+    color: var(--foreground);
   }
 
-  /* Never left to the UA default: 3:1 non-text contrast against the surface is
-     a WCAG 2.2 requirement, and the default ring disappears on the raised
-     card colour. */
   :focus-visible {
     outline: 2px solid var(--ring);
-    outline-offset: 2px;
-    border-radius: 4px;
+    outline-offset: 3px;
+    border-radius: 0.65rem;
   }
 }
-
-/* ---------------------------------------------------------------------------
-   Materials
-
-   Three classes, and adding a fourth is a design decision rather than a
-   styling one. Everything here is `background-color` + `box-shadow`; there is
-   no `background-image` anywhere in this file.
-   --------------------------------------------------------------------------- */
 
 @layer components {
-  /* A paper slip on the desk. */
+  .glass-panel,
   .slip {
-    background-color: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--radius-2xl);
+    background:
+      linear-gradient(145deg, var(--glass-highlight), transparent 42%),
+      var(--glass-surface);
     box-shadow: var(--elev-raise);
+    -webkit-backdrop-filter: blur(24px) saturate(145%);
+    backdrop-filter: blur(24px) saturate(145%);
   }
 
-  /* The same slip, lying flat — for the many-per-screen case where a full
-     cast shadow would turn the page into soup. */
+  .glass-panel::before,
+  .slip::before {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    content: "";
+    border-radius: inherit;
+    background: linear-gradient(110deg, oklch(1 0 0 / 0.1), transparent 36%, oklch(1 0 0 / 0.035) 68%, transparent);
+  }
+
+  .glass-card,
   .slip-flat {
-    background-color: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    position: relative;
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--radius-xl);
+    background: var(--glass-surface-soft);
     box-shadow: var(--elev-flat);
+    -webkit-backdrop-filter: blur(18px) saturate(135%);
+    backdrop-filter: blur(18px) saturate(135%);
   }
 
-  /* A well cut into the surface: inputs, transcript readouts, the dock tray. */
+  .glass-strong {
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--radius-2xl);
+    background:
+      linear-gradient(145deg, var(--glass-highlight), transparent 48%),
+      var(--glass-surface-strong);
+    box-shadow: var(--elev-raise);
+    -webkit-backdrop-filter: blur(32px) saturate(160%);
+    backdrop-filter: blur(32px) saturate(160%);
+  }
+
+  .glass-dock {
+    border: 1px solid var(--glass-edge);
+    background:
+      linear-gradient(155deg, oklch(1 0 0 / 0.13), transparent 44%),
+      var(--glass-surface-strong);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.12),
+      0 24px 80px -26px oklch(0 0 0 / 0.7),
+      0 8px 24px -18px oklch(0 0 0 / 0.62);
+    -webkit-backdrop-filter: blur(30px) saturate(165%);
+    backdrop-filter: blur(30px) saturate(165%);
+  }
+
+  .glass-inset,
   .well {
-    background-color: var(--input);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in oklch, var(--border) 82%, transparent);
+    border-radius: var(--radius-lg);
+    background: var(--input);
     box-shadow: var(--elev-press);
+    -webkit-backdrop-filter: blur(14px) saturate(125%);
+    backdrop-filter: blur(14px) saturate(125%);
   }
 
-  /* Pressable things travel. 1px is enough to feel and small enough that it
-     never reflows a neighbour. */
   .pressable {
     transition:
-      transform 120ms var(--ease-fluid),
-      box-shadow 120ms var(--ease-fluid);
+      transform 180ms var(--ease-fluid),
+      box-shadow 180ms var(--ease-fluid),
+      border-color 180ms var(--ease-fluid),
+      background-color 180ms var(--ease-fluid),
+      color 180ms var(--ease-fluid);
   }
-  .pressable:active {
-    transform: translateY(1px);
+
+  .pressable:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  .pressable:active:not(:disabled) {
+    transform: translateY(1px) scale(0.985);
+  }
+
+  .section-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--primary);
+    font-size: 0.675rem;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .text-gradient {
+    color: transparent;
+    background: linear-gradient(105deg, var(--foreground) 8%, color-mix(in oklch, var(--primary) 84%, white) 54%, color-mix(in oklch, var(--accent) 72%, white));
+    background-clip: text;
+    -webkit-background-clip: text;
+  }
+
+  .ambient-orb {
+    pointer-events: none;
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(1px);
+    opacity: 0.72;
+    background: radial-gradient(circle at 32% 28%, oklch(1 0 0 / 0.58), var(--ambient-a) 22%, var(--ambient-b) 64%, transparent 72%);
+    animation: ambient-drift 12s ease-in-out infinite alternate;
+  }
+
+  .brand-mark {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 2.65rem;
+    height: 2.65rem;
+    flex: none;
+    overflow: hidden;
+    border: 1px solid color-mix(in oklch, var(--primary) 38%, var(--glass-edge));
+    border-radius: 0.95rem;
+    color: var(--primary);
+    background:
+      radial-gradient(circle at 28% 18%, oklch(1 0 0 / 0.36), transparent 30%),
+      linear-gradient(145deg, color-mix(in oklch, var(--primary) 22%, var(--glass-surface-strong)), color-mix(in oklch, var(--accent) 12%, var(--glass-surface-strong)));
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.26),
+      0 10px 28px -13px color-mix(in oklch, var(--primary) 58%, transparent);
+  }
+
+  .brand-mark--compact {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.8rem;
+  }
+
+  .brand-mark__wave {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 1rem;
+  }
+
+  .brand-mark__wave i {
+    display: block;
+    width: 2px;
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: 0 0 8px color-mix(in oklch, var(--primary) 70%, transparent);
+  }
+
+  .brand-mark__wave i:nth-child(1),
+  .brand-mark__wave i:nth-child(5) { height: 0.35rem; opacity: 0.62; }
+  .brand-mark__wave i:nth-child(2),
+  .brand-mark__wave i:nth-child(4) { height: 0.72rem; opacity: 0.82; }
+  .brand-mark__wave i:nth-child(3) { height: 1rem; }
+
+  .brand-mark__pulse {
+    position: absolute;
+    right: 0.42rem;
+    top: 0.42rem;
+    width: 0.32rem;
+    height: 0.32rem;
+    border: 1px solid color-mix(in oklch, var(--primary) 80%, white);
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--primary) 82%, white);
+    box-shadow: 0 0 9px var(--primary);
+  }
+
+  .voice-aura {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .voice-aura::before,
+  .voice-aura::after {
+    position: absolute;
+    inset: -12%;
+    z-index: -1;
+    content: "";
+    border-radius: inherit;
+    background: color-mix(in oklch, var(--primary) 25%, transparent);
+    filter: blur(10px);
+    animation: voice-bloom 2.3s var(--ease-fluid) infinite;
+  }
+
+  .voice-aura::after {
+    inset: -34%;
+    opacity: 0.42;
+    animation-delay: -1.15s;
   }
 }
 
-/* ---------------------------------------------------------------------------
-   Accessibility overrides
-   --------------------------------------------------------------------------- */
+@keyframes ambient-drift {
+  from { transform: translate3d(-2%, -2%, 0) scale(0.96); }
+  to { transform: translate3d(3%, 2%, 0) scale(1.05); }
+}
 
-/* The entire depth system is decorative. Under a contrast preference it is
-   replaced by an honest border, because a shadow is not a boundary. */
+@keyframes voice-bloom {
+  0%, 100% { transform: scale(0.9); opacity: 0.34; }
+  50% { transform: scale(1.18); opacity: 0.08; }
+}
+
+@keyframes key-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.72; }
+  50% { transform: scale(2.1); opacity: 0; }
+}
+
+.key-pulse::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  border-radius: inherit;
+  background: var(--destructive);
+  animation: key-pulse 1.8s var(--ease-fluid) infinite;
+}
+
+.transcript-interim {
+  opacity: 0.48;
+  font-style: italic;
+  transition: opacity 220ms var(--ease-fluid);
+}
+
+.transcript-final { opacity: 1; }
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+  background-clip: padding-box;
+}
+
 @media (prefers-contrast: more) {
   :root,
   .dark {
-    --elev-raise: none;
-    --elev-flat: none;
-    --elev-press: none;
-    --elev-key: none;
-    --elev-key-down: none;
-    --border: currentColor;
+    --glass-surface: var(--card);
+    --glass-surface-strong: var(--card);
+    --glass-surface-soft: var(--card);
+    --glass-edge: currentColor;
   }
+
+  .glass-panel,
+  .glass-card,
+  .glass-strong,
+  .glass-dock,
+  .glass-inset,
   .slip,
   .slip-flat,
   .well {
     border-width: 2px;
+    backdrop-filter: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
@@ -402,53 +510,32 @@
   }
 }
 
-/* ---------------------------------------------------------------------------
-   Motion
+@media (max-width: 640px) {
+  :root { --radius: 0.9rem; }
 
-   Compositor-only properties (transform / opacity / box-shadow). Nothing here
-   drives layout, so it stays off the main thread on a mid-range phone.
-   --------------------------------------------------------------------------- */
-
-/* Live recording pulse. A ring expanding out of the key, in the destructive
-   ink, so "we are recording" is unmistakable from across a room. */
-@keyframes key-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.5;
-  }
-  50% {
-    transform: scale(1.5);
-    opacity: 0;
+  body::before {
+    background-size: 44px 44px;
+    opacity: 0.1;
   }
 }
 
-.key-pulse::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-color: var(--destructive);
-  animation: key-pulse 1.8s var(--ease-fluid) infinite;
-  z-index: -1;
-}
+/* A short phone has room for the persistent navigation dock or the full idle
+   recall field, but not both without covering the first content card. Keep the
+   primary voice action floating at the edge and let the dedicated Recall view
+   carry typed history search. Recording and processing states remain full-size
+   because they contain time-sensitive transcript and status information. */
+@media (max-width: 1023px) and (max-height: 700px) {
+  .voice-dock-frame {
+    justify-content: flex-end;
+  }
 
-/* Interim speech-to-text settles to full opacity when the token is finalised.
-   This is what makes live transcription feel responsive rather than uncertain. */
-.transcript-interim {
-  opacity: 0.45;
-  font-style: italic;
-  transition: opacity 220ms var(--ease-fluid);
-}
-.transcript-final {
-  opacity: 1;
-}
+  .voice-dock-idle {
+    width: auto;
+    grid-template-columns: auto;
+    border-radius: 999px;
+  }
 
-/* Hide the scrollbar on the horizontal stat rail without disabling the scroll. */
-.no-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+  .voice-dock-idle .voice-dock-query {
+    display: none;
+  }
 }

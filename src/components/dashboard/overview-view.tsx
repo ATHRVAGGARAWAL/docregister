@@ -1,15 +1,20 @@
 "use client";
 
-import { ArrowRightIcon, CalendarDaysIcon, HistoryIcon, Mic2Icon } from "lucide-react";
+import {
+  ArrowRightIcon,
+  CalendarDaysIcon,
+  HistoryIcon,
+  Mic2Icon,
+  SparklesIcon,
+} from "lucide-react";
 
 import { MixChart } from "@/components/charts/mix-chart";
 import { VolumeChart } from "@/components/charts/volume-chart";
 import { RegisterTimeline } from "@/components/dashboard/register-timeline";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { VisitHero } from "@/components/dashboard/visit-hero";
 import { StatRail } from "@/components/dashboard/stat-rail";
+import { VisitHero } from "@/components/dashboard/visit-hero";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
 import { cn } from "@/lib/utils";
 import type { AnalyticsPayload, RegisterEntry } from "@/lib/types";
@@ -49,22 +54,28 @@ export function OverviewView({
   onOpenPatient: (patient: PatientMatch) => void;
 }) {
   return (
-    <div className="space-y-7">
-      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+    <div className="space-y-9 sm:space-y-11">
+      <section className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
         <div>
-          <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <CalendarDaysIcon className="size-3.5" aria-hidden />
+          <p className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+            <CalendarDaysIcon className="size-3.5 text-primary" strokeWidth={1.8} aria-hidden />
             {todayLabel()}
           </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">
+          <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-[-0.045em] text-balance text-foreground sm:text-4xl lg:text-[2.75rem] lg:leading-[1.05]">
             {greeting()}, {doctorName}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Here&rsquo;s how your clinic is moving today.
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Your practice, distilled into one calm clinical view.
           </p>
         </div>
-        <Button size="lg" onClick={onStartDictation} className="sm:w-auto">
-          <Mic2Icon aria-hidden />
+        <Button
+          size="lg"
+          onClick={onStartDictation}
+          className="group h-12 rounded-full px-5 shadow-[0_14px_36px_-16px_var(--primary)] sm:w-auto"
+        >
+          <span className="relative grid size-7 place-items-center rounded-full bg-primary-foreground/12">
+            <Mic2Icon className="size-4 transition-transform duration-300 group-hover:scale-110" aria-hidden />
+          </span>
           Dictate a visit
         </Button>
       </section>
@@ -77,13 +88,27 @@ export function OverviewView({
 
       <StatRail analytics={analytics} />
 
-      <section>
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <section aria-labelledby="clinic-trends-title">
+        <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <h2 className="text-base font-semibold tracking-tight">Clinic trends</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">Patient volume and visit mix over time</p>
+            <p className="text-[10px] font-semibold tracking-[0.16em] text-primary uppercase">
+              Practice intelligence
+            </p>
+            <h2
+              id="clinic-trends-title"
+              className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground"
+            >
+              Clinic trends
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Patient volume and visit composition over time
+            </p>
           </div>
-          <div className="inline-flex rounded-lg border border-border bg-secondary/60 p-1" role="group" aria-label="Analytics range">
+          <div
+            className="glass-inset inline-flex w-fit rounded-full p-1"
+            role="group"
+            aria-label="Analytics range"
+          >
             {RANGES.map((option) => (
               <button
                 key={option.days}
@@ -91,10 +116,10 @@ export function OverviewView({
                 onClick={() => onRangeChange(option.days)}
                 aria-pressed={range === option.days}
                 className={cn(
-                  "h-8 rounded-md px-3 text-xs font-medium transition-colors",
+                  "h-8 min-w-12 touch-manipulation rounded-full px-3 text-[10px] font-semibold tracking-[0.08em] transition-[background-color,color,box-shadow] duration-300 [@media(pointer:coarse)]:min-h-11",
                   range === option.days
-                    ? "bg-card text-foreground shadow-flat"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-primary text-primary-foreground shadow-[0_6px_16px_-8px_var(--primary)]"
+                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                 )}
               >
                 {option.label}
@@ -102,34 +127,47 @@ export function OverviewView({
             ))}
           </div>
         </div>
+
         {rangeError && (
-          <Alert variant="destructive" role="alert" className="mb-4">
+          <Alert variant="destructive" role="alert" className="mb-4 rounded-2xl">
             <AlertTitle>Could not load analytics</AlertTitle>
             <AlertDescription>
               {rangeError} The charts below are from the last range that loaded.
             </AlertDescription>
           </Alert>
         )}
-        <div className="grid gap-4 md:grid-cols-2">
+
+        <div className="grid gap-4 xl:grid-cols-2">
           <VolumeChart data={analytics.series} loading={loadingRange} />
           <MixChart data={analytics.series.slice(-14)} loading={loadingRange} />
         </div>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.6fr)]">
-        <section>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(19rem,0.55fr)]">
+        <section aria-labelledby="recent-visits-title">
           <div className="mb-4 flex items-end justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold tracking-tight">Recent visits</h2>
-              {/* Says what is on screen, not what exists. This read
-                  "12 visits today" above a list of five. */}
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="text-[10px] font-semibold tracking-[0.16em] text-primary uppercase">
+                Today&rsquo;s register
+              </p>
+              <h2
+                id="recent-visits-title"
+                className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground"
+              >
+                Recent visits
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
                 {entries.length > RECENT_LIMIT
                   ? `Latest ${RECENT_LIMIT} of ${entries.length} visits today`
                   : `${entries.length} visit${entries.length === 1 ? "" : "s"} today`}
               </p>
             </div>
-            <Button variant="ghost" size="sm" onClick={onOpenRegister}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onOpenRegister}
+              className="rounded-full px-3 text-xs"
+            >
               View register <ArrowRightIcon aria-hidden />
             </Button>
           </div>
@@ -140,22 +178,35 @@ export function OverviewView({
           />
         </section>
 
-        <Card className="h-fit gap-0 overflow-hidden py-0">
-          <CardContent className="p-5">
-            <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
-              <HistoryIcon className="size-5" aria-hidden />
+        <aside className="glass-strong group relative isolate h-fit min-h-72 overflow-hidden rounded-[2rem] p-6 sm:p-7">
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -right-20 -bottom-24 -z-10 size-64 rounded-full bg-primary/16 blur-3xl transition-transform duration-700 group-hover:scale-110"
+          />
+          <div className="flex items-center justify-between">
+            <span className="grid size-11 place-items-center rounded-[1.1rem] border border-primary/20 bg-primary/12 text-primary shadow-[0_10px_28px_-18px_var(--primary)]">
+              <HistoryIcon className="size-5" strokeWidth={1.7} aria-hidden />
             </span>
-            <h2 className="mt-5 text-lg font-semibold tracking-tight">Need the last prescription?</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Ask in plain language. Every answer stays linked to the verified visits it came
-              from.
-            </p>
-            <Button variant="outline" className="mt-5 w-full" onClick={onOpenRecall}>
-              Search patient history
-              <ArrowRightIcon aria-hidden />
-            </Button>
-          </CardContent>
-        </Card>
+            <SparklesIcon className="size-4 text-primary/60" strokeWidth={1.5} aria-hidden />
+          </div>
+          <p className="mt-8 text-[10px] font-semibold tracking-[0.16em] text-primary uppercase">
+            Clinical recall
+          </p>
+          <h2 className="mt-2 max-w-xs text-xl font-semibold leading-7 tracking-[-0.035em] text-foreground">
+            Need the last prescription?
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            Ask naturally. Every answer stays linked to the verified visits it came from.
+          </p>
+          <Button
+            variant="outline"
+            className="mt-7 w-full rounded-full border-white/10 bg-foreground/[0.035] shadow-none hover:bg-primary/10 hover:text-primary"
+            onClick={onOpenRecall}
+          >
+            Search patient history
+            <ArrowRightIcon className="transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden />
+          </Button>
+        </aside>
       </div>
     </div>
   );

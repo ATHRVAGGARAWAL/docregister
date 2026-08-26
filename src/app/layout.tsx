@@ -23,13 +23,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "docregister — voice register for clinics",
+  title: "docregister — voice clinical intelligence",
   description:
     "Dictate a consultation in Hindi, Punjabi or English and it becomes a structured register entry, with patient history from your phone.",
   applicationName: "docregister",
   // A doctor's register is not something to hand to a crawler.
   robots: { index: false, follow: false },
-  appleWebApp: { capable: true, title: "docregister", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "docregister", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
 };
 
@@ -37,8 +37,8 @@ export const viewport: Viewport = {
   // Matches `--background` in each theme so the browser chrome does not leave a
   // mismatched strip above the page.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f2efe9" },
-    { media: "(prefers-color-scheme: dark)", color: "#111318" },
+    { media: "(prefers-color-scheme: light)", color: "#eef3f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0d18" },
   ],
   // The dock sits on the home-indicator edge and reads env(safe-area-inset-*),
   // which stays 0 unless the viewport covers the display cutouts.
@@ -57,6 +57,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
@@ -66,7 +67,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             has already painted, and that paint is the flash. */}
         <InlineScript html={THEME_SCRIPT} nonce={nonce} />
       </head>
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-full flex-col overflow-x-hidden">
         <ThemeSync />
         {/* One switch for every `motion/react` animation in the app.
             `globals.css` has a `prefers-reduced-motion` block, but it only

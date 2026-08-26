@@ -12,16 +12,16 @@ import { cn } from "@/lib/utils";
  * a word ("Needs review", "First visit") at the call site.
  */
 const badgeVariants = cva(
-  "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-sm border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap [&>svg]:size-3 [&>svg]:pointer-events-none",
+  "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-[0.035em] whitespace-nowrap backdrop-blur-md [&>svg]:size-3 [&>svg]:pointer-events-none",
   {
     variants: {
       variant: {
-        default: "border-primary/25 bg-primary/12 text-primary",
-        secondary: "border-border bg-secondary text-secondary-foreground",
-        destructive: "border-destructive/25 bg-destructive/12 text-destructive",
-        money: "border-money/25 bg-money/12 text-money",
-        warning: "border-warning/30 bg-warning/12 text-warning",
-        outline: "border-border text-muted-foreground",
+        default: "border-primary/25 bg-primary/10 text-primary shadow-[0_0_18px_-10px_var(--primary)]",
+        secondary: "border-border/70 bg-secondary/55 text-secondary-foreground",
+        destructive: "border-destructive/25 bg-destructive/10 text-destructive",
+        money: "border-money/25 bg-money/10 text-money",
+        warning: "border-warning/25 bg-warning/10 text-warning",
+        outline: "border-border/70 bg-card/20 text-muted-foreground",
       },
     },
     defaultVariants: { variant: "default" },

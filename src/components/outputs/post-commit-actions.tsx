@@ -21,10 +21,10 @@ export function PostCommitActions({
   onViewRegister?: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2" aria-label="Saved visit actions">
-      <Button asChild variant="outline" size="sm"><a href={`/api/encounters/${encodeURIComponent(encounterId)}/prescription/print`} target="_blank" rel="noreferrer"><PrinterIcon className="size-4" aria-hidden />Print prescription</a></Button>
-      {onScheduleFollowUp && <Button type="button" variant="secondary" size="sm" onClick={() => onScheduleFollowUp(patientId, encounterId)}><CalendarPlusIcon className="size-4" aria-hidden />Schedule follow-up</Button>}
-      {onViewRegister && <Button type="button" variant="ghost" size="sm" onClick={onViewRegister}>View register<ArrowRightIcon className="size-4" aria-hidden /></Button>}
+    <div className="glass-inset flex flex-wrap items-center gap-1.5 rounded-[1rem] p-1.5" aria-label="Saved visit actions">
+      <Button asChild variant="outline" size="sm" className="rounded-[0.7rem] border-white/10 bg-white/5"><a href={`/api/encounters/${encodeURIComponent(encounterId)}/prescription/print`} target="_blank" rel="noreferrer"><PrinterIcon className="size-4 text-primary" aria-hidden />Print prescription</a></Button>
+      {onScheduleFollowUp && <Button type="button" variant="secondary" size="sm" className="rounded-[0.7rem] bg-primary/10 text-primary hover:bg-primary/15" onClick={() => onScheduleFollowUp(patientId, encounterId)}><CalendarPlusIcon className="size-4" aria-hidden />Schedule follow-up</Button>}
+      {onViewRegister && <Button type="button" variant="ghost" size="sm" className="group rounded-[0.7rem]" onClick={onViewRegister}>View register<ArrowRightIcon className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden /></Button>}
     </div>
   );
 }

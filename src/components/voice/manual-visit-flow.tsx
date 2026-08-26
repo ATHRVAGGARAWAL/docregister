@@ -170,99 +170,136 @@ export function ManualVisitFlow({
         if (!next) close();
       }}
     >
-      <SheetContent className="sm:max-w-2xl">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <FilePenLine className="size-4 text-primary" aria-hidden />
-            Enter visit manually
-          </SheetTitle>
-          <SheetDescription>
-            Use the same review and confirmation step as a dictated visit.
-          </SheetDescription>
+      <SheetContent className="glass-strong overflow-hidden border-white/10 bg-card/90 sm:max-w-2xl">
+        <SheetHeader className="relative border-b border-white/8 px-5 pb-4 pt-5 sm:px-6">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-[0_14px_30px_-18px_var(--primary)]">
+              <FilePenLine className="size-4" aria-hidden />
+            </span>
+            <div>
+              <SheetTitle className="text-lg font-semibold tracking-[-0.025em]">
+                Enter visit manually
+              </SheetTitle>
+              <SheetDescription className="mt-1 max-w-md leading-5">
+                Capture the essentials now. The same clinical review step follows before anything is saved.
+              </SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
 
         <form onSubmit={prepareReview} className="contents">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormField label="Patient name" htmlFor="manual-patient-name" required>
-                <Input
-                  id="manual-patient-name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  autoComplete="off"
-                  autoFocus
-                />
-              </FormField>
-              <FormField label="Phone" htmlFor="manual-patient-phone">
-                <Input
-                  id="manual-patient-phone"
-                  value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
-                  inputMode="tel"
-                  autoComplete="tel"
-                  placeholder="Optional, helps find the right chart"
-                />
-              </FormField>
-              <FormField label="Age" htmlFor="manual-patient-age">
-                <Input
-                  id="manual-patient-age"
-                  value={age}
-                  onChange={(event) => setAge(event.target.value)}
-                  inputMode="numeric"
-                  className="tnum"
-                />
-              </FormField>
-              <FormField label="Sex" htmlFor="manual-patient-sex">
-                <select
-                  id="manual-patient-sex"
-                  value={sex}
-                  onChange={(event) => setSex(event.target.value as PatientSex | "")}
-                  className="well text-foreground h-10 w-full px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/35"
-                >
-                  <option value="">Not stated</option>
-                  {PATIENT_SEX_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-            </div>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
+            <section className="glass-inset rounded-2xl border-white/8 bg-background/20 p-4">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="tnum grid size-7 place-items-center rounded-full bg-primary/10 text-[0.6875rem] font-semibold text-primary">01</span>
+                <div>
+                  <h3 className="text-sm font-semibold tracking-[-0.015em]">Patient identity</h3>
+                  <p className="text-xs text-muted-foreground">Enough detail to find or create the correct chart.</p>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField label="Patient name" htmlFor="manual-patient-name" required>
+                  <Input
+                    id="manual-patient-name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    autoComplete="off"
+                    autoFocus
+                    className="h-11 rounded-xl bg-background/30"
+                  />
+                </FormField>
+                <FormField label="Phone" htmlFor="manual-patient-phone">
+                  <Input
+                    id="manual-patient-phone"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="Optional, helps find the right chart"
+                    className="h-11 rounded-xl bg-background/30"
+                  />
+                </FormField>
+                <FormField label="Age" htmlFor="manual-patient-age">
+                  <Input
+                    id="manual-patient-age"
+                    value={age}
+                    onChange={(event) => setAge(event.target.value)}
+                    inputMode="numeric"
+                    className="tnum h-11 rounded-xl bg-background/30"
+                  />
+                </FormField>
+                <FormField label="Sex" htmlFor="manual-patient-sex">
+                  <select
+                    id="manual-patient-sex"
+                    value={sex}
+                    onChange={(event) => setSex(event.target.value as PatientSex | "")}
+                    className="glass-inset h-11 w-full rounded-xl border-white/8 bg-background/30 px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/35"
+                  >
+                    <option value="">Not stated</option>
+                    {PATIENT_SEX_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+              </div>
+            </section>
 
-            <FormField label="Diagnosis" htmlFor="manual-diagnosis">
-              <Textarea
-                id="manual-diagnosis"
-                value={diagnosis}
-                onChange={(event) => setDiagnosis(event.target.value)}
-                rows={2}
-                className="resize-none"
-              />
-            </FormField>
+            <section className="glass-inset rounded-2xl border-white/8 bg-background/20 p-4">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="tnum grid size-7 place-items-center rounded-full bg-primary/10 text-[0.6875rem] font-semibold text-primary">02</span>
+                <div>
+                  <h3 className="text-sm font-semibold tracking-[-0.015em]">Clinical note</h3>
+                  <p className="text-xs text-muted-foreground">Summarise the assessment and care plan.</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <FormField label="Diagnosis" htmlFor="manual-diagnosis">
+                  <Textarea
+                    id="manual-diagnosis"
+                    value={diagnosis}
+                    onChange={(event) => setDiagnosis(event.target.value)}
+                    rows={2}
+                    className="resize-none rounded-xl bg-background/30"
+                  />
+                </FormField>
 
-            <FormField label="Treatment plan" htmlFor="manual-treatment">
-              <Textarea
-                id="manual-treatment"
-                value={treatment}
-                onChange={(event) => setTreatment(event.target.value)}
-                rows={3}
-                className="resize-none"
-              />
-            </FormField>
+                <FormField label="Treatment plan" htmlFor="manual-treatment">
+                  <Textarea
+                    id="manual-treatment"
+                    value={treatment}
+                    onChange={(event) => setTreatment(event.target.value)}
+                    rows={3}
+                    className="resize-none rounded-xl bg-background/30"
+                  />
+                </FormField>
+              </div>
+            </section>
 
-            <MedicationEditor value={medications} onChange={setMedications} />
+            <section className="glass-inset rounded-2xl border-white/8 bg-background/20 p-4">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="tnum grid size-7 place-items-center rounded-full bg-primary/10 text-[0.6875rem] font-semibold text-primary">03</span>
+                <div>
+                  <h3 className="text-sm font-semibold tracking-[-0.015em]">Prescription</h3>
+                  <p className="text-xs text-muted-foreground">Add only the medicines discussed in this visit.</p>
+                </div>
+              </div>
+              <MedicationEditor value={medications} onChange={setMedications} />
+            </section>
           </div>
 
-          <SheetFooter className="flex-col items-stretch gap-2">
+          <SheetFooter className="flex-col items-stretch gap-2 border-white/8 bg-background/20 px-4 sm:px-6">
             {failure && (
-              <p role="alert" className="text-destructive text-xs">
+              <p role="alert" className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive">
                 {failure}
               </p>
             )}
             <div className="flex gap-3">
-              <Button type="button" variant="outline" size="lg" onClick={close}>
+              <Button type="button" variant="outline" size="lg" onClick={close} className="rounded-xl">
                 Cancel
               </Button>
-              <Button type="submit" size="lg" className="flex-1" disabled={saving}>
+              <Button type="submit" size="lg" className="flex-1 rounded-xl" disabled={saving}>
                 {saving ? (
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                 ) : (
@@ -293,10 +330,10 @@ function FormField({
     <div>
       <Label
         htmlFor={htmlFor}
-        className="text-muted-foreground mb-1.5 text-[11px] tracking-[0.12em] uppercase"
+        className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
       >
         {label}
-        {required && <span className="text-destructive ml-1">required</span>}
+        {required && <span className="ml-1 text-primary">required</span>}
       </Label>
       {children}
     </div>

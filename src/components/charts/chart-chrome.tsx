@@ -77,18 +77,22 @@ export function ChartFrame({
       // three hundred milliseconds during which the figures being read out are
       // the previous range's.
       aria-busy={loading || undefined}
-      className="slip relative p-4 sm:p-5"
+      className="glass-card group/chart relative isolate overflow-hidden rounded-[1.9rem] p-5 sm:p-6"
     >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -top-24 -right-20 -z-10 size-48 rounded-full bg-primary/8 opacity-70 blur-3xl transition-opacity duration-500 group-hover/chart:opacity-100"
+      />
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <Heading
             id={titleId}
-            className="text-foreground text-sm font-medium tracking-tight"
+            className="text-[15px] font-semibold tracking-[-0.025em] text-foreground"
           >
             {title}
           </Heading>
           {subtitle && (
-            <p className="text-muted-foreground mt-0.5 truncate text-xs">{subtitle}</p>
+            <p className="mt-1 truncate text-[11px] leading-5 text-muted-foreground">{subtitle}</p>
           )}
         </div>
 
@@ -102,7 +106,7 @@ export function ChartFrame({
           // broken reference is worse than none: it is the thing a screen
           // reader offers to jump to and then cannot find.
           aria-controls={showTable ? tableId : undefined}
-          className="shrink-0"
+          className="size-9 shrink-0 rounded-full border-white/10 bg-foreground/[0.035] shadow-none hover:bg-primary/10 hover:text-primary"
         >
           {showTable ? (
             <X className="size-3.5" aria-hidden />
@@ -116,20 +120,20 @@ export function ChartFrame({
       </header>
 
       {series.length >= 2 && (
-        <ul className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <ul className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5">
           {series.map((item) => (
             <li
               key={item.key}
-              className="text-muted-foreground flex items-center gap-1.5 text-xs"
+              className="flex items-center gap-2 text-[10px] font-medium tracking-[0.05em] text-muted-foreground uppercase"
             >
               <span
                 aria-hidden
                 className={
                   item.shape === "line"
-                    ? "h-0.5 w-3.5 rounded-full"
-                    : "size-2.5 rounded-[3px]"
+                    ? "h-0.5 w-5 rounded-full shadow-[0_0_10px_currentColor]"
+                    : "h-1.5 w-5 rounded-full shadow-[0_0_10px_currentColor]"
                 }
-                style={{ background: item.color }}
+                style={{ background: item.color, color: item.color }}
               />
               {item.label}
             </li>
@@ -140,7 +144,7 @@ export function ChartFrame({
       {/* Refetch keeps the frame: the previous render stays, dimmed. No
           skeleton, no layout jump. */}
       <div
-        className={`mt-4 transition-opacity duration-300 ${loading ? "opacity-40" : "opacity-100"}`}
+        className={`mt-5 transition-[opacity,filter] duration-300 ${loading ? "opacity-35 blur-[1px]" : "opacity-100 blur-0"}`}
       >
         {children}
       </div>
@@ -172,7 +176,7 @@ function ChartTable({
   columns: ChartColumn[];
 }) {
   return (
-    <div id={id} className="border-border mt-4 max-h-64 overflow-auto rounded-lg border">
+    <div id={id} className="glass-inset mt-5 max-h-64 overflow-auto rounded-[1.2rem] border border-border/60">
       <table className="w-full text-left text-xs">
         {/* Off-screen rather than absent: the heading two lines above says which
             chart this is, but a screen reader reading the table on its own —
@@ -181,13 +185,13 @@ function ChartTable({
         <caption className="sr-only">{caption} — data table</caption>
         {/* Opaque, not translucent: this header scrolls over live rows and a
             see-through bar would let digits show through digits. */}
-        <thead className="bg-card text-muted-foreground sticky top-0">
+        <thead className="sticky top-0 bg-card/95 text-muted-foreground backdrop-blur-xl">
           <tr>
             {columns.map((column) => (
               <th
                 key={column.key}
                 scope="col"
-                className={`border-border border-b px-3 py-2 font-normal ${
+                className={`border-b border-border/70 px-3 py-2.5 text-[10px] font-semibold tracking-[0.08em] uppercase ${
                   column.numeric ? "text-right" : ""
                 }`}
               >
@@ -196,13 +200,13 @@ function ChartTable({
             ))}
           </tr>
         </thead>
-        <tbody className="text-foreground divide-border divide-y">
+        <tbody className="divide-y divide-border/60 text-foreground">
           {rows.map((row, index) => (
             <tr key={index}>
               {columns.map((column) => (
                 <td
                   key={column.key}
-                  className={`px-3 py-2 ${column.numeric ? "tnum text-right" : ""}`}
+                  className={`px-3 py-2.5 ${column.numeric ? "tnum text-right" : ""}`}
                 >
                   {row[column.key]}
                 </td>
@@ -240,18 +244,18 @@ export function ChartTooltip({
   rows: TooltipRow[];
 }) {
   return (
-    <div className="bg-popover border-border shadow-raise pointer-events-none rounded-lg border px-3 py-2">
-      <p className="text-muted-foreground text-[11px]">{heading}</p>
-      <ul className="mt-1 space-y-0.5">
+    <div className="glass-strong pointer-events-none min-w-32 rounded-[1rem] border border-white/10 px-3.5 py-3 shadow-2xl">
+      <p className="text-[10px] font-medium tracking-[0.06em] text-muted-foreground uppercase">{heading}</p>
+      <ul className="mt-2 space-y-1">
         {rows.map((row) => (
           <li key={row.label} className="flex items-center gap-2 text-xs">
             <span
               aria-hidden
-              className="h-0.5 w-3 shrink-0 rounded-full"
-              style={{ background: row.color }}
+              className="h-1.5 w-1.5 shrink-0 rounded-full shadow-[0_0_9px_currentColor]"
+              style={{ background: row.color, color: row.color }}
             />
-            <span className="text-foreground tnum font-medium">{row.value}</span>
-            <span className="text-muted-foreground">{row.label}</span>
+            <span className="tnum font-semibold text-foreground">{row.value}</span>
+            <span className="text-[11px] text-muted-foreground">{row.label}</span>
           </li>
         ))}
       </ul>

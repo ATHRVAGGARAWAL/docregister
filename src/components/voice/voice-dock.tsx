@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Lock, Mic, Search, Square, X } from "lucide-react";
+import { AudioLines, Lock, Mic, Search, SendHorizontal, Square, X } from "lucide-react";
 
 import { ClickSpark } from "@/components/reactbits/click-spark";
 import { Waveform } from "@/components/voice/waveform";
@@ -229,7 +229,7 @@ export function VoiceDock({
   return (
     <div
       ref={dockRef}
-      className="pointer-events-none fixed right-0 bottom-[4.75rem] left-0 z-40 flex justify-center px-4 pb-3 lg:bottom-0 lg:left-[17rem] lg:pb-[max(1rem,env(safe-area-inset-bottom))]"
+      className="voice-dock-frame pointer-events-none fixed right-0 bottom-[5rem] left-0 z-40 flex justify-center px-3 pb-3 sm:px-5 lg:bottom-2 lg:left-[17rem] lg:pb-[max(1rem,env(safe-area-inset-bottom))]"
     >
       <p className="sr-only" role="status" aria-live="polite">
         {activity}
@@ -239,10 +239,18 @@ export function VoiceDock({
         layout
         transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className={cn(
-          "slip pointer-events-auto w-full max-w-lg p-3",
-          !listening && !busy && "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2",
+          "glass-dock pointer-events-auto relative isolate w-full max-w-[42rem] overflow-visible rounded-[1.75rem] border border-white/10 p-2 shadow-[0_28px_80px_-32px_rgba(0,0,0,0.85)]",
+          !listening && !busy && "voice-dock-idle grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2",
         )}
       >
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-x-12 -top-px h-px bg-gradient-to-r from-transparent via-white/35 to-transparent",
+            listening ? "opacity-100" : "opacity-60",
+          )}
+          aria-hidden
+        />
+
         <AnimatePresence mode="popLayout" initial={false}>
           {/* ---- Listening ------------------------------------------------ */}
           {listening && (
@@ -252,34 +260,33 @@ export function VoiceDock({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: reduceMotion ? 0 : 0.3 }}
-              className="px-1"
+              className="min-w-0 px-2 pt-2 sm:px-3"
             >
-              <div className="flex items-center gap-3">
-                <span className="text-foreground tnum flex items-center gap-1.5 text-sm font-medium">
-                  {/* `relative` matters: the pulse ring is an ::after pinned to
-                      this element's box. It sits at z-index -1 so the expanding
-                      ring passes behind the dot rather than washing over it. */}
+              <div className="flex items-center justify-between gap-3">
+                <span className="glass-inset tnum flex min-h-8 items-center gap-2 rounded-full px-3 text-xs font-semibold text-foreground">
                   <span
-                    className="key-pulse bg-destructive relative size-2 rounded-full"
+                    className="key-pulse relative size-2 rounded-full bg-destructive shadow-[0_0_14px_var(--destructive)]"
                     aria-hidden
                   />
                   {formatDuration(elapsedMs)}
                 </span>
-                <Waveform spectrumRef={spectrumRef} active={phase === "listening"} />
                 {locked && (
-                  <span className="bg-secondary text-secondary-foreground flex shrink-0 items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium">
+                  <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/15 bg-primary/8 px-2.5 py-1.5 text-[0.6875rem] font-semibold text-primary">
                     <Lock className="size-3" aria-hidden /> Hands-free
                   </span>
                 )}
               </div>
 
-              {/* The transcript is read out of a recess, the way a readout on a
-                  physical device is. Interim text sits at reduced opacity and
-                  settles to full when the engine finalises it, so "not yet
-                  certain" is visible without a second colour. */}
+              <div className="glass-inset relative mt-2 overflow-hidden rounded-2xl border-white/8 bg-background/25 px-3 py-2.5 sm:px-4">
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-primary" aria-hidden>
+                  <Waveform spectrumRef={spectrumRef} active={phase === "listening"} />
+                </div>
+                <div className="relative h-12 bg-gradient-to-b from-background/45 via-background/65 to-background/45" aria-hidden />
+              </div>
+
               <p
                 aria-live="polite"
-                className="well text-foreground mt-2 line-clamp-2 min-h-[2.75rem] px-3 py-2 text-sm"
+                className="mt-2 line-clamp-2 min-h-[2.75rem] px-1 text-sm leading-6 text-foreground"
               >
                 {transcript ? (
                   <>
@@ -287,7 +294,7 @@ export function VoiceDock({
                     <span className="transcript-interim">{interimText}</span>
                   </>
                 ) : (
-                  <span className="text-muted-foreground">Listening…</span>
+                  <span className="text-muted-foreground">Listening for the patient details…</span>
                 )}
               </p>
 
@@ -295,8 +302,8 @@ export function VoiceDock({
                 /* A countdown the doctor has to act on inside ten seconds. It
                    was 11px, which is unreadable at arm's length on a phone held
                    at a bedside — the one place this message is ever shown. */
-                <p className="text-warning mt-1.5 text-sm font-medium" role="status">
-                  {Math.ceil(remainingMs / 1000)}s left — wrap up this patient.
+                <p className="mt-1.5 rounded-xl border border-warning/20 bg-warning/8 px-3 py-2 text-xs font-medium text-warning" role="status">
+                  {Math.ceil(remainingMs / 1000)} seconds left — wrap up this patient.
                 </p>
               )}
             </motion.div>
@@ -309,14 +316,29 @@ export function VoiceDock({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex items-center gap-3 px-2 py-2"
+              className="flex min-h-16 items-center gap-3 px-3 py-2"
             >
-              <span className="bg-primary size-2 animate-pulse rounded-full" aria-hidden />
-              <p className="text-muted-foreground text-sm">
-                {phase === "transcribing"
-                  ? "Transcribing what you said…"
-                  : "Pulling out the details…"}
-              </p>
+              <span className="relative grid size-10 shrink-0 place-items-center rounded-full border border-primary/20 bg-primary/10 text-primary">
+                {!reduceMotion && (
+                  <motion.span
+                    className="absolute inset-0 rounded-full border border-primary/35"
+                    animate={{ scale: [1, 1.45], opacity: [0.75, 0] }}
+                    transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
+                    aria-hidden
+                  />
+                )}
+                <AudioLines className="size-4" aria-hidden />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {phase === "transcribing" ? "Creating the transcript" : "Structuring the visit"}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {phase === "transcribing"
+                    ? "Turning your dictation into clinical text…"
+                    : "Finding the patient, diagnosis and prescription…"}
+                </p>
+              </div>
             </motion.div>
           )}
 
@@ -328,22 +350,32 @@ export function VoiceDock({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="well flex h-12 items-center gap-2 px-3"
+              className="voice-dock-query glass-inset flex h-14 min-w-0 items-center gap-2 rounded-[1.15rem] border-white/8 bg-background/25 px-3"
             >
-              <Search className="text-muted-foreground size-4 shrink-0" aria-hidden />
+              <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary/8 text-primary">
+                <Search className="size-4" aria-hidden />
+              </span>
               <input
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
                 placeholder="What did I prescribe Sunita last time?"
                 aria-label="Ask about a patient's history"
-                className="text-foreground placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent py-2.5 text-sm outline-none"
+                className="min-w-0 flex-1 bg-transparent py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
               />
+              <button
+                type="submit"
+                disabled={!question.trim()}
+                className="grid size-9 shrink-0 touch-manipulation place-items-center rounded-xl border border-white/8 bg-white/5 text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-35 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11"
+              >
+                <SendHorizontal className="size-4" aria-hidden />
+                <span className="sr-only">Ask patient history</span>
+              </button>
             </motion.form>
           )}
         </AnimatePresence>
 
         {error && (
-          <p role="alert" className="text-destructive col-span-full mt-2 px-1 text-sm">
+          <p role="alert" className="col-span-full mt-2 rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive">
             {error}
           </p>
         )}
@@ -352,34 +384,50 @@ export function VoiceDock({
         <div
           className={cn(
             "flex items-center justify-center gap-3",
-            listening || busy ? "mt-3" : "mt-0",
+            listening || busy ? "mt-3 pb-1" : "mt-0",
           )}
         >
           {listening && locked ? (
             <>
-              <Button variant="outline" size="icon" onClick={onCancel}>
+              <Button variant="outline" size="icon" onClick={onCancel} className="size-11 rounded-full border-white/10 bg-white/5">
                 <X className="size-4" aria-hidden />
                 <span className="sr-only">Discard recording</span>
               </Button>
-              <button
-                type="button"
-                onClick={onStop}
-                className="bg-destructive shadow-key active:shadow-key-down pressable grid size-14 place-items-center rounded-full text-white"
-              >
-                <Square className="size-5 fill-current" aria-hidden />
-                <span className="sr-only">Stop recording and review this visit</span>
-              </button>
+              <div className="relative">
+                {!reduceMotion && (
+                  <motion.span
+                    className="absolute -inset-2 rounded-full border border-destructive/35"
+                    animate={{ scale: [1, 1.35], opacity: [0.6, 0] }}
+                    transition={{ duration: 1.35, repeat: Infinity, ease: "easeOut" }}
+                    aria-hidden
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={onStop}
+                  className="pressable grid size-16 place-items-center rounded-full border border-white/15 bg-destructive text-white shadow-[0_12px_34px_-12px_var(--destructive)] transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+                >
+                  <Square className="size-5 fill-current" aria-hidden />
+                  <span className="sr-only">Stop recording and review this visit</span>
+                </button>
+              </div>
             </>
+          ) : busy ? (
+            <span className="relative grid size-12 place-items-center rounded-full border border-primary/20 bg-primary/10 text-primary shadow-[0_0_30px_-10px_var(--primary)]" aria-hidden>
+              <AudioLines className="size-5" />
+            </span>
           ) : (
             <div className="relative flex flex-col items-center">
               {holding && (
                 <motion.span
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 - slide / LOCK_DISTANCE }}
-                  className="text-muted-foreground absolute -top-9 flex flex-col items-center text-xs"
+                  className="absolute -top-12 flex flex-col items-center rounded-full border border-white/10 bg-background/70 px-3 py-1.5 text-[0.6875rem] font-medium text-muted-foreground shadow-lg backdrop-blur-md"
                 >
-                  <Lock className="size-3.5" aria-hidden />
-                  slide up to lock
+                  <span className="flex items-center gap-1.5">
+                    <Lock className="size-3.5" aria-hidden />
+                    Slide to lock
+                  </span>
                 </motion.span>
               )}
 
@@ -394,41 +442,66 @@ export function VoiceDock({
                 sparkCount={10}
                 className="rounded-full"
               >
-                <button
-                  type="button"
-                  disabled={busy}
-                  onPointerDown={handlePointerDown}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  onPointerCancel={handlePointerUp}
-                  onClick={handleClick}
-                  aria-pressed={listening}
-                  // Without `touchAction: none`, dragging up scrolls the page
-                  // instead of locking. The scale tracks input level, so the key
-                  // physically responds to the voice hitting it — but only when
-                  // motion is welcome; for someone who asked for less of it, a
-                  // control that breathes under their finger is not decoration
-                  // they can ignore.
-                  style={{
-                    touchAction: "none",
-                    transform: `translateY(${-Math.min(slide, LOCK_DISTANCE)}px) scale(${
-                      reduceMotion ? 1 : 1 + level * 0.1
-                    })`,
-                  }}
-                  className={cn(
-                    "bg-primary text-primary-foreground shadow-key active:shadow-key-down focus-visible:ring-ring focus-visible:ring-offset-background grid place-items-center rounded-full transition-[box-shadow] duration-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50",
-                    listening ? "size-16" : "size-12",
+                <div className="relative grid place-items-center">
+                  <motion.span
+                    className={cn(
+                      "voice-aura pointer-events-none absolute rounded-full",
+                      listening ? "-inset-5" : "-inset-3",
+                    )}
+                    animate={
+                      reduceMotion
+                        ? { opacity: listening ? 0.45 : 0.2 }
+                        : {
+                            opacity: listening ? [0.3, 0.65, 0.3] : [0.14, 0.28, 0.14],
+                            scale: listening ? [1, 1.08 + level * 0.12, 1] : [1, 1.06, 1],
+                          }
+                    }
+                    transition={{ duration: listening ? 1.1 : 2.8, repeat: Infinity, ease: "easeInOut" }}
+                    aria-hidden
+                  />
+                  {!reduceMotion && listening && (
+                    <motion.span
+                      className="pointer-events-none absolute -inset-3 rounded-full border border-primary/35"
+                      animate={{ scale: [1, 1.6], opacity: [0.7, 0] }}
+                      transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
+                      aria-hidden
+                    />
                   )}
-                  aria-label={
-                    listening
-                      ? "Stop recording and review this visit"
-                      : "Record a visit. Tap to start hands-free, or hold to record while pressed."
-                  }
-                >
-                  <Mic className="size-6" aria-hidden />
-                </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
+                    onClick={handleClick}
+                    aria-pressed={listening}
+                    // Without `touchAction: none`, dragging up scrolls the page
+                    // instead of locking. The scale tracks input level, so the key
+                    // physically responds to the voice hitting it — but only when
+                    // motion is welcome; for someone who asked for less of it, a
+                    // control that breathes under their finger is not decoration
+                    // they can ignore.
+                    style={{
+                      touchAction: "none",
+                      transform: `translateY(${-Math.min(slide, LOCK_DISTANCE)}px) scale(${
+                        reduceMotion ? 1 : 1 + level * 0.1
+                      })`,
+                    }}
+                    className={cn(
+                      "relative grid place-items-center rounded-full border border-white/20 bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_14px_40px_-14px_var(--primary)] transition-[box-shadow] duration-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:opacity-50",
+                      listening ? "size-[4.5rem]" : "size-14",
+                    )}
+                    aria-label={
+                      listening
+                        ? "Stop recording and review this visit"
+                        : "Record a visit. Tap to start hands-free, or hold to record while pressed."
+                    }
+                  >
+                    <Mic className={cn("drop-shadow-sm", listening ? "size-7" : "size-5")} aria-hidden />
+                  </button>
+                </div>
               </ClickSpark>
-
             </div>
           )}
         </div>

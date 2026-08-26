@@ -14,17 +14,14 @@ import { THEME_KEY } from "@/lib/theme";
  * job is done by the blocking script in the root layout regardless of which
  * library owns the toggle.
  *
- * Both themes are real here: a clinic at 11am is a bright room and paper is the
- * honest default, but the same doctor doing their evening books wants the
- * graphite one. Neither is a token inversion of the other — the depth values
- * are tuned separately, since a white light-catch reads as a hard edge on a
- * dark material and has to drop to a sheen.
+ * Both themes are real here: the deep clinical workspace is the product
+ * default, with a bright glass option for sunlit rooms. Neither is a token
+ * inversion of the other; their depth values are tuned separately.
  *
  * The current theme is read with `useSyncExternalStore` rather than mirrored
  * into state from an effect. `<html class="dark">` genuinely is external state
- * — the layout's blocking script sets it before React exists, and the OS can
- * change it underneath us — so this subscribes to it instead of guessing on
- * first render and correcting afterwards.
+ * — the layout's blocking script sets it before React exists — so this
+ * subscribes to it instead of guessing on first render and correcting afterwards.
  */
 
 /** Re-read whenever anything touches the class list on `<html>`. */
@@ -39,9 +36,9 @@ function subscribe(onChange: () => void) {
 
 const isDark = () => document.documentElement.classList.contains("dark");
 
-// On the server there is no class list to read. Light is the honest default:
-// it matches the `--background` the layout ships in its light `themeColor`.
-const isDarkOnServer = () => false;
+// The product defaults to its deep clinical theme until a doctor explicitly
+// saves the bright theme, so the server snapshot mirrors that first paint.
+const isDarkOnServer = () => true;
 
 export function ThemeToggle() {
   const dark = useSyncExternalStore(subscribe, isDark, isDarkOnServer);
@@ -65,6 +62,7 @@ export function ThemeToggle() {
       onClick={toggle}
       aria-pressed={dark}
       aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+      className="border-border/50 bg-card/25"
     >
       <SunIcon className="size-4 dark:hidden" aria-hidden />
       <MoonIcon className="hidden size-4 dark:block" aria-hidden />

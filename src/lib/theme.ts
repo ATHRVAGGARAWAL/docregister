@@ -15,11 +15,11 @@
 export const THEME_KEY = "theme";
 
 /**
- * The rule: an explicit stored choice wins; with no stored choice, follow the
- * operating system. Anything that throws (private mode, storage disabled) falls
- * through to the light default already in the markup.
+ * The rule: an explicit light choice wins; otherwise use the product's
+ * signature deep clinical theme. Doctors can still choose the bright glass
+ * theme explicitly from the toggle.
  */
-export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("${THEME_KEY}");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark")}}catch(e){}})()`;
+export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("${THEME_KEY}");if(t!=="light"){document.documentElement.classList.add("dark")}}catch(e){document.documentElement.classList.add("dark")}})()`;
 
 /**
  * The same rule, re-applied from the client.
@@ -34,11 +34,10 @@ export const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("${THEME
 export function applyStoredTheme(): void {
   try {
     const stored = localStorage.getItem(THEME_KEY);
-    const dark =
-      stored === "dark" ||
-      (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const dark = stored !== "light";
     document.documentElement.classList.toggle("dark", dark);
   } catch {
-    // Storage unavailable. The markup's light default stands.
+    // Storage unavailable. Keep the signature dark theme.
+    document.documentElement.classList.add("dark");
   }
 }

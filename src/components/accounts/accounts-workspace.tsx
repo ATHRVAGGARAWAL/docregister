@@ -74,7 +74,7 @@ const EMPTY: AccountsPayload = {
   totalCount: 0,
 };
 
-/** Dedicated income and expense ledger, adapted from 21st.dev data cards, badge tabs, and dense table blocks. */
+/** Dedicated income and expense ledger with compact, responsive transaction cards. */
 export function AccountsWorkspace() {
   const [data, setData] = useState<AccountsPayload>(EMPTY);
   const [days, setDays] = useState(30);
@@ -138,25 +138,27 @@ export function AccountsWorkspace() {
   }), [data.entries, data.totalCount]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <CalendarRangeIcon className="size-3.5" aria-hidden />
-            Doctor-scoped ledger
+          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+            <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary/10">
+              <CalendarRangeIcon className="size-3.5" aria-hidden />
+            </span>
+            Practice finance
           </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">Accounts</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Income and expenses live here, separate from clinical records.
+          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Accounts</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            A private, doctor-scoped view of cash flow without touching clinical records.
           </p>
         </div>
-        <Button size="lg" onClick={() => setEntryOpen(true)}>
+        <Button size="lg" onClick={() => setEntryOpen(true)} className="rounded-xl shadow-[0_14px_32px_-16px_var(--primary)]">
           <PlusIcon aria-hidden /> Add entry
         </Button>
       </section>
 
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" role="alert">
           <AlertTitle>Couldn’t update accounts</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
@@ -164,8 +166,8 @@ export function AccountsWorkspace() {
 
       <SummaryCards payload={data} loading={loading} />
 
-      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-flat">
-        <div className="border-b border-border p-4 sm:p-5">
+      <section className="glass-card overflow-hidden rounded-[1.65rem] border-white/10 bg-card/45">
+        <div className="border-b border-white/8 p-4 sm:p-5">
           <form
             className="flex gap-2"
             onSubmit={(event) => {
@@ -180,13 +182,13 @@ export function AccountsWorkspace() {
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search category, person, method, or note"
                 aria-label="Search accounts"
-                className="h-11 pl-10"
+                className="glass-inset h-11 rounded-xl border-white/8 bg-background/20 pl-10 shadow-none"
               />
             </div>
-            <Button type="submit" size="lg" variant="outline">Search</Button>
+            <Button type="submit" size="lg" variant="outline" className="rounded-xl border-white/10 bg-white/5">Search</Button>
           </form>
 
-          <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="mt-4 flex flex-col gap-3 border-t border-white/8 pt-4 xl:flex-row xl:items-center xl:justify-between">
             <BadgeTabs
               label="Entry type"
               items={KIND_TABS.map((item) => ({ ...item, badge: badges[item.value] }))}
@@ -200,7 +202,7 @@ export function AccountsWorkspace() {
                 value={status}
                 onChange={(value) => setStatus(value as typeof status)}
               />
-              <div className="well inline-flex items-center gap-1 p-1" role="group" aria-label="Accounts date range">
+              <div className="glass-inset inline-flex items-center gap-1 rounded-full p-1" role="group" aria-label="Accounts date range">
                 {RANGES.map((range) => (
                   <button
                     key={range.days}
@@ -208,8 +210,8 @@ export function AccountsWorkspace() {
                     aria-pressed={days === range.days}
                     onClick={() => setDays(range.days)}
                     className={cn(
-                      "h-7 rounded-sm px-2.5 text-[11px] font-medium transition-colors",
-                      days === range.days ? "border border-border bg-card text-foreground shadow-flat" : "text-muted-foreground hover:text-foreground",
+                      "h-7 touch-manipulation rounded-full px-2.5 text-[11px] font-medium transition-colors [@media(pointer:coarse)]:min-h-11",
+                      days === range.days ? "bg-primary text-primary-foreground shadow-[0_8px_20px_-12px_var(--primary)]" : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
                     )}
                   >
                     {range.label}
@@ -256,13 +258,14 @@ function SummaryCards({ payload, loading }: { payload: AccountsPayload; loading:
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: index * 0.04 }}
         >
-          <Card className="h-full gap-3 py-4">
+          <Card className="glass-card group relative h-full gap-3 overflow-hidden rounded-[1.35rem] border-white/10 bg-card/45 py-4 transition-all duration-300 hover:-translate-y-1 hover:border-primary/20 hover:bg-card/65">
+            <span className="pointer-events-none absolute -right-10 -top-12 size-24 rounded-full bg-primary/7 blur-2xl transition-colors group-hover:bg-primary/12" aria-hidden />
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="text-xs text-muted-foreground">{card.label}</CardTitle>
-              <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", card.tone)}><card.icon className="size-4" aria-hidden /></span>
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{card.label}</CardTitle>
+              <span className={cn("grid size-8 shrink-0 place-items-center rounded-[0.8rem] border border-white/10", card.tone)}><card.icon className="size-4" aria-hidden /></span>
             </CardHeader>
             <CardContent>
-              <p className={cn("tnum text-xl font-semibold tracking-tight sm:text-2xl", card.label === "Pending" && "text-money")}>
+              <p className={cn("tnum text-xl font-semibold tracking-[-0.045em] sm:text-2xl", card.label === "Pending" && "text-money")}>
                 {loading ? "—" : formatPaise(card.value)}
               </p>
               <p className="mt-1 text-[11px] text-muted-foreground">{card.hint}</p>
@@ -286,7 +289,7 @@ function BadgeTabs({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="well inline-flex w-fit max-w-full items-center gap-1 overflow-x-auto p-1" role="group" aria-label={label}>
+    <div className="glass-inset inline-flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-full p-1" role="group" aria-label={label}>
       {items.map((item) => {
         const active = item.value === value;
         return (
@@ -296,8 +299,8 @@ function BadgeTabs({
             onClick={() => onChange(item.value)}
             aria-pressed={active}
             className={cn(
-              "relative inline-flex h-7 shrink-0 items-center gap-1.5 rounded-sm px-3 text-xs font-medium transition-colors",
-              active ? "border border-border bg-card text-foreground shadow-flat" : "text-muted-foreground hover:text-foreground",
+              "relative inline-flex h-7 shrink-0 touch-manipulation items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-11",
+              active ? "bg-primary text-primary-foreground shadow-[0_8px_20px_-12px_var(--primary)]" : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
             )}
           >
             {item.label}
@@ -308,7 +311,7 @@ function BadgeTabs({
                   initial={{ scale: 0.7, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.7, opacity: 0 }}
-                  className="tnum rounded-full bg-secondary px-1.5 py-0.5 text-[10px] leading-none text-secondary-foreground"
+                  className="tnum rounded-full bg-white/12 px-1.5 py-0.5 text-[10px] leading-none text-current"
                 >
                   {item.badge}
                 </motion.span>
@@ -347,46 +350,51 @@ function Ledger({
   }
 
   return (
-    <>
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/55 text-left text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
-            <tr><th className="px-5 py-3 font-medium">Date</th><th className="px-3 py-3 font-medium">Entry</th><th className="px-3 py-3 font-medium">Method</th><th className="px-3 py-3 font-medium">Status</th><th className="px-5 py-3 text-right font-medium">Amount</th></tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {entries.map((entry) => (
-              <tr key={entry.id} className="transition-colors hover:bg-secondary/30">
-                <td className="whitespace-nowrap px-5 py-3.5 text-xs text-muted-foreground">{formatEntryDate(entry.occurred_at)}</td>
-                <td className="min-w-64 px-3 py-3.5"><p className="font-medium">{entry.category}</p><p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{[entry.counterparty, entry.note].filter(Boolean).join(" · ") || (entry.kind === "income" ? "Income" : "Expense")}</p></td>
-                <td className="whitespace-nowrap px-3 py-3.5 text-xs text-muted-foreground">{entry.payment_method ? PAYMENT_LABELS[entry.payment_method] : "—"}</td>
-                <td className="px-3 py-3.5"><StatusCell entry={entry} onMarkPaid={onMarkPaid} /></td>
-                <td className={cn("tnum whitespace-nowrap px-5 py-3.5 text-right font-semibold", entry.kind === "income" ? "text-money" : "text-destructive")}>
-                  {entry.kind === "expense" ? "−" : "+"}{formatPaise(entry.amount_paise)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <ul className="divide-y divide-border md:hidden">
-        {entries.map((entry) => (
-          <li key={entry.id} className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0"><p className="font-medium">{entry.category}</p><p className="mt-1 truncate text-xs text-muted-foreground">{entry.counterparty || entry.note || formatEntryDate(entry.occurred_at)}</p></div>
-              <p className={cn("tnum shrink-0 font-semibold", entry.kind === "income" ? "text-money" : "text-destructive")}>{entry.kind === "expense" ? "−" : "+"}{formatPaise(entry.amount_paise)}</p>
+    <ul className="grid gap-2.5 p-3 sm:p-4 lg:grid-cols-2" aria-label="Account entries">
+      {entries.map((entry) => (
+        <li
+          key={entry.id}
+          className="glass-inset group relative overflow-hidden rounded-[1.2rem] p-4 transition-[border-color,background-color,transform] duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:bg-white/6"
+        >
+          <span
+            className={cn(
+              "absolute inset-y-4 left-0 w-0.5 rounded-r-full",
+              entry.kind === "income" ? "bg-money" : "bg-destructive",
+            )}
+            aria-hidden
+          />
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className={cn("grid size-9 shrink-0 place-items-center rounded-[0.85rem] border border-white/10", entry.kind === "income" ? "bg-money/10 text-money" : "bg-destructive/10 text-destructive")}>
+                {entry.kind === "income" ? <ArrowDownLeftIcon className="size-4" aria-hidden /> : <ArrowUpRightIcon className="size-4" aria-hidden />}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold tracking-[-0.015em]">{entry.category}</p>
+                <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                  {[entry.counterparty, entry.note].filter(Boolean).join(" · ") || (entry.kind === "income" ? "Income" : "Expense")}
+                </p>
+              </div>
             </div>
-            <div className="mt-3 flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{formatEntryDate(entry.occurred_at)}{entry.payment_method ? ` · ${PAYMENT_LABELS[entry.payment_method]}` : ""}</p><StatusCell entry={entry} onMarkPaid={onMarkPaid} /></div>
-          </li>
-        ))}
-      </ul>
-    </>
+            <p className={cn("tnum shrink-0 text-base font-semibold tracking-[-0.03em]", entry.kind === "income" ? "text-money" : "text-destructive")}>
+              {entry.kind === "expense" ? "−" : "+"}{formatPaise(entry.amount_paise)}
+            </p>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/8 pt-3">
+            <p className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span>{formatEntryDate(entry.occurred_at)}</span>
+              {entry.payment_method && <><span aria-hidden>·</span><span>{PAYMENT_LABELS[entry.payment_method]}</span></>}
+            </p>
+            <StatusCell entry={entry} onMarkPaid={onMarkPaid} />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 function StatusCell({ entry, onMarkPaid }: { entry: AccountEntry; onMarkPaid: (entry: AccountEntry) => void }) {
-  if (entry.status === "paid") return <Badge variant="secondary"><CheckIcon aria-hidden />Paid</Badge>;
-  return <Button type="button" size="sm" variant="outline" className="h-7 text-xs text-money" onClick={() => onMarkPaid(entry)}><Clock3Icon aria-hidden />Mark paid</Button>;
+  if (entry.status === "paid") return <Badge variant="secondary" className="border-emerald-400/15 bg-emerald-400/10 text-emerald-500"><CheckIcon aria-hidden />Paid</Badge>;
+  return <Button type="button" size="sm" variant="ghost" className="h-7 text-xs text-money hover:bg-money/10 hover:text-money" onClick={() => onMarkPaid(entry)}><Clock3Icon aria-hidden />Mark paid</Button>;
 }
 
 function AccountEntrySheet({
@@ -451,16 +459,24 @@ function AccountEntrySheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle>Add account entry</SheetTitle>
-          <SheetDescription>Record income or an expense in the financial ledger.</SheetDescription>
+      <SheetContent className="glass-strong overflow-hidden border-white/10 bg-card/75 sm:max-w-lg">
+        <div className="ambient-orb pointer-events-none absolute -right-24 -top-24 size-52 opacity-45" aria-hidden />
+        <SheetHeader className="relative border-b border-white/8 pr-14 sm:px-6 sm:pt-6 sm:pb-4">
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-[0.95rem] border border-primary/20 bg-primary/12 text-primary shadow-[0_12px_26px_-18px_var(--primary)]">
+              <BanknoteIcon className="size-4.5" aria-hidden />
+            </span>
+            <div>
+              <SheetTitle className="text-lg tracking-[-0.025em]">Add account entry</SheetTitle>
+              <SheetDescription className="mt-1">Record income or an expense in the financial ledger.</SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
         <form onSubmit={submit} className="contents">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5">
-            <div className="well grid grid-cols-2 gap-1 p-1" role="group" aria-label="Entry type">
+          <div className="relative min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5 sm:px-6">
+            <div className="glass-inset grid grid-cols-2 gap-1 rounded-full p-1" role="group" aria-label="Entry type">
               {(["income", "expense"] as const).map((value) => (
-                <button key={value} type="button" aria-pressed={kind === value} onClick={() => changeKind(value)} className={cn("h-9 rounded-sm text-sm font-medium capitalize", kind === value ? "border border-border bg-card shadow-flat" : "text-muted-foreground")}>{value}</button>
+                <button key={value} type="button" aria-pressed={kind === value} onClick={() => changeKind(value)} className={cn("h-9 touch-manipulation rounded-full text-sm font-medium capitalize transition-colors [@media(pointer:coarse)]:min-h-11", kind === value ? "bg-primary text-primary-foreground shadow-[0_9px_22px_-13px_var(--primary)]" : "text-muted-foreground hover:bg-white/5 hover:text-foreground")}>{value}</button>
               ))}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -469,16 +485,16 @@ function AccountEntrySheet({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Category" htmlFor="account-category"><Input id="account-category" required maxLength={120} value={category} onChange={(event) => setCategory(event.target.value)} list="account-categories" /><datalist id="account-categories">{(kind === "income" ? ["Consultation", "Procedure", "Certificate", "Other income"] : ["Supplies", "Rent", "Utilities", "Staff", "Equipment", "Other expense"]).map((item) => <option key={item} value={item} />)}</datalist></Field>
-              <Field label="Status" htmlFor="account-status"><select id="account-status" value={status} onChange={(event) => setStatus(event.target.value as AccountEntryStatus)} className="well h-10 w-full px-3 text-sm text-foreground outline-none"><option value="paid">Paid</option><option value="pending">Pending</option></select></Field>
+              <Field label="Status" htmlFor="account-status"><select id="account-status" value={status} onChange={(event) => setStatus(event.target.value as AccountEntryStatus)} className="glass-inset h-10 w-full rounded-lg px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11"><option value="paid">Paid</option><option value="pending">Pending</option></select></Field>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Payment method" htmlFor="account-method"><select id="account-method" value={method} onChange={(event) => setMethod(event.target.value as AccountPaymentMethod | "")} className="well h-10 w-full px-3 text-sm text-foreground outline-none"><option value="">Not specified</option>{Object.entries(PAYMENT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+              <Field label="Payment method" htmlFor="account-method"><select id="account-method" value={method} onChange={(event) => setMethod(event.target.value as AccountPaymentMethod | "")} className="glass-inset h-10 w-full rounded-lg px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11"><option value="">Not specified</option>{Object.entries(PAYMENT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
               <Field label="Person or business" htmlFor="account-counterparty"><Input id="account-counterparty" maxLength={300} value={counterparty} onChange={(event) => setCounterparty(event.target.value)} placeholder={kind === "income" ? "Patient or payer" : "Vendor or payee"} /></Field>
             </div>
             <Field label="Note" htmlFor="account-note"><Textarea id="account-note" maxLength={2000} rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional details" /></Field>
             {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           </div>
-          <SheetFooter>
+          <SheetFooter className="relative border-white/8 bg-card/45 sm:px-6">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
             <Button type="submit" disabled={saving || !amount.trim() || !category.trim()}>{saving ? <LoaderCircleIcon className="animate-spin" aria-hidden /> : <BanknoteIcon aria-hidden />}Save entry</Button>
           </SheetFooter>

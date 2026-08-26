@@ -11,7 +11,6 @@ import {
   SaveIcon,
   ShieldCheckIcon,
   StethoscopeIcon,
-  UserRoundIcon,
   XIcon,
 } from "lucide-react";
 
@@ -157,27 +156,27 @@ export function PatientHistorySheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:h-[88dvh] sm:max-h-[88dvh] sm:max-w-5xl">
-        <SheetHeader className="border-b border-border pr-14 sm:px-7 sm:pt-6 sm:pb-4">
+      <SheetContent className="glass-strong overflow-hidden border-white/10 bg-card/72 sm:h-[90dvh] sm:max-h-[90dvh] sm:max-w-5xl">
+        <div className="ambient-orb pointer-events-none absolute -right-24 -top-28 size-64 opacity-40" aria-hidden />
+        <SheetHeader className="relative border-b border-white/8 pr-14 sm:px-7 sm:pt-6 sm:pb-5">
           <div className="flex items-center gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-              <UserRoundIcon className="size-5" aria-hidden />
+            <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-[1rem] border border-primary/20 bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklab,var(--primary)_26%,transparent),transparent_68%)] text-sm font-semibold tracking-[-0.03em] text-primary shadow-[0_12px_30px_-18px_var(--primary)]">
+              {patientInitials(history?.patient.full_name ?? patient?.full_name ?? "Patient")}
             </span>
             <div className="min-w-0">
-              <SheetTitle className="truncate text-lg">
+              <SheetTitle className="truncate text-xl tracking-[-0.035em]">
                 {history?.patient.full_name ?? patient?.full_name ?? "Patient chart"}
               </SheetTitle>
-              <SheetDescription>
-                Review the full history or correct the patient&rsquo;s master details. The current
-                visit draft stays unchanged.
+              <SheetDescription className="mt-1">
+                Longitudinal chart, medicines, and master patient details.
               </SheetDescription>
             </div>
           </div>
         </SheetHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-secondary/25 px-5 py-5 sm:px-7">
+        <div className="relative min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
           {loading && (
-            <div className="grid min-h-72 place-items-center rounded-xl border border-border bg-card">
+            <div className="glass-card grid min-h-72 place-items-center rounded-[1.5rem]">
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <LoaderCircleIcon className="size-4 animate-spin" aria-hidden />
                 Opening patient chart…
@@ -195,7 +194,7 @@ export function PatientHistorySheet({
 
           {history && (
             <div className="space-y-5">
-              <section className="grid gap-3 sm:grid-cols-3">
+              <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                 <SummaryCard
                   icon={ClipboardListIcon}
                   label="Recorded visits"
@@ -217,17 +216,17 @@ export function PatientHistorySheet({
                 />
               </section>
 
-              <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
+              <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
                 <section className="space-y-3">
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
                       Medical timeline
                     </p>
-                    <h2 className="mt-1 text-lg font-semibold tracking-tight">All visits</h2>
+                    <h2 className="mt-1 text-lg font-semibold tracking-[-0.025em]">All visits</h2>
                   </div>
 
                   {history.encounters.length === 0 ? (
-                    <Card className="gap-0 py-0">
+                    <Card className="glass-card gap-0 rounded-[1.35rem] border-white/10 bg-card/45 py-0">
                       <CardContent className="grid min-h-44 place-items-center p-6 text-center">
                         <div>
                           <ClipboardListIcon className="mx-auto size-6 text-muted-foreground" aria-hidden />
@@ -239,7 +238,7 @@ export function PatientHistorySheet({
                       </CardContent>
                     </Card>
                   ) : (
-                    <ol className="space-y-3">
+                    <ol className="relative space-y-3 before:absolute before:bottom-4 before:left-[1.18rem] before:top-4 before:w-px before:bg-gradient-to-b before:from-primary/50 before:via-border before:to-transparent sm:before:left-[1.43rem]">
                       {history.encounters.map((encounter) => (
                         <VisitCard key={encounter.id} encounter={encounter} />
                       ))}
@@ -248,10 +247,10 @@ export function PatientHistorySheet({
                 </section>
 
                 <aside className="space-y-3 lg:sticky lg:top-0">
-                  <Card className="gap-0 py-0">
+                  <Card className="glass-card gap-0 rounded-[1.4rem] border-white/10 bg-card/55 py-0">
                     <CardContent className="p-5">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
                           Patient details
                         </p>
                         {!editForm && (
@@ -344,7 +343,7 @@ export function PatientHistorySheet({
                           </div>
                         </div>
                       ) : (
-                        <dl className="mt-4 space-y-3 text-sm">
+                        <dl className="mt-4 divide-y divide-white/8 text-sm">
                           <Detail label="Age" value={history.patient.age_years == null ? "Not recorded" : `${history.patient.age_years} years`} />
                           <Detail label="Sex" value={history.patient.sex || "Not recorded"} />
                           <Detail label="Phone" value={maskPhone(history.patient.phone) || "Not recorded"} />
@@ -357,7 +356,7 @@ export function PatientHistorySheet({
                   </Card>
 
                   {!editForm && history.patient.notes && (
-                    <Alert variant="default" role="note">
+                    <Alert variant="default" role="note" className="glass-card rounded-[1.2rem] border-primary/15 bg-primary/7">
                       <StethoscopeIcon className="mt-0.5 size-4 text-primary" aria-hidden />
                       <AlertTitle>Patient note</AlertTitle>
                       <AlertDescription className="whitespace-pre-wrap">
@@ -371,7 +370,7 @@ export function PatientHistorySheet({
           )}
         </div>
 
-        <SheetFooter className="sm:px-7">
+        <SheetFooter className="relative border-white/8 bg-card/45 sm:px-7">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-none">
             Back to review
           </Button>
@@ -397,14 +396,14 @@ function SummaryCard({
   value: string;
 }) {
   return (
-    <Card className="gap-0 py-0">
-      <CardContent className="flex items-center gap-3 p-4">
-        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+    <Card className="glass-card gap-0 rounded-[1.2rem] border-white/10 bg-card/45 py-0 last:col-span-2 sm:last:col-span-1">
+      <CardContent className="flex items-center gap-3 p-3.5 sm:p-4">
+        <span className="grid size-9 shrink-0 place-items-center rounded-[0.8rem] border border-primary/20 bg-primary/10 text-primary">
           <Icon className="size-4" aria-hidden />
         </span>
         <div className="min-w-0">
-          <p className="truncate text-xs text-muted-foreground">{label}</p>
-          <p className="tnum mt-0.5 truncate text-base font-semibold">{value}</p>
+          <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+          <p className="tnum mt-1 truncate text-sm font-semibold tracking-[-0.02em] sm:text-base">{value}</p>
         </div>
       </CardContent>
     </Card>
@@ -413,13 +412,14 @@ function SummaryCard({
 
 function VisitCard({ encounter }: { encounter: PatientHistoryEncounter }) {
   return (
-    <li>
-      <Card className="gap-0 overflow-hidden py-0">
+    <li className="relative pl-9 sm:pl-11">
+      <span className="absolute left-[0.78rem] top-5 z-10 size-3 rounded-full border-[3px] border-card bg-primary shadow-[0_0_14px_color-mix(in_oklab,var(--primary)_70%,transparent)] sm:left-[1.03rem]" aria-hidden />
+      <Card className="glass-card gap-0 overflow-hidden rounded-[1.35rem] border-white/10 bg-card/45 py-0 transition-colors hover:border-primary/20 hover:bg-card/60">
         <CardContent className="p-0">
-          <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-secondary/45 px-4 py-3 sm:px-5">
+          <header className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 px-4 py-3.5 sm:px-5">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold">{formatPatientDate(encounter.occurred_at)}</p>
-              <span className="text-xs text-muted-foreground">{formatClock(encounter.occurred_at)}</span>
+              <p className="text-sm font-semibold tracking-[-0.015em]">{formatPatientDate(encounter.occurred_at)}</p>
+              <span className="glass-inset rounded-full px-2 py-0.5 text-[10px] text-muted-foreground">{formatClock(encounter.occurred_at)}</span>
               {encounter.visit_number != null && (
                 <Badge variant="outline">Visit {encounter.visit_number}</Badge>
               )}
@@ -438,7 +438,7 @@ function VisitCard({ encounter }: { encounter: PatientHistoryEncounter }) {
               {encounter.prescription.length > 0 ? (
                 <ul className="mt-2 grid gap-2 sm:grid-cols-2">
                   {encounter.prescription.map((medicine) => (
-                    <li key={medicine.id} className="rounded-lg border border-border bg-background px-3 py-2.5">
+                    <li key={medicine.id} className="glass-inset rounded-[0.9rem] px-3 py-2.5">
                       <p className="text-sm font-medium">
                         {[medicine.drug_name, medicine.strength].filter(Boolean).join(" ")}
                       </p>
@@ -482,7 +482,7 @@ function ClinicalField({ label, value }: { label: string; value: string | null }
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="tnum text-right font-medium capitalize">{value}</dd>
     </div>
@@ -552,4 +552,14 @@ async function readBody(response: Response, fallback: string): Promise<unknown> 
     throw new Error(typeof error === "string" ? error : fallback);
   }
   return payload;
+}
+
+function patientInitials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "PT";
 }

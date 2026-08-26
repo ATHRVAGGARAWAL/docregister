@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { BookOpenCheckIcon, CalendarDaysIcon } from "lucide-react";
+import { CalendarDaysIcon } from "lucide-react";
 
 import { AccountsWorkspace } from "@/components/accounts/accounts-workspace";
 import { AppNavigation, type AppView } from "@/components/dashboard/app-navigation";
@@ -32,6 +32,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AnalyticsPayload, RegisterEntry } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { BrandMark } from "@/components/brand/brand-mark";
 
 const viewTitles: Record<AppView, string> = {
   overview: "Overview",
@@ -476,7 +477,12 @@ export function Dashboard({
   }
 
   return (
-    <div className="min-h-dvh bg-background">
+    <div className="relative isolate min-h-dvh overflow-x-clip">
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <span className="ambient-orb -top-32 -left-28 size-[30rem] opacity-50" />
+        <span className="ambient-orb top-[28%] -right-44 size-[34rem] opacity-35 [animation-delay:-4s]" />
+        <span className="absolute inset-x-[12%] top-0 h-px bg-gradient-to-r from-transparent via-primary/25 to-transparent" />
+      </div>
       <AppNavigation
         active={view}
         doctorName={profile.fullName}
@@ -486,18 +492,16 @@ export function Dashboard({
       />
 
       <div className="lg:pl-[17rem]">
-        <header className="sticky top-0 z-20 border-b border-border bg-background/95">
-          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-30 px-3 pt-3 sm:px-5 sm:pt-4 lg:px-8">
+          <div className="glass-strong mx-auto flex h-16 max-w-[94rem] items-center justify-between gap-4 rounded-2xl px-3.5 sm:px-5">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground lg:hidden">
-                <BookOpenCheckIcon className="size-[18px]" aria-hidden />
-              </span>
+              <BrandMark compact className="lg:hidden" />
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold tracking-tight lg:text-base">
+                <p className="truncate text-sm font-semibold tracking-[-0.025em] lg:text-base">
                   {viewTitles[view]}
                 </p>
-                <p className="hidden items-center gap-1.5 text-[11px] text-muted-foreground sm:flex">
-                  <CalendarDaysIcon className="size-3" aria-hidden />
+                <p className="hidden items-center gap-1.5 text-[10px] font-medium tracking-[0.08em] text-muted-foreground uppercase sm:flex">
+                  <CalendarDaysIcon className="size-3 text-primary" aria-hidden />
                   {new Intl.DateTimeFormat("en-IN", {
                     day: "numeric",
                     month: "short",
@@ -507,13 +511,23 @@ export function Dashboard({
                 </p>
               </div>
             </div>
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              <span className="hidden items-center gap-2 rounded-full border border-primary/15 bg-primary/8 px-3 py-1.5 text-[10px] font-semibold tracking-[0.08em] text-primary uppercase md:flex">
+                <span className="size-1.5 rounded-full bg-primary shadow-[0_0_10px_var(--primary)]" />
+                Clinic live
+              </span>
+              <ThemeToggle />
+            </div>
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-7xl px-4 pb-[calc(var(--dock-height,9rem)+7rem)] pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pb-[calc(var(--dock-height,9rem)+2rem)]">
+        <main className="mx-auto w-full max-w-[94rem] px-4 pb-[calc(var(--dock-height,9rem)+7rem)] pt-7 sm:px-6 sm:pt-9 lg:px-8 lg:pb-[calc(var(--dock-height,9rem)+3rem)]">
           {(discardedDraftId || draftError) && (
-            <Alert variant={draftError ? "destructive" : "default"} className="mb-4">
+            <Alert
+              variant={draftError ? "destructive" : "default"}
+              role={draftError ? "alert" : "status"}
+              className="mb-4"
+            >
               <AlertTitle>{draftError ? "Draft action failed" : "Draft discarded"}</AlertTitle>
               <AlertDescription className="flex items-center justify-between gap-3">
                 {draftError ?? "You can restore it while this message is visible."}

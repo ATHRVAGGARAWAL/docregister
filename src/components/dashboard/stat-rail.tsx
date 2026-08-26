@@ -1,23 +1,14 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 import { CountUp } from "@/components/reactbits/count-up";
 import { formatCount } from "@/lib/format";
 import type { AnalyticsPayload } from "@/lib/types";
 
-/**
- * The supporting numbers.
- *
- * A horizontally-scrollable rail on a phone rather than a 2×2 grid. Four equal
- * boxes on a small screen is the boxy-dashboard look this app is avoiding, and
- * it forces every tile to the width of the narrowest one. A rail lets each tile
- * size to its content and reads as one continuous strip of card stock instead
- * of four competing rectangles; at `sm` and up it relaxes into four columns
- * because the horizontal room is there and scrolling to find a number is worse
- * than seeing all four.
- */
+/** A continuous metric ribbon: four readings, one visual object. */
 export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
+  const reduceMotion = useReducedMotion();
   const today = analytics.today;
   const seen = today?.patient_count ?? 0;
 
@@ -29,72 +20,81 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
       hint:
         analytics.deltas.patients !== null
           ? `${analytics.deltas.patients > 0 ? "+" : ""}${analytics.deltas.patients}% vs yesterday`
-          : undefined,
+          : "Live clinic count",
+      swatch: "var(--primary)",
     },
     {
-      label: "New",
+      label: "New patients",
       value: today?.new_patients ?? 0,
       format: formatCount,
-      // The swatch, not the type, carries series identity. A chart hue stepped
-      // for adjacency against its neighbours is not a legible text colour, and
-      // reusing it as one is how a palette quietly fails its contrast audit.
+      hint: "First consultation",
       swatch: "var(--chart-1)",
     },
     {
       label: "Returning",
       value: today?.returning_patients ?? 0,
       format: formatCount,
+      hint: "Continuing care",
       swatch: "var(--chart-2)",
     },
     {
-      label: "Visits in range",
+      label: "Range volume",
       value: analytics.totals.patient_count,
       format: formatCount,
       hint: `${formatCount(analytics.totals.new_patients)} new · ${formatCount(analytics.totals.returning_patients)} returning`,
+      swatch: "var(--primary)",
     },
   ];
 
   return (
-    <div
-      className="no-scrollbar -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 xl:grid-cols-4"
-      role="list"
-    >
-      {tiles.map((tile, index) => (
-        <motion.div
-          key={tile.label}
-          role="listitem"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.05 * index, ease: [0.22, 1, 0.36, 1] }}
-          className="min-w-[10rem] shrink-0 snap-start rounded-xl border border-border bg-card px-4 py-4 shadow-flat sm:min-w-0"
-        >
-          <div className="flex items-center gap-1.5">
-            {tile.swatch && (
+    <div className="no-scrollbar -mx-5 overflow-x-auto px-5 sm:mx-0 sm:px-0">
+      <div
+        className="glass-card grid min-w-[42rem] grid-cols-4 overflow-hidden rounded-[1.75rem] sm:min-w-0"
+        role="list"
+      >
+        {tiles.map((tile, index) => (
+          <motion.div
+            key={tile.label}
+            role="listitem"
+            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.5,
+              delay: reduceMotion ? 0 : 0.06 * index,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="group relative min-h-32 px-5 py-5 transition-colors duration-300 hover:bg-foreground/[0.025] sm:px-6"
+          >
+            {index > 0 && (
               <span
                 aria-hidden
-                className="size-2 shrink-0 rounded-[2px]"
-                style={{ background: tile.swatch }}
+                className="absolute inset-y-5 left-0 w-px bg-gradient-to-b from-transparent via-border to-transparent"
               />
             )}
-            <p className="text-muted-foreground truncate text-[11px]">{tile.label}</p>
-          </div>
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="h-1.5 w-5 rounded-full opacity-80 shadow-[0_0_14px_currentColor] transition-all duration-300 group-hover:w-7"
+                style={{ background: tile.swatch, color: tile.swatch }}
+              />
+              <p className="truncate text-[10px] font-semibold tracking-[0.13em] text-muted-foreground uppercase">
+                {tile.label}
+              </p>
+            </div>
 
-          <p
-            className="tnum mt-2 text-2xl font-semibold tracking-tight text-foreground"
-          >
-            <CountUp
-              to={tile.value}
-              duration={0.9}
-              delay={0.05 * index}
-              format={tile.format}
-            />
-          </p>
+            <p className="tnum mt-3 text-[2rem] font-semibold leading-none tracking-[-0.055em] text-foreground">
+              <CountUp
+                to={tile.value}
+                duration={0.9}
+                delay={reduceMotion ? 0 : 0.05 * index}
+                format={tile.format}
+              />
+            </p>
 
-          {tile.hint && (
-            <p className="text-muted-foreground mt-0.5 truncate text-[11px]">{tile.hint}</p>
-          )}
-        </motion.div>
-      ))}
+            <p className="mt-2 truncate text-[10px] text-muted-foreground">{tile.hint}</p>
+          </motion.div>
+        ))}
+      </div>
     </div>
   );
 }

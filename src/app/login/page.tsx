@@ -16,18 +16,13 @@ import {
   SparklesIcon,
 } from "lucide-react";
 
+import { BrandLockup } from "@/components/brand/brand-mark";
 import { Reveal } from "@/components/reactbits/reveal";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -47,18 +42,18 @@ type Status = "idle" | "sending" | "sent" | "error";
 const workflow = [
   {
     icon: Mic2Icon,
-    title: "Dictate naturally",
-    copy: "Speak in Hindi, Punjabi or English between consultations.",
+    title: "Speak naturally",
+    copy: "Hindi, Punjabi or English—the register listens in your clinical rhythm.",
   },
   {
     icon: SparklesIcon,
-    title: "Review the details",
-    copy: "Confirm the patient, diagnosis, treatment and prescription before saving.",
+    title: "Review with clarity",
+    copy: "Patient, diagnosis, treatment and medicines arrive ready to confirm.",
   },
   {
     icon: BookOpenCheckIcon,
-    title: "Keep the register current",
-    copy: "Your daily patient count and visit history update as you work.",
+    title: "Stay effortlessly current",
+    copy: "Every verified visit updates the register, history and clinic picture.",
   },
 ];
 
@@ -97,7 +92,6 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     const normalizedEmail = email.trim();
     const normalizedName = fullName.trim();
     if (!normalizedEmail || (mode === "signup" && !normalizedName)) return;
@@ -141,163 +135,150 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
   const signingUp = mode === "signup";
 
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-background">
-      <div
-        aria-hidden
-        className="absolute inset-y-0 left-0 hidden w-[47%] border-r border-border bg-primary/[0.055] lg:block dark:bg-primary/[0.035]"
-      />
-      <div
-        aria-hidden
-        className="absolute -left-24 top-24 hidden size-72 rounded-full border border-primary/15 lg:block"
-      />
-      <div
-        aria-hidden
-        className="absolute left-[34%] top-[58%] hidden size-24 rounded-full bg-primary/8 lg:block"
-      />
+    <main className="relative isolate min-h-dvh overflow-hidden">
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <span className="ambient-orb -top-40 -left-40 size-[36rem] opacity-60" />
+        <span className="ambient-orb -right-48 bottom-[-15rem] size-[42rem] opacity-45 [animation-delay:-5s]" />
+        <span className="absolute top-[15%] left-[44%] h-[34rem] w-px rotate-[18deg] bg-gradient-to-b from-transparent via-primary/20 to-transparent" />
+      </div>
 
-      <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8 sm:py-7 lg:px-10">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-flat">
-            <BookOpenCheckIcon className="size-5" aria-hidden />
-          </div>
-          <div>
-            <p className="text-sm font-semibold tracking-tight">docregister</p>
-            <p className="text-[11px] text-muted-foreground">Voice-first clinical register</p>
-          </div>
+      <header className="relative z-10 mx-auto flex w-full max-w-[94rem] items-center justify-between px-5 py-5 sm:px-8 lg:px-10 lg:py-7">
+        <BrandLockup />
+        <div className="glass-card flex items-center gap-2 rounded-2xl p-1.5">
+          <span className="hidden px-2 text-[10px] font-semibold tracking-[0.11em] text-muted-foreground uppercase sm:block">
+            Private workspace
+          </span>
+          <ThemeToggle />
         </div>
-        <ThemeToggle />
       </header>
 
-      <div className="relative z-10 mx-auto grid w-full max-w-7xl items-center gap-12 px-5 pb-10 pt-4 sm:px-8 lg:min-h-[calc(100dvh-96px)] lg:grid-cols-[minmax(0,1fr)_minmax(25rem,29rem)] lg:gap-20 lg:px-10 lg:pb-20 lg:pt-0">
-        <section className="order-2 mx-auto w-full max-w-xl lg:order-1 lg:mx-0 lg:max-w-[35rem]">
-          <Reveal distance={12} duration={0.45}>
-            <Badge variant="default" className="mb-5">
+      <div className="relative z-10 mx-auto grid w-full max-w-[94rem] items-center gap-10 px-5 pb-10 pt-2 sm:px-8 lg:min-h-[calc(100dvh-100px)] lg:grid-cols-[minmax(0,1.12fr)_minmax(25rem,30rem)] lg:gap-20 lg:px-10 lg:pb-20 lg:pt-0">
+        <section className="hidden max-w-[44rem] lg:block">
+          <Reveal distance={16} duration={0.5}>
+            <Badge className="mb-6">
               <ShieldCheckIcon aria-hidden />
-              Built for independent clinics
+              Built for the pace of private practice
             </Badge>
-            <h1 className="max-w-[12ch] text-4xl font-semibold leading-[1.06] tracking-[-0.04em] text-balance sm:text-5xl lg:text-[3.6rem]">
-              Your register, ready before the next patient.
+            <h1 className="max-w-[11ch] text-[clamp(3.6rem,6vw,6.6rem)] font-semibold leading-[0.91] tracking-[-0.072em] text-balance">
+              Care moves at the speed of <span className="text-gradient">your voice.</span>
             </h1>
-            <p className="mt-5 max-w-[34rem] text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-              Turn a quick voice note into a clean, reviewable clinical entry—and keep
-              today&rsquo;s patient register current automatically.
+            <p className="mt-7 max-w-[35rem] text-lg leading-8 text-muted-foreground">
+              A calm clinical workspace that turns a conversation into a precise,
+              reviewable record—before the next patient walks in.
             </p>
           </Reveal>
 
-          <Reveal distance={12} duration={0.45} delay={0.08}>
-            <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:mt-10 lg:grid-cols-1">
-              {workflow.map((item, index) => (
-                <div
-                  key={item.title}
-                  className="flex gap-3 rounded-xl border border-border/80 bg-card/65 p-3.5 shadow-flat backdrop-blur-sm lg:max-w-[31rem] lg:items-center lg:bg-card/45"
-                >
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
-                    <item.icon className="size-4" aria-hidden />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="tnum text-[10px] font-semibold text-muted-foreground">
-                        0{index + 1}
-                      </span>
-                      <p className="text-sm font-medium">{item.title}</p>
+          <Reveal distance={12} duration={0.5} delay={0.08}>
+            <div className="glass-card mt-10 max-w-[38rem] overflow-hidden rounded-[1.7rem] p-2">
+              <div className="rounded-[1.35rem] border border-primary/15 bg-background/25 p-5 backdrop-blur-xl">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="voice-aura grid size-11 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-key">
+                      <Mic2Icon className="size-5" aria-hidden />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold tracking-[-0.02em]">Listening to consultation</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">Hindi + clinical English</p>
                     </div>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      {item.copy}
-                    </p>
                   </div>
+                  <span className="tnum rounded-full border border-primary/20 bg-primary/8 px-3 py-1.5 text-xs font-medium text-primary">
+                    00:18
+                  </span>
                 </div>
-              ))}
+                <div className="mt-6 flex h-12 items-center gap-1" aria-hidden>
+                  {[18, 30, 46, 28, 54, 38, 22, 48, 34, 58, 28, 42, 18, 34, 24, 46, 30, 20].map(
+                    (height, index) => (
+                      <span
+                        key={`${height}-${index}`}
+                        className="w-1 flex-1 rounded-full bg-gradient-to-t from-primary/25 via-primary to-accent/75"
+                        style={{ height: `${height}px`, opacity: 0.48 + (index % 4) * 0.12 }}
+                      />
+                    ),
+                  )}
+                </div>
+                <p className="mt-5 text-[15px] leading-7 text-foreground/85">
+                  “Sunita, 42… fever since three days. Start paracetamol and review on Friday.”
+                </p>
+              </div>
             </div>
           </Reveal>
 
-          <Reveal distance={8} duration={0.4} delay={0.14}>
-            <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground lg:mt-9">
-              <span className="flex items-center gap-1.5">
-                <CheckIcon className="size-3.5 text-primary" aria-hidden />
-                Passwordless access
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CheckIcon className="size-3.5 text-primary" aria-hidden />
-                India data residency
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CheckIcon className="size-3.5 text-primary" aria-hidden />
-                Works on phone and desktop
-              </span>
-            </div>
-          </Reveal>
+          <div className="mt-8 grid max-w-[42rem] grid-cols-3 gap-5">
+            {workflow.map((item, index) => (
+              <Reveal key={item.title} distance={8} duration={0.4} delay={0.12 + index * 0.05}>
+                <div className="border-l border-border/70 pl-4">
+                  <div className="flex items-center gap-2">
+                    <item.icon className="size-3.5 text-primary" aria-hidden />
+                    <span className="tnum text-[10px] font-semibold text-muted-foreground">0{index + 1}</span>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold tracking-[-0.02em]">{item.title}</p>
+                  <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{item.copy}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </section>
 
-        <Reveal
-          distance={16}
-          duration={0.5}
-          delay={0.06}
-          className="order-1 w-full lg:order-2"
-        >
-          <Card className="mx-auto w-full max-w-[29rem] gap-0 overflow-hidden py-0">
+        <Reveal distance={18} duration={0.5} delay={0.04} className="w-full">
+          <div className="mb-7 lg:hidden">
+            <Badge className="mb-4">
+              <ShieldCheckIcon aria-hidden /> Secure clinical workspace
+            </Badge>
+            <h1 className="max-w-[12ch] text-4xl font-semibold leading-[0.98] tracking-[-0.055em]">
+              Your register, ready when you are.
+            </h1>
+          </div>
+
+          <Card className="mx-auto w-full max-w-[30rem] gap-0 overflow-hidden rounded-[2rem] py-0">
             {status === "sent" ? (
-              <div className="px-6 py-8 sm:px-8 sm:py-10">
-                <div className="flex size-12 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+              <div className="px-6 py-9 sm:px-8 sm:py-10">
+                <span className="grid size-14 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-[0_0_36px_-16px_var(--primary)]">
                   <MailCheckIcon className="size-6" aria-hidden />
-                </div>
-                <h2 className="mt-6 text-2xl font-semibold tracking-tight">Check your inbox</h2>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                </span>
+                <p className="section-kicker mt-8">Link sent securely</p>
+                <h2 className="mt-2 text-3xl font-semibold tracking-[-0.045em]">Check your inbox</h2>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">
                   We sent a secure {signingUp ? "account setup" : "sign-in"} link to{" "}
                   <span className="font-medium text-foreground">{email.trim()}</span>.
                 </p>
-
                 <Alert variant="success" className="mt-6" role="status">
                   <Clock3Icon className="mt-0.5 size-4" aria-hidden />
                   <AlertTitle>Use the newest email</AlertTitle>
-                  <AlertDescription>
-                    For your security, the link is single-use. You can open it on this device or
-                    your phone.
-                  </AlertDescription>
+                  <AlertDescription>The link is single-use and works on this device or your phone.</AlertDescription>
                 </Alert>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="lg"
-                  className="mt-7 w-full"
-                  onClick={() => setStatus("idle")}
-                >
+                <Button type="button" variant="outline" size="lg" className="mt-7 w-full" onClick={() => setStatus("idle")}>
                   Use a different email
                 </Button>
               </div>
             ) : (
               <>
-                <CardHeader className="border-b border-border/80 px-6 py-6 sm:px-8 sm:py-7">
-                  <div className="mb-3 flex items-center gap-2 text-xs font-medium text-primary">
+                <CardHeader className="border-b border-border/60 px-6 py-7 sm:px-8 sm:py-8">
+                  <div className="mb-4 flex items-center gap-2 text-xs font-medium text-primary">
                     <LockKeyholeIcon className="size-3.5" aria-hidden />
                     Secure clinic access
                   </div>
-                  <CardTitle className="text-2xl font-semibold leading-tight">
-                    {signingUp ? "Start your clinic register" : "Welcome back"}
+                  <CardTitle className="text-[1.75rem] font-semibold leading-tight tracking-[-0.04em]">
+                    {signingUp ? "Create your clinical workspace" : "Welcome back, doctor"}
                   </CardTitle>
-                  <CardDescription className="mt-1.5 text-sm leading-6">
+                  <CardDescription className="mt-2 text-sm leading-6">
                     {signingUp
-                      ? "Create your workspace with one secure email link."
-                      : "Sign in with the email linked to your clinic."}
+                      ? "Set up your private register with one secure email link."
+                      : "Continue to today’s register with your clinic email."}
                   </CardDescription>
                 </CardHeader>
 
-                <CardContent className="px-6 py-6 sm:px-8 sm:py-7">
+                <CardContent className="px-6 py-7 sm:px-8 sm:py-8">
                   <Tabs value={mode} onValueChange={changeMode}>
-                    <TabsList className="mb-6 grid h-10 w-full grid-cols-2">
-                      <TabsTrigger value="signin" className="h-8 text-sm">
-                        Sign in
-                      </TabsTrigger>
-                      <TabsTrigger value="signup" className="h-8 text-sm">
-                        Create account
-                      </TabsTrigger>
+                    <TabsList className="mb-7 grid h-11 w-full grid-cols-2 rounded-xl">
+                      <TabsTrigger value="signin" className="h-9 text-sm">Sign in</TabsTrigger>
+                      <TabsTrigger value="signup" className="h-9 text-sm">Create account</TabsTrigger>
                     </TabsList>
                   </Tabs>
 
                   <form onSubmit={submit} aria-busy={sending}>
                     <div className="space-y-5">
                       {signingUp && (
-                        <div className="space-y-2">
+                        <div className="space-y-2.5">
                           <Label htmlFor="full-name">Your name</Label>
                           <Input
                             id="full-name"
@@ -311,12 +292,12 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                               clearError();
                             }}
                             placeholder="Dr. Aditi Mehta"
-                            className="h-11 bg-background/50"
+                            className="h-12"
                           />
                         </div>
                       )}
 
-                      <div className="space-y-2">
+                      <div className="space-y-2.5">
                         <Label htmlFor="email">Work email</Label>
                         <Input
                           id="email"
@@ -333,11 +314,11 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                             clearError();
                           }}
                           placeholder="doctor@clinic.in"
-                          className="h-11 bg-background/50"
+                          className="h-12"
                         />
                         <p id="email-hint" className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-                          <MailCheckIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                          We&rsquo;ll email you a one-time link. No password to remember.
+                          <MailCheckIcon className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+                          We’ll email a one-time link. No password to remember.
                         </p>
                       </div>
                     </div>
@@ -345,30 +326,22 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                     {status === "error" && (
                       <Alert id="auth-error" variant="destructive" role="alert" className="mt-5">
                         <CircleAlertIcon className="mt-0.5 size-4" aria-hidden />
-                        <AlertTitle>Couldn&rsquo;t send the link</AlertTitle>
+                        <AlertTitle>Couldn’t send the link</AlertTitle>
                         <AlertDescription>{message}</AlertDescription>
                       </Alert>
                     )}
 
-                    <Button type="submit" size="lg" disabled={sending} className="mt-6 w-full">
+                    <Button type="submit" size="lg" disabled={sending} className="mt-7 w-full">
                       {sending ? (
-                        <>
-                          <LoaderCircleIcon className="animate-spin" aria-hidden />
-                          Sending secure link
-                        </>
+                        <><LoaderCircleIcon className="animate-spin" aria-hidden /> Sending secure link</>
                       ) : (
-                        <>
-                          {signingUp ? "Create account" : "Continue with email"}
-                          <ArrowRightIcon aria-hidden />
-                        </>
+                        <>{signingUp ? "Create account" : "Continue with email"}<ArrowRightIcon aria-hidden /></>
                       )}
                     </Button>
 
                     <div className="my-6 flex items-center gap-3">
                       <Separator className="flex-1" />
-                      <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                        Private by design
-                      </span>
+                      <span className="text-[9px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">Private by design</span>
                       <Separator className="flex-1" />
                     </div>
 
@@ -377,7 +350,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                       <button
                         type="button"
                         onClick={() => changeMode(signingUp ? "signin" : "signup")}
-                        className="font-medium text-primary underline-offset-4 hover:underline"
+                        className="inline-flex touch-manipulation items-center rounded-md font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-2"
                       >
                         {signingUp ? "Sign in" : "Create an account"}
                       </button>
@@ -388,10 +361,11 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
             )}
           </Card>
 
-          <p className="mx-auto mt-5 max-w-[26rem] text-center text-[11px] leading-5 text-muted-foreground">
-            Patient data is stored in the Mumbai region in line with ABDM&rsquo;s Health Data
-            Management Policy.
-          </p>
+          <div className="mx-auto mt-5 flex max-w-[28rem] flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[10px] font-medium text-muted-foreground">
+            <span className="flex items-center gap-1.5"><CheckIcon className="size-3 text-primary" aria-hidden /> Passwordless</span>
+            <span className="flex items-center gap-1.5"><CheckIcon className="size-3 text-primary" aria-hidden /> Mumbai region</span>
+            <span className="flex items-center gap-1.5"><CheckIcon className="size-3 text-primary" aria-hidden /> Mobile ready</span>
+          </div>
         </Reveal>
       </div>
     </main>

@@ -45,7 +45,7 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/45 dark:bg-black/65",
+        "fixed inset-0 z-50 bg-[#060812]/68 backdrop-blur-md",
         "data-[state=open]:animate-in data-[state=open]:fade-in-0",
         "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
         className,
@@ -77,13 +77,13 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "bg-popover text-popover-foreground fixed z-50 flex flex-col border border-border shadow-raise outline-none",
+          "glass-strong bg-popover/82 text-popover-foreground fixed z-50 flex flex-col border border-border/70 shadow-raise outline-none",
           "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-8",
           "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-8",
           "duration-300",
           side === "responsive" &&
-            "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl sm:inset-0 sm:m-auto sm:h-fit sm:max-h-[88dvh] sm:w-full sm:max-w-lg sm:rounded-2xl",
-          side === "bottom" && "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl",
+            "inset-x-2 bottom-2 max-h-[92dvh] rounded-[1.75rem] sm:inset-0 sm:m-auto sm:h-fit sm:max-h-[88dvh] sm:w-full sm:max-w-lg sm:rounded-[1.75rem]",
+          side === "bottom" && "inset-x-2 bottom-2 max-h-[92dvh] rounded-[1.75rem]",
           side === "top" && "inset-x-0 top-0 max-h-[92dvh] rounded-b-2xl",
           side === "right" && "inset-y-0 right-0 h-full w-3/4 max-w-sm sm:max-w-md",
           side === "left" && "inset-y-0 left-0 h-full w-3/4 max-w-sm sm:max-w-md",
@@ -98,7 +98,7 @@ function SheetContent({
           <div
             aria-hidden
             className={cn(
-              "bg-border mx-auto mt-2.5 h-1 w-9 shrink-0 rounded-full",
+              "bg-muted-foreground/35 mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full",
               side === "responsive" && "sm:hidden",
             )}
           />
@@ -107,7 +107,7 @@ function SheetContent({
         {children}
 
         {showClose && (
-          <SheetPrimitive.Close className="pressable text-muted-foreground hover:bg-secondary hover:text-foreground absolute top-3.5 right-3.5 grid size-8 place-items-center rounded-sm transition-colors">
+          <SheetPrimitive.Close className="pressable text-muted-foreground hover:bg-secondary/70 hover:text-foreground absolute top-3.5 right-3.5 grid size-9 place-items-center rounded-xl border border-transparent transition-colors hover:border-border/60">
             <XIcon className="size-4" aria-hidden />
             <span className="sr-only">Close</span>
           </SheetPrimitive.Close>
@@ -144,7 +144,7 @@ function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPr
   return (
     <SheetPrimitive.Title
       data-slot="sheet-title"
-      className={cn("text-foreground text-base font-medium tracking-tight", className)}
+      className={cn("text-foreground text-base font-semibold tracking-[-0.025em]", className)}
       {...props}
     />
   );

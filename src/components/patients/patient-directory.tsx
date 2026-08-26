@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LoaderCircleIcon, SearchIcon, UserRoundIcon, UsersRoundIcon } from "lucide-react";
+import {
+  ArrowUpRightIcon,
+  CalendarClockIcon,
+  LoaderCircleIcon,
+  SearchIcon,
+  UsersRoundIcon,
+} from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
@@ -16,12 +22,10 @@ const SEARCH_DEBOUNCE_MS = 300;
 /**
  * Every chart in the clinic, searchable.
  *
- * A real `<table>` from `sm` up and stacked rows below it. Five columns at
- * 430px is not a table, it is five illegible columns — and this app is used on
- * a phone, one-handed, between patients. The two renderings are deliberate
- * duplication: a table that has been reflowed into blocks with CSS keeps the
- * row/column semantics a screen reader announces while showing something that
- * no longer matches them.
+ * Charts remain cards at every breakpoint: names and recency are the dominant
+ * scanning cues, while age, phone and visit count stay in a consistent place.
+ * This avoids turning a wide desktop register into a dense spreadsheet that
+ * cannot preserve the same one-handed reading order on a phone.
  */
 export function PatientDirectory({
   patients,
@@ -60,21 +64,23 @@ export function PatientDirectory({
   const blank = patients.length === 0;
 
   return (
-    <div className="space-y-6">
-      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+    <div className="space-y-7">
+      <section className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
-          <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <UsersRoundIcon className="size-3.5" aria-hidden />
-            Every chart in the clinic
+          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+            <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary/10">
+              <UsersRoundIcon className="size-3.5" aria-hidden />
+            </span>
+            Clinical index
           </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">
+          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
             Patient directory
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Open any name for that patient&rsquo;s full medical history.
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+            Every chart, organised for a fast glance between consultations.
           </p>
         </div>
-        <p className="flex items-center gap-2 text-left text-sm text-muted-foreground sm:text-right">
+        <p className="glass-inset flex w-fit items-center gap-2 rounded-full px-3.5 py-2 text-left text-xs font-medium text-muted-foreground sm:text-right">
           {loading && !blank && (
             <LoaderCircleIcon className="size-3.5 animate-spin" aria-hidden />
           )}
@@ -94,7 +100,8 @@ export function PatientDirectory({
         </p>
       </section>
 
-      <section className="rounded-xl border border-border bg-card p-4 shadow-flat sm:p-5">
+      <section className="glass-strong relative overflow-hidden rounded-[1.5rem] p-3 sm:p-4">
+        <div className="ambient-orb pointer-events-none absolute -right-14 -top-16 size-36 opacity-45" aria-hidden />
         <form
           onSubmit={(event) => {
             // Nothing to submit — the debounce has already asked, or is about
@@ -103,9 +110,9 @@ export function PatientDirectory({
             onSearch(draft.trim());
           }}
         >
-          <div className="relative">
+          <div className="relative z-10">
             <SearchIcon
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-primary"
               aria-hidden
             />
             <Input
@@ -114,7 +121,7 @@ export function PatientDirectory({
               placeholder="Search by name, or the last digits of a phone number"
               aria-label="Search patients"
               maxLength={120}
-              className="h-11 pl-10"
+              className="glass-inset h-13 rounded-[1.1rem] border-white/10 bg-background/25 pl-11 pr-4 text-[15px] shadow-none placeholder:text-muted-foreground/65"
             />
           </div>
         </form>
@@ -131,7 +138,7 @@ export function PatientDirectory({
         )}
 
         {loading && blank ? (
-          <div className="grid min-h-56 place-items-center rounded-xl border border-border bg-card">
+          <div className="glass-card grid min-h-56 place-items-center rounded-[1.5rem]">
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <LoaderCircleIcon className="size-4 animate-spin" aria-hidden />
               Loading patients…
@@ -141,84 +148,51 @@ export function PatientDirectory({
           !error && <EmptyDirectory query={query} />
         ) : (
           <>
-            <div className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-flat sm:block">
-              <table className="w-full border-collapse text-sm">
-                <caption className="sr-only">
-                  Patients, most recently seen first. Select a name to open that chart.
-                </caption>
-                <thead>
-                  <tr className="border-b border-border bg-secondary/45 text-left text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                    <th scope="col" className="px-4 py-3 font-medium">Name</th>
-                    <th scope="col" className="px-4 py-3 font-medium">Age</th>
-                    <th scope="col" className="px-4 py-3 font-medium">Phone</th>
-                    <th scope="col" className="px-4 py-3 text-right font-medium">Visits</th>
-                    <th scope="col" className="px-4 py-3 text-right font-medium">Last seen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {patients.map((patient) => (
-                    <tr
-                      key={patient.id}
-                      className="border-b border-border transition-colors last:border-0 hover:bg-secondary/35"
-                    >
-                      <th scope="row" className="px-4 py-3 text-left font-medium">
-                        <button
-                          type="button"
-                          onClick={() => onOpenPatient(patient)}
-                          className="rounded-sm text-left underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          {patient.full_name}
-                        </button>
-                      </th>
-                      <td className="tnum px-4 py-3 text-muted-foreground">
-                        {patient.age_years == null ? <NotRecorded /> : patient.age_years}
-                      </td>
-                      <td className="tnum px-4 py-3 text-muted-foreground">
-                        {maskPhone(patient.phone) ?? <NotRecorded />}
-                      </td>
-                      <td className="tnum px-4 py-3 text-right">
-                        {formatCount(patient.visit_count ?? 0)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">
-                        <LastSeen occurredAt={patient.last_visit} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <ul className="space-y-2 sm:hidden">
+            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {patients.map((patient) => (
                 <li key={patient.id}>
                   <button
                     type="button"
                     onClick={() => onOpenPatient(patient)}
                     className={cn(
-                      "pressable slip-flat flex w-full items-center gap-3 px-4 py-3 text-left",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      "glass-card group relative flex min-h-44 w-full flex-col overflow-hidden rounded-[1.4rem] p-4 text-left",
+                      "transition-[transform,border-color,background-color,box-shadow] duration-300 hover:-translate-y-1 hover:border-primary/25 hover:bg-card/80 hover:shadow-[0_24px_70px_-34px_color-mix(in_oklab,var(--primary)_45%,transparent)]",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     )}
                   >
-                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/12 text-primary">
-                      <UserRoundIcon className="size-4" aria-hidden />
+                    <span className="pointer-events-none absolute -right-12 -top-12 size-28 rounded-full bg-primary/8 blur-2xl transition-colors group-hover:bg-primary/14" aria-hidden />
+                    <span className="relative flex w-full items-start gap-3">
+                      <span aria-hidden className="relative grid size-12 shrink-0 place-items-center rounded-[1rem] border border-primary/20 bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklab,var(--primary)_28%,transparent),transparent_68%)] text-sm font-semibold tracking-[-0.03em] text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_10px_30px_-18px_var(--primary)]">
+                        {patientInitials(patient.full_name)}
+                        <span className="absolute -bottom-1 -right-1 size-3 rounded-full border-2 border-card bg-emerald-400" aria-hidden />
+                      </span>
+                      <span className="min-w-0 flex-1 pt-0.5">
+                        <span className="block truncate text-[15px] font-semibold tracking-[-0.02em]">
+                          {patient.full_name}
+                        </span>
+                        <span className="mt-1 block truncate text-xs text-muted-foreground">
+                          {patient.age_years == null ? "Age not recorded" : `${patient.age_years} years`}
+                          <span aria-hidden> · </span>
+                          <span className="tnum">{maskPhone(patient.phone) ?? "No phone"}</span>
+                        </span>
+                      </span>
+                      <span className="grid size-8 shrink-0 place-items-center rounded-full border border-white/10 bg-white/5 text-muted-foreground transition-all group-hover:border-primary/25 group-hover:bg-primary/12 group-hover:text-primary">
+                        <ArrowUpRightIcon className="size-3.5" aria-hidden />
+                      </span>
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">
-                        {patient.full_name}
+
+                    <span className="mt-auto grid w-full grid-cols-[auto_1fr] items-end gap-3 pt-5">
+                      <span>
+                        <span className="tnum block text-2xl font-semibold tracking-[-0.05em]">
+                          {formatCount(patient.visit_count ?? 0)}
+                        </span>
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          recorded visit{patient.visit_count === 1 ? "" : "s"}
+                        </span>
                       </span>
-                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                        {patient.age_years == null ? "Age not recorded" : `Age ${patient.age_years}`}
-                        {" · "}
-                        <span className="tnum">{maskPhone(patient.phone) ?? "No phone"}</span>
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-right">
-                      <span className="block text-xs font-medium">
-                        <span className="tnum">{formatCount(patient.visit_count ?? 0)}</span>{" "}
-                        visit{patient.visit_count === 1 ? "" : "s"}
-                      </span>
-                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                        <LastSeen occurredAt={patient.last_visit} prefix="Last seen " />
+                      <span className="flex items-center justify-end gap-1.5 text-right text-[11px] text-muted-foreground">
+                        <CalendarClockIcon className="size-3.5 text-primary/75" aria-hidden />
+                        <LastSeen occurredAt={patient.last_visit} />
                       </span>
                     </span>
                   </button>
@@ -240,8 +214,8 @@ export function PatientDirectory({
 function EmptyDirectory({ query }: { query: string }) {
   const searching = query.trim().length > 0;
   return (
-    <div className="rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
-      <span className="mx-auto grid size-11 place-items-center rounded-xl bg-secondary text-muted-foreground">
+    <div className="glass-card rounded-[1.5rem] border-dashed px-6 py-14 text-center">
+      <span className="mx-auto grid size-12 place-items-center rounded-[1rem] border border-white/10 bg-primary/10 text-primary shadow-[0_12px_30px_-18px_var(--primary)]">
         <UsersRoundIcon className="size-5" aria-hidden />
       </span>
       <p className="mt-4 text-sm font-medium">
@@ -254,6 +228,16 @@ function EmptyDirectory({ query }: { query: string }) {
       </p>
     </div>
   );
+}
+
+function patientInitials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "PT";
 }
 
 /**
@@ -277,11 +261,3 @@ function LastSeen({ occurredAt, prefix = "" }: { occurredAt: string | null; pref
  * a screen reader either skips it or reads punctuation, neither of which is
  * "we do not have this".
  */
-function NotRecorded() {
-  return (
-    <>
-      <span aria-hidden>—</span>
-      <span className="sr-only">Not recorded</span>
-    </>
-  );
-}

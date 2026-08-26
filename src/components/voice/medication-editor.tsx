@@ -50,21 +50,22 @@ export function MedicationEditor({
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-muted-foreground text-[11px] tracking-[0.12em] uppercase">
-          Prescription
+        <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Medicines
         </p>
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={() => onChange([...value, { ...EMPTY_MEDICATION }])}
+          className="rounded-xl text-primary hover:bg-primary/10 hover:text-primary"
         >
           <Plus className="size-3" aria-hidden /> Add medicine
         </Button>
       </div>
 
       {value.length === 0 ? (
-        <p className="well text-muted-foreground mt-2 px-3 py-4 text-center text-xs">
+        <p className="glass-inset mt-2 rounded-xl border-white/8 bg-background/20 px-3 py-5 text-center text-xs text-muted-foreground">
           No medicines added.
         </p>
       ) : (
@@ -72,15 +73,24 @@ export function MedicationEditor({
           {value.map((medicine, index) => {
             const prefix = `prescription.${index}`;
             return (
-              <li key={index} className="slip-flat rounded-xl border border-border p-3">
+              <li
+                key={index}
+                className="glass-card relative overflow-hidden rounded-2xl border-white/8 bg-card/30 p-3.5 [&_[data-slot=input]]:rounded-xl [&_[data-slot=input]]:bg-background/25 [&_[data-slot=textarea]]:rounded-xl [&_[data-slot=textarea]]:bg-background/25"
+              >
+                <div className="pointer-events-none absolute -right-12 -top-14 size-32 rounded-full bg-primary/8 blur-3xl" aria-hidden />
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="text-foreground text-sm font-medium">Medicine {index + 1}</p>
+                  <p className="relative flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <span className="tnum grid size-6 place-items-center rounded-lg bg-primary/10 text-[0.625rem] text-primary">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    Medicine
+                  </p>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
                     onClick={() => onChange(value.filter((_, itemIndex) => itemIndex !== index))}
-                    className="hover:text-destructive"
+                    className="relative rounded-xl hover:bg-destructive/10 hover:text-destructive"
                   >
                     <Trash2 className="size-3.5" aria-hidden />
                     <span className="sr-only">Remove {medicine.drug_name || `medicine ${index + 1}`}</span>
@@ -251,7 +261,7 @@ function MedicationField({
       <Label
         htmlFor={reviewFieldId(fieldKey)}
         className={cn(
-          "text-muted-foreground mb-1.5 flex text-[11px] tracking-[0.1em] uppercase",
+          "mb-1.5 flex text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
           flagged && !reviewed && "text-warning",
         )}
       >
