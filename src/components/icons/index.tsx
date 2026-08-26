@@ -297,12 +297,6 @@ export const PlusIcon = createIcon("PlusIcon", [
 ]);
 export const Plus = PlusIcon;
 
-export const PrinterIcon = createIcon("PrinterIcon", [
-  path("M7 8V3.5h10V8M7 17H4.5A2.5 2.5 0 0 1 2 14.5v-4A2.5 2.5 0 0 1 4.5 8h15a2.5 2.5 0 0 1 2.5 2.5v4a2.5 2.5 0 0 1-2.5 2.5H17"),
-  rect(7, 14, 10, 7, 1, "paper"),
-  circle(18.5, 11.5, 0.4, "status"),
-]);
-
 export const Quote = createIcon("Quote", [
   path("M4 11.5h6V19H3.5v-4.2c0-5 2.2-8 6.5-9.8"),
   path("M14 11.5h6V19h-6.5v-4.2c0-5 2.2-8 6.5-9.8"),
