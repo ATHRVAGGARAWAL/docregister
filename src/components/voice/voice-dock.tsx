@@ -83,39 +83,43 @@ export function VoiceDock({
   /**
    * Whether the recording being held met a dead network on its way out.
    *
-   * `offline` cannot answer that by itself: once the connection is back it
-   * reads false again, and a recording stranded by an outage becomes
-   * indistinguishable from one the server refused. Remembering it is what lets
+   * `offline` cannot answer that alone: by the time the connection is back it
+   * reads false again, and a recording stranded by an outage is no longer
+   * distinguishable from one the server refused. Remembering it is what lets
    * the dock make the specific offer — the connection you lost is back, send
-   * the thing you already said — rather than the generic "try again".
+   * the thing you already said — instead of a generic "try again".
    *
-   * In memory, for the life of the page, and deliberately no further: what
-   * this refers to is consultation audio on a shared clinic phone. The
-   * reasoning is in offline-notice.tsx; please read it before adding storage.
+   * Snapshotted as the hold appears rather than in an effect, so the answer is
+   * on screen in the same paint as the failure. The second branch covers the
+   * order that is not guaranteed on a phone losing signal: the upload can
+   * reject a beat before the browser fires `offline`.
+   *
+   * This lives in memory for the life of the page and deliberately goes no
+   * further — what it refers to is consultation audio on a shared clinic
+   * phone. The reasoning is in offline-notice.tsx; read it before adding
+   * storage of any kind.
    */
-  const [heldThroughOutage, setHeldThroughOutage] = useState(false);
+  const [hold, setHold] = useState({ held: false, duringOutage: false });
+  if (hold.held !== canRetryTranscription) {
+    setHold({ held: canRetryTranscription, duringOutage: canRetryTranscription && offline });
+  } else if (hold.held && offline && !hold.duringOutage) {
+    setHold({ held: true, duringOutage: true });
+  }
 
-  useEffect(() => {
-    if (!canRetryTranscription) {
-      setHeldThroughOutage(false);
-      return;
-    }
-    if (offline && !heldThroughOutage) setHeldThroughOutage(true);
-  }, [canRetryTranscription, heldThroughOutage, offline]);
-
-  // Suppressed while busy, because a send already in flight is described by the
-  // dock's own working state and an offer to send it reads as a dock that has
-  // not noticed.
-  const heldRecording = canRetryTranscription && !busy && (offline || heldThroughOutage);
+  // Not while busy: a send already in flight is described by the dock's own
+  // working state, and offering to send it there reads as a dock that has not
+  // noticed. Not a claim that the upload will now succeed either — only that
+  // connectivity is the honest explanation to lead with.
+  const offlineHold = canRetryTranscription && !busy && (offline || hold.duringOutage);
 
   const sendHeldRecording = useCallback(() => {
-    // Forget the outage as the doctor acts on it. If this attempt fails for a
-    // reason that is not the network, the ordinary error path owns the
-    // explanation, and a stale "the connection is back" would sit on top of it
-    // offering the same button again. While the browser still reads offline
-    // the effect above re-arms this on the next render, which is right: there
-    // the outage is not past tense.
-    setHeldThroughOutage(false);
+    // Forget the outage as the doctor acts on it, so that a second failure for
+    // a reason that is not the network falls back to the ordinary error, with
+    // the server's own message, instead of "the connection is back" sitting on
+    // top of it offering the same button again. If the browser still reads
+    // offline the branch above re-arms this on the next render, which is
+    // right — there the outage is not in the past tense.
+    setHold((current) => ({ ...current, duringOutage: false }));
     onRetryTranscription();
   }, [onRetryTranscription]);
 
@@ -305,7 +309,7 @@ export function VoiceDock({
 
         <OfflineNotice
           offline={offline}
-          heldRecording={heldRecording}
+          heldRecording={offlineHold}
           onSend={sendHeldRecording}
           onManualEntry={onManualEntry}
         />
@@ -313,7 +317,7 @@ export function VoiceDock({
         {/* The notice above says all of this better when the network is why the
             upload failed, and says it without the raw "try again" that sends a
             doctor back into a retry that cannot work yet. */}
-        {error && !heldRecording && (
+        {error && !offlineHold && (
           <div className="col-span-full mt-2 flex flex-col gap-2 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <p role="alert" className="text-xs text-destructive">{error}</p>
             <div className="flex shrink-0 flex-wrap gap-2">

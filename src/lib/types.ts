@@ -15,6 +15,8 @@ export interface AnalyticsPayload {
   series: DailyPoint[];
   totals: Omit<DailyPoint, "day">;
   today: DailyPoint | null;
+  /** The last finished day, for comparisons `today` cannot honestly support. */
+  yesterday: DailyPoint | null;
   deltas: { patients: number | null };
 }
 

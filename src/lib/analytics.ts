@@ -79,18 +79,20 @@ export async function loadDailyStats(
     series,
     totals,
     today,
-    // Percentage deltas are computed here rather than in the component so the
-    // divide-by-zero case (a first day, or a holiday) is handled once.
-    deltas: {
-      patients: percentDelta(today?.patient_count, yesterday?.patient_count),
-    },
+    yesterday,
+    // Deliberately not a percentage.
+    //
+    // `today` is always the in-progress day — `series.at(-1)` is the current IST
+    // bucket — and `yesterday` is always a finished one. A percentage between
+    // the two is not a change, it is a clock reading: at 9am every doctor with
+    // any patients yesterday saw "-100%" in alarming red, and the number only
+    // stops being a lie some time in the evening.
+    //
+    // The raw pair beside it is true at every hour and lets the doctor make the
+    // comparison themselves, which is the one they can actually calibrate. Kept
+    // in the payload rather than dropped so the shape stays stable for callers.
+    deltas: { patients: null },
   };
-}
-
-function percentDelta(current?: number, previous?: number): number | null {
-  if (current === undefined || previous === undefined) return null;
-  if (!previous) return null;
-  return Math.round(((current - previous) / previous) * 100);
 }
 
 /** An empty payload, so a failed query renders an empty dashboard, not a crash. */
@@ -111,6 +113,7 @@ export function emptyAnalytics(days = 30): AnalyticsPayload {
     series,
     totals: { patient_count: 0, new_patients: 0, returning_patients: 0 },
     today: series.at(-1) ?? null,
+    yesterday: series.at(-2) ?? null,
     deltas: { patients: null },
   };
 }

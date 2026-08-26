@@ -11,6 +11,7 @@ const { WORKSPACES } = await import("./tests/e2e/fixtures/workspaces.ts");
 const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 const AXE = readFileSync("node_modules/axe-core/axe.min.js", "utf8");
 const PROBE = readFileSync("a11y-probe.js", "utf8");
+const THEME = process.env.THEME === "dark" ? "dark" : "light";
 
 const AXE_SRC = `window.axe.run(document, {
   runOnly: { type: "tag", values: ["wcag2a","wcag2aa","wcag21a","wcag21aa","wcag22aa","best-practice"] },
@@ -48,14 +49,16 @@ for (const vp of VIEWPORTS) {
     viewport: { width: vp.width, height: vp.height },
     timezoneId: "Asia/Kolkata",
     locale: "en-IN",
+    colorScheme: THEME === "dark" ? "dark" : "light",
   });
+  await ctx.addInitScript(`try { localStorage.setItem("theme", "${THEME}"); } catch (e) {}`);
   const page = await ctx.newPage();
 
   for (const ws of WORKSPACES) {
     await page.goto(`${BASE}/?view=${ws.view}`, { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle").catch(() => {});
     await page.waitForTimeout(700);
-    out.push(JSON.stringify({ vp: vp.name, view: ws.view, ...(await audit(page)) }));
+    out.push(JSON.stringify({ theme: THEME, vp: vp.name, view: ws.view, ...(await audit(page)) }));
   }
 
   if (vp.width < 1024) {
@@ -63,7 +66,7 @@ for (const vp of VIEWPORTS) {
     await page.waitForLoadState("networkidle").catch(() => {});
     await page.getByRole("button", { name: "Open workspace menu" }).click();
     await page.waitForTimeout(600);
-    out.push(JSON.stringify({ vp: vp.name, view: "overview[sheet-open]", ...(await audit(page)) }));
+    out.push(JSON.stringify({ theme: THEME, vp: vp.name, view: "overview[sheet-open]", ...(await audit(page)) }));
   }
 
   await ctx.close();

@@ -18,9 +18,12 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
       label: "Patients today",
       value: seen,
       format: formatCount,
+      // Yesterday's finished total rather than a percentage against it. Today is
+      // still running, so a percentage would be a clock reading dressed as a
+      // trend; the raw pair is true at every hour of the day.
       hint:
-        analytics.deltas.patients !== null
-          ? `${analytics.deltas.patients > 0 ? "+" : ""}${analytics.deltas.patients}% vs yesterday`
+        analytics.yesterday
+          ? `${formatCount(analytics.yesterday.patient_count)} seen yesterday`
           : "Live clinic count",
       swatch: "var(--primary)",
     },

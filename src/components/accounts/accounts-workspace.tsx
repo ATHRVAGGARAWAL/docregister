@@ -317,9 +317,12 @@ function BadgeTabs({
                   initial={{ scale: 0.7, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.7, opacity: 0 }}
-                  // The pill keeps its light background on the selected tab too, so it
-                  // cannot inherit that tab's white text — the count measured 1.09:1
-                  // against it, i.e. invisible.
+                  // The count sits on --secondary and would otherwise inherit the
+                  // selected tab's --primary-foreground. In the light theme
+                  // --secondary is a near-white, against which that white measures
+                  // 1.09:1 — invisible; in dark it is a near-black, where the same
+                  // white would have been fine. Pinning --secondary-foreground is
+                  // the one rule legible in both: 15.5:1 light, 12.8:1 dark.
                   className={cn(
                     "tnum rounded-full bg-secondary px-1.5 py-0.5 text-xs leading-none",
                     active ? "text-secondary-foreground" : "text-current",

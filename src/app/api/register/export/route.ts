@@ -27,7 +27,11 @@ import { callWorkflow } from "@/lib/supabase/workflows";
  * for a file that leaves the building.
  */
 
-export const runtime = "nodejs";
+/**
+ * A maximal range walks forty pages of `register_search`, so the budget has to
+ * cover far more than one query. Same ceiling the recall route runs at.
+ */
+export const maxDuration = 60;
 
 /** `searchRegister`'s own ceiling, so this is the fewest round trips possible. */
 const PAGE_SIZE = 500;
@@ -53,7 +57,7 @@ const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 export const GET = withDoctor(async ({ doctor, supabase, request }) => {
   const url = new URL(request.url);
 
-  const format = url.searchParams.get("format") ?? "csv";
+  const format = url.searchParams.get("format")?.trim() || "csv";
   if (format !== "csv") throw new ApiError("Only `csv` export is supported.");
 
   const today = todayInIndia();
@@ -74,18 +78,23 @@ export const GET = withDoctor(async ({ doctor, supabase, request }) => {
 
   const rows: RegisterExportRow[] = [];
   // `register_search` orders by `occurred_at desc`, so a visit committed while
-  // this is paging lands on page 0 and pushes every later page down by one row
-  // — which an offset walk sees as the same encounter twice. Deduplicating by
-  // id costs one Set and removes the whole class of duplicate.
+  // this is paging lands on page 0 and shifts every later page down by a row —
+  // which an offset walk reads as the same encounter twice. The Set removes
+  // that duplicate. It does not turn the walk into a snapshot: a visit recorded
+  // after the export began can still be missed, which is the honest answer for
+  // a file the doctor asked for a moment ago.
   const seen = new Set<string>();
   let offset = 0;
 
   for (;;) {
     const page = await searchRegister(supabase, doctor.id, { limit: PAGE_SIZE, offset, days });
 
+    // `totalCount` counts everything at or after `from`, including visits later
+    // than `to` that get trimmed below — so the message names the start date,
+    // which is the parameter that actually changes how much has to be read.
     if (offset === 0 && page.totalCount > MAX_ROWS) {
       throw new ApiError(
-        `That range holds ${page.totalCount} visits, more than one file can carry. Export a shorter range.`,
+        `Reading back to ${from} covers ${page.totalCount} visits, more than one file can carry. Choose a later start date.`,
         413,
       );
     }
@@ -136,7 +145,11 @@ export const GET = withDoctor(async ({ doctor, supabase, request }) => {
 function readDay(value: string | null, fallback: string, field: string): string {
   const day = value?.trim() ?? "";
   if (day === "") return fallback;
-  if (!ISO_DAY.test(day) || Number.isNaN(Date.parse(`${day}T00:00:00Z`))) {
+  // The round-trip is the real check. `Date.parse` rolls an impossible day over
+  // rather than rejecting it — "2026-02-30" becomes 2 March — so without it the
+  // file would be named for a date the data does not cover.
+  const parsed = new Date(`${day}T00:00:00Z`);
+  if (!ISO_DAY.test(day) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== day) {
     throw new ApiError(`\`${field}\` must be a date like 2026-07-01.`);
   }
   return day;

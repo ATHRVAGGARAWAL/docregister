@@ -54,11 +54,13 @@ type VisitActions = {
 export function RegisterTimeline({
   entries,
   compact = false,
-  // Overview shows this list too, so the defaults have to read correctly there:
-  // an empty list on Overview means "nothing dictated today", not "nothing matched".
-  // The register passes filter-aware copy instead — telling a doctor to adjust
-  // filters that are not on the screen sends them hunting for a control one view away.
-  emptyTitle = "No visits recorded yet",
+  // Only the caller knows which slice of the register it handed over — Overview
+  // passes today's visits, the register passes a filtered page — so the default
+  // says this list is empty and claims nothing about the register behind it. A
+  // default like "no visits recorded yet" would tell a doctor who saw ten
+  // patients yesterday and none yet today that the whole register was gone.
+  // Callers that know their own scope pass copy that says so.
+  emptyTitle = "No visits to show",
   emptyHint = "Dictate a visit and it appears here.",
   onOpenPatient,
   onOpenDraft,

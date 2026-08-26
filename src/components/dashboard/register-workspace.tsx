@@ -28,6 +28,9 @@ const RANGES = [
   { label: "90 days", days: 90 },
 ] as const;
 
+/** The widest window the filter offers, so the empty state never suggests a longer one. */
+const LONGEST_RANGE_DAYS = Math.max(...RANGES.map((option) => option.days));
+
 const STATUSES = [
   { label: "All", value: "all" },
   { label: "Confirmed", value: "committed" },
@@ -96,6 +99,7 @@ export function RegisterWorkspace({
         ? discardedCount
         : totalCount;
   const page = registerPageRange(totalCount, offset, entries.length || limit);
+  const empty = emptyStateCopy(days, status, query, committedCount + draftCount + discardedCount);
 
   return (
     <div className="space-y-5 sm:space-y-7">
@@ -268,8 +272,8 @@ export function RegisterWorkspace({
         ) : (
           <RegisterTimeline
             entries={entries}
-            emptyTitle="No visits match these filters"
-            emptyHint="Widen the date range, choose a different status, or clear the search."
+            emptyTitle={empty.title}
+            emptyHint={empty.hint}
             onOpenPatient={onOpenPatient}
             onOpenDraft={onOpenDraft}
             onRestoreDraft={onRestoreDraft}
@@ -295,4 +299,36 @@ export function RegisterWorkspace({
       )}
     </div>
   );
+}
+
+/**
+ * An empty register has two causes and they need different answers. Filters that
+ * excluded everything are fixable on this screen; a stretch of days in which the
+ * doctor saw nobody is not, and answering that with "adjust your filters" while
+ * every filter sits at its default points at controls that would not have helped.
+ *
+ * `windowCount` is the three status counts added up, and register_totals computes
+ * those over the date range and the search term but not the status tab. Above
+ * zero it means the window does hold visits and a tab is hiding them — including
+ * the "All" tab, which leaves out discarded drafts by design.
+ */
+function emptyStateCopy(
+  days: number,
+  status: RegisterStatus,
+  query: string,
+  windowCount: number,
+): { title: string; hint: string } {
+  if (status !== "all" || query.trim() !== "" || windowCount > 0) {
+    return {
+      title: "No visits match these filters",
+      hint: "Widen the date range, choose a different status, or clear the search.",
+    };
+  }
+  return {
+    title: days === 1 ? "No visits recorded today" : `No visits in the last ${days} days`,
+    hint:
+      days < LONGEST_RANGE_DAYS
+        ? "Dictate a visit and it appears here, or choose a longer date range."
+        : "Dictate a visit and it appears here.",
+  };
 }
