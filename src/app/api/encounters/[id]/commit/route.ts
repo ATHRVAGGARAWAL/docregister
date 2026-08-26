@@ -46,7 +46,7 @@ interface AccountEntryResult {
   id: string;
 }
 
-export const POST = withDoctor<Params>(async ({ supabase, request, params }) => {
+export const POST = withDoctor<Params>(async ({ doctor, supabase, request, params }) => {
   const body = await readBody<CommitBody>(request);
   const idempotencyKey = body.idempotencyKey?.trim() || null;
   const amountPaise = optionalAmountPaise(body.consultationFeeInr);
@@ -55,62 +55,20 @@ export const POST = withDoctor<Params>(async ({ supabase, request, params }) => 
     throw new ApiError("Choose an existing patient or add a new one before saving.");
   }
 
-  // Idempotency claim, optional patient creation, patient locking, visit-number
-  // assignment and the draft-to-committed transition all happen in this single
-  // transaction. A duplicate phone is deliberately a conflict: a number is a
-  // search hint, never enough evidence to silently attach a visit to a chart.
-  let { data, error } = await callWorkflow<CommitResult[]>(
+  // Commit the clinical record first through the established patient-scoped
+  // workflow. Accounts is deliberately attempted afterwards: a ledger problem
+  // must never prevent a reviewed prescription reaching the correct chart.
+  // The idempotency key makes a retry safe if the response is lost.
+  const { data, error } = await callWorkflow<CommitResult[]>(
     supabase,
-    "commit_encounter_with_income_workflow",
+    "commit_encounter_workflow",
     {
       p_encounter_id: params.id,
       p_patient_id: body.patientId ?? null,
       p_new_patient: body.newPatient ?? null,
       p_idempotency_key: idempotencyKey,
-      p_amount_paise: amountPaise,
     },
   );
-
-  let fallbackAccountEntryId: string | null = null;
-  let accountEntryError = false;
-
-  // Keep rolling deployments safe: Vercel may receive this route a few minutes
-  // before migration 0018 reaches Supabase. The existing workflows still
-  // complete the visit and create the linked Accounts row; once the migration
-  // is installed, the same work happens atomically in PostgreSQL.
-  if (error && (error.code === "PGRST202" || error.code === "42883")) {
-    ({ data, error } = await callWorkflow<CommitResult[]>(supabase, "commit_encounter_workflow", {
-      p_encounter_id: params.id,
-      p_patient_id: body.patientId ?? null,
-      p_new_patient: body.newPatient ?? null,
-      p_idempotency_key: idempotencyKey,
-    }));
-
-    const committed = data?.[0];
-    if (!error && committed && amountPaise !== null) {
-      const account = await callWorkflow<AccountEntryResult | AccountEntryResult[]>(
-        supabase,
-        "create_account_entry",
-        {
-          p_kind: "income",
-          p_status: "paid",
-          p_amount_paise: amountPaise,
-          p_category: "Consultation",
-          p_payment_method: null,
-          p_counterparty: body.newPatient?.full_name?.trim() || null,
-          p_note: "Captured from the reviewed visit amount",
-          p_occurred_at: new Date().toISOString(),
-          p_patient_id: committed.patient_id,
-          p_encounter_id: committed.encounter_id,
-          p_idempotency_key: `visit-${committed.encounter_id}`,
-        },
-      );
-      const entry = Array.isArray(account.data) ? account.data[0] : account.data;
-      fallbackAccountEntryId = entry?.id ?? null;
-      accountEntryError = Boolean(account.error || !entry);
-      if (account.error) console.error("[commit] fallback account entry failed", account.error);
-    }
-  }
 
   if (error) {
     console.error("[commit] workflow failed", error);
@@ -138,13 +96,85 @@ export const POST = withDoctor<Params>(async ({ supabase, request, params }) => 
   const result = data?.[0];
   if (!result) throw new ApiError("Could not save this visit to the register.", 500);
 
+  const { data: savedEncounter, error: verificationError } = await supabase
+    .from("encounters")
+    .select("id, patient_id, status")
+    .eq("id", result.encounter_id)
+    .eq("doctor_id", doctor.id)
+    .eq("clinic_id", doctor.clinic_id)
+    .maybeSingle();
+  const expectedPatientId = body.patientId ?? result.patient_id;
+  if (
+    verificationError ||
+    !savedEncounter ||
+    savedEncounter.id !== params.id ||
+    savedEncounter.status !== "committed" ||
+    savedEncounter.patient_id !== result.patient_id ||
+    result.patient_id !== expectedPatientId
+  ) {
+    console.error("[commit] ownership verification failed", {
+      code: verificationError?.code,
+      requestedEncounterMatches: result.encounter_id === params.id,
+      selectedPatientMatches: result.patient_id === expectedPatientId,
+      rowVerified: Boolean(savedEncounter),
+    });
+    throw new ApiError("The saved visit could not be verified against the selected patient.", 503);
+  }
+
+  let accountEntryId: string | null = null;
+  let accountEntryError = false;
+
+  if (amountPaise !== null) {
+    // Migration 0018 owns the visit-income source and clears the temporary fee
+    // from the clinical JSON. Running it after the clinical commit makes an
+    // Accounts failure non-fatal while retaining its idempotent behaviour.
+    const income = await callWorkflow<CommitResult[]>(
+      supabase,
+      "commit_encounter_with_income_workflow",
+      {
+        p_encounter_id: params.id,
+        p_patient_id: body.patientId ?? null,
+        p_new_patient: body.newPatient ?? null,
+        p_idempotency_key: idempotencyKey,
+        p_amount_paise: amountPaise,
+      },
+    );
+    const incomeResult = income.data?.[0];
+    accountEntryId = incomeResult?.account_entry_id ?? null;
+
+    if (income.error || !accountEntryId) {
+      if (income.error) console.error("[commit] visit income workflow failed", income.error);
+      const account = await callWorkflow<AccountEntryResult | AccountEntryResult[]>(
+        supabase,
+        "create_account_entry",
+        {
+          p_kind: "income",
+          p_status: "paid",
+          p_amount_paise: amountPaise,
+          p_category: "Consultation",
+          p_payment_method: null,
+          p_counterparty: body.newPatient?.full_name?.trim() || null,
+          p_note: "Captured from the reviewed visit amount",
+          p_occurred_at: new Date().toISOString(),
+          p_patient_id: result.patient_id,
+          p_encounter_id: result.encounter_id,
+          p_idempotency_key: `visit-${result.encounter_id}`,
+        },
+      );
+      const entry = Array.isArray(account.data) ? account.data[0] : account.data;
+      accountEntryId = entry?.id ?? null;
+      accountEntryError = Boolean(account.error || !entry);
+      if (account.error) console.error("[commit] fallback account entry failed", account.error);
+    }
+  }
+
   return NextResponse.json({
     encounterId: result.encounter_id,
     patientId: result.patient_id,
     visitNumber: result.visit_number,
     isNewPatient: result.is_new_patient,
     alreadyCommitted: result.already_committed,
-    accountEntryId: result.account_entry_id ?? fallbackAccountEntryId,
+    accountEntryId,
     accountEntryError,
   });
 }, { rateLimit: "commit" });

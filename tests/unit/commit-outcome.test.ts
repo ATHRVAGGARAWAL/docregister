@@ -29,3 +29,27 @@ test("an incomplete commit result never opens post-commit actions", () => {
     /missing its patient/,
   );
 });
+
+test("a commit for a different patient never opens the success screen", () => {
+  const payload = {
+    encounterId: "11111111-1111-4111-8111-111111111111",
+    patientId: "22222222-2222-4222-8222-222222222222",
+    visitNumber: 7,
+    isNewPatient: false,
+    alreadyCommitted: false,
+    accountEntryId: null,
+    accountEntryError: false,
+  };
+  let propagated = false;
+
+  assert.throws(
+    () => propagateCommitOutcome(payload, () => {
+      propagated = true;
+    }, {
+      encounterId: payload.encounterId,
+      patientId: "33333333-3333-4333-8333-333333333333",
+    }),
+    /selected patient/,
+  );
+  assert.equal(propagated, false);
+});

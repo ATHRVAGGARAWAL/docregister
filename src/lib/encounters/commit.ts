@@ -7,13 +7,17 @@ import type { CommitOutcome } from "@/lib/types";
 export function propagateCommitOutcome(
   value: unknown,
   onCommitted: (outcome: CommitOutcome) => void,
+  expected?: { encounterId: string; patientId?: string | null },
 ): CommitOutcome {
-  const outcome = parseCommitOutcome(value);
+  const outcome = parseCommitOutcome(value, expected);
   onCommitted(outcome);
   return outcome;
 }
 
-export function parseCommitOutcome(value: unknown): CommitOutcome {
+export function parseCommitOutcome(
+  value: unknown,
+  expected?: { encounterId: string; patientId?: string | null },
+): CommitOutcome {
   if (!value || typeof value !== "object") throw new Error("The saved visit response was incomplete.");
 
   const candidate = value as Partial<CommitOutcome>;
@@ -37,6 +41,12 @@ export function parseCommitOutcome(value: unknown): CommitOutcome {
   }
   if (typeof candidate.accountEntryError !== "boolean") {
     throw new Error("The saved visit response had invalid account status.");
+  }
+  if (expected && candidate.encounterId !== expected.encounterId) {
+    throw new Error("The saved visit could not be verified against this draft.");
+  }
+  if (expected?.patientId && candidate.patientId !== expected.patientId) {
+    throw new Error("The saved visit could not be verified against the selected patient.");
   }
 
   return candidate as CommitOutcome;

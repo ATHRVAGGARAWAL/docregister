@@ -37,10 +37,27 @@ import {
 } from "@/lib/encounters/review";
 import { PATIENT_SEX_OPTIONS } from "@/lib/encounters/review";
 import { propagateCommitOutcome } from "@/lib/encounters/commit";
+import { createDraftSaveQueue } from "@/lib/encounters/draft-save-queue";
 import { formatVisitDay, maskPhone } from "@/lib/format";
 import type { CommitOutcome } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { MedicationEditor } from "@/components/voice/medication-editor";
+
+interface DraftUpdatePayload {
+  patient_name_spoken: string;
+  age_years: number | null;
+  diagnosis: string | null;
+  treatment: string | null;
+  consultation_fee_inr: number | null;
+  prescription: ReviewMedication[];
+}
+
+class DraftSaveError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "DraftSaveError";
+  }
+}
 
 /**
  * The confirmation step — the only place a dictated visit becomes a record.
@@ -92,13 +109,39 @@ export function ReviewSheet({
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
-  const [draftVersion, setDraftVersion] = useState<number>(() => {
+  const [draftSaveQueue] = useState(() => {
     const version = (draft as ReviewDraft & { version?: number }).version;
-    return Number.isInteger(version) && version! > 0 ? version! : 1;
+    const initialVersion = Number.isInteger(version) && version! > 0 ? version! : 1;
+    return createDraftSaveQueue<DraftUpdatePayload>(
+      initialVersion,
+      async (payload, expectedVersion) => {
+        const response = await fetch(`/api/drafts/${draft.encounterId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, expectedVersion }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (response.status === 401) {
+            window.dispatchEvent(new Event("docregister:session-expired"));
+          }
+          throw new DraftSaveError(
+            typeof body?.error === "string" ? body.error : "Could not save your draft.",
+            response.status,
+          );
+        }
+        const nextVersion = Number(body?.version);
+        return {
+          version: Number.isInteger(nextVersion) && nextVersion > 0
+            ? nextVersion
+            : expectedVersion + 1,
+        };
+      },
+    );
   });
   const [autosaveState, setAutosaveState] = useState<"saved" | "saving" | "error" | "conflict">("saved");
   const autosaveStateRef = useRef<"saved" | "saving" | "error" | "conflict">("saved");
-  const skipNextAutosaveRef = useRef(false);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstAutosave = useRef(true);
 
   // Stable across retries so a double-tap on a slow connection commits once.
@@ -232,9 +275,8 @@ export function ReviewSheet({
     }
   }
 
-  const draftPayload = useMemo(
+  const draftPayload = useMemo<DraftUpdatePayload>(
     () => ({
-      expectedVersion: draftVersion,
       patient_name_spoken: name.trim(),
       age_years: parseNumber(age),
       diagnosis: diagnosis.trim() || null,
@@ -242,7 +284,7 @@ export function ReviewSheet({
       consultation_fee_inr: parseOptionalMoney(consultationFee),
       prescription: drugs,
     }),
-    [age, consultationFee, diagnosis, draftVersion, drugs, name, treatment],
+    [age, consultationFee, diagnosis, drugs, name, treatment],
   );
 
   // Voice capture already creates the draft server-side. Once a doctor starts
@@ -253,41 +295,32 @@ export function ReviewSheet({
       firstAutosave.current = false;
       return;
     }
-    if (skipNextAutosaveRef.current) {
-      skipNextAutosaveRef.current = false;
-      return;
-    }
-    if (commitOutcome || !isDirty || autosaveStateRef.current === "conflict") return;
-    const timer = setTimeout(async () => {
+    if (commitOutcome || saving || !isDirty || autosaveStateRef.current === "conflict") return;
+    const timer = setTimeout(() => {
+      autosaveTimerRef.current = null;
       autosaveStateRef.current = "saving";
       setAutosaveState("saving");
-      try {
-        const response = await fetch(`/api/drafts/${draft.encounterId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(draftPayload),
-        });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          if (response.status === 409) {
+      void draftSaveQueue.enqueue(draftPayload)
+        .then(() => {
+          autosaveStateRef.current = "saved";
+          setAutosaveState("saved");
+        })
+        .catch((error) => {
+          if (error instanceof DraftSaveError && error.status === 409) {
             autosaveStateRef.current = "conflict";
             setAutosaveState("conflict");
+          } else {
+            autosaveStateRef.current = "error";
+            setAutosaveState("error");
           }
-          throw new Error(body?.error ?? "Could not autosave this draft.");
-        }
-        skipNextAutosaveRef.current = true;
-        setDraftVersion(Number(body.version ?? draftVersion + 1));
-        autosaveStateRef.current = "saved";
-        setAutosaveState("saved");
-      } catch {
-        if (autosaveStateRef.current !== "conflict") {
-          autosaveStateRef.current = "error";
-          setAutosaveState("error");
-        }
-      }
+        });
     }, 600);
-    return () => clearTimeout(timer);
-  }, [commitOutcome, draft.encounterId, draftPayload, draftVersion, isDirty]);
+    autosaveTimerRef.current = timer;
+    return () => {
+      clearTimeout(timer);
+      if (autosaveTimerRef.current === timer) autosaveTimerRef.current = null;
+    };
+  }, [commitOutcome, draftPayload, draftSaveQueue, isDirty, saving]);
 
   async function save() {
     const firstPendingReview = checklist.findIndex((item) => !reviewedKeys.has(item.key));
@@ -321,17 +354,28 @@ export function ReviewSheet({
 
     setSaving(true);
     setFailure(null);
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
 
+    let draftPersisted = false;
     try {
-      const patch = await fetch(`/api/drafts/${draft.encounterId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draftPayload),
-      });
-      if (!patch.ok) throw new Error(await errorMessage(patch, "Could not save edits."));
-      const saved = await patch.json().catch(() => ({}));
-      skipNextAutosaveRef.current = true;
-      setDraftVersion(Number(saved.version ?? draftVersion + 1));
+      // If autosave is already in flight, this waits for it and then writes the
+      // final payload with the newly returned version. The two requests can no
+      // longer reject one another as stale.
+      try {
+        await draftSaveQueue.enqueue(draftPayload);
+        draftPersisted = true;
+        autosaveStateRef.current = "saved";
+        setAutosaveState("saved");
+      } catch (error) {
+        // A lost response can leave the visit committed on the server while
+        // this screen still looks open. The draft endpoint then returns 404;
+        // continue to the idempotent commit call so it can confirm that save
+        // instead of trapping the doctor behind a false failure.
+        if (!(error instanceof DraftSaveError) || error.status !== 404) throw error;
+      }
 
       const commit = await fetch(`/api/encounters/${draft.encounterId}/commit`, {
         method: "POST",
@@ -358,10 +402,18 @@ export function ReviewSheet({
       }
 
       navigator.vibrate?.([8, 40, 8]);
-      const outcome = propagateCommitOutcome(commitBody, onCommitted);
+      const outcome = propagateCommitOutcome(commitBody, onCommitted, {
+        encounterId: draft.encounterId,
+        patientId: patient?.id ?? null,
+      });
       setCommitOutcome(outcome);
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : "Could not save the visit.");
+      const message = error instanceof Error ? error.message : "Could not save the visit.";
+      setFailure(
+        draftPersisted
+          ? `${message} Your reviewed draft is saved — correct anything mentioned, then try saving again.`
+          : `${message} Your edits are still on screen — try saving again.`,
+      );
     } finally {
       setSaving(false);
     }
@@ -1151,22 +1203,6 @@ function parseOptionalMoney(value: string): number | null {
   return consultationFeeError(value) ? null : parseNumber(value);
 }
 
-/**
- * A failed request does not promise a JSON body — a proxy 502 or an offline
- * browser returns HTML, and `.json()` then throws a SyntaxError that replaces
- * the message the doctor should have seen with a parser error.
- */
-async function errorMessage(response: Response, fallback: string): Promise<string> {
-  if (response.status === 401 && typeof window !== "undefined") {
-    window.dispatchEvent(new Event("docregister:session-expired"));
-  }
-  try {
-    const body = await response.json();
-    return typeof body?.error === "string" ? body.error : fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 /**
  * The one place a reviewed visit can be thrown away by accident.
