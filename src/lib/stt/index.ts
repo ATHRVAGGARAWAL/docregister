@@ -68,8 +68,10 @@ function fallbackFor(primary: SttProvider): SttProvider | undefined {
  * Two things to check before raising it. `/api/drafts/[id]/retry` also pays for
  * extraction in the same request — a further `BUDGET_MS.precise.total` (36s, in
  * src/lib/llm/index.ts) — so 40 + 36 puts it past 60 before any of its own work
- * is counted. That route declares its own longer `maxDuration` for exactly this
- * reason; raising `STT_TIMEOUT_MS` moves that number too. And Sarvam's
+ * is counted. That route still declares 60 and knows it does not fit — the
+ * overflow is written down in its own header, because Vercel's Hobby plan caps
+ * a Node function there and a declaration the plan rejects fails the deploy.
+ * Raising `STT_TIMEOUT_MS` widens that acknowledged gap. And Sarvam's
  * romanisation pass is not part of the 40s above — it runs after a *successful*
  * primary, and is capped separately in `sarvam.ts` so a nicety cannot push a
  * finished transcript past the ceiling.

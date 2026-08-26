@@ -4,8 +4,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+// Focus is marked twice on a Button, and that is now deliberate. The base
+// `:focus-visible` rule in globals.css paints an outline with `!important`, so a
+// `focus-visible:outline-none` here cannot suppress it — importance outranks
+// layer order — and a component that has to be overruled to stay accessible is
+// one grep away from being copied. The ring sits inside that outline rather than
+// replacing it.
+//
+// `--ring` (#0046b8) measures 8.18:1 on `--background`, well past the 3:1 a
+// focus indicator owes. The earlier 25%-opacity ring measured ~1.4:1, which is
+// what the full token replaced.
 const buttonVariants = cva(
-  "pressable inline-flex shrink-0 touch-manipulation items-center justify-center gap-2 rounded-lg border border-transparent text-sm font-medium tracking-[-0.01em] whitespace-nowrap outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/25 disabled:pointer-events-none disabled:opacity-45 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "pressable inline-flex shrink-0 touch-manipulation items-center justify-center gap-2 rounded-lg border border-transparent text-sm font-medium tracking-[-0.01em] whitespace-nowrap select-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-45 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
