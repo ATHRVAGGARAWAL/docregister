@@ -81,7 +81,7 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
               </p>
             </div>
 
-            <p className="tnum mt-2.5 text-[1.75rem] font-semibold leading-none tracking-[-0.055em] text-foreground sm:mt-3 sm:text-[2rem]">
+            <p className="mt-2.5 text-[1.75rem] font-semibold leading-none tracking-[-0.055em] text-foreground tabular-nums sm:mt-3 sm:text-[2rem]">
               <CountUp
                 to={tile.value}
                 duration={0.9}

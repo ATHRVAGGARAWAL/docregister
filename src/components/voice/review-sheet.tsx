@@ -124,6 +124,7 @@ export function ReviewSheet({
   const [romanText, setRomanText] = useState(draft.romanText);
   const [degraded, setDegraded] = useState(draft.degraded);
   const [commitOutcome, setCommitOutcome] = useState<CommitOutcome | null>(null);
+  const pendingReviewCount = checklist.filter((item) => !reviewedKeys.has(item.key)).length;
 
   // Has the doctor put anything of their own into this sheet? Only used to
   // decide whether an accidental dismissal is allowed to throw the visit away
@@ -283,6 +284,12 @@ export function ReviewSheet({
   }, [commitOutcome, draft.encounterId, draftPayload, draftVersion, isDirty]);
 
   async function save() {
+    const firstPendingReview = checklist.findIndex((item) => !reviewedKeys.has(item.key));
+    if (firstPendingReview >= 0) {
+      setFailure("Review every flagged detail before saving this visit.");
+      focusReviewItem(firstPendingReview);
+      return;
+    }
     if (!name.trim()) {
       setFailure("A patient name is required.");
       return;
@@ -423,73 +430,75 @@ export function ReviewSheet({
         }}
         onPointerDownOutside={(event) => event.preventDefault()}
       >
-        <SheetHeader className="border-b border-border px-5 pb-4 pt-5 sm:px-6">
+        <SheetHeader className="border-b border-border px-4 pb-3 pt-3 sm:px-6 sm:pb-4 sm:pt-5">
           <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary-soft text-primary">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary-soft text-primary sm:size-10">
               <ShieldCheck className="size-4" aria-hidden />
             </span>
             <div>
-              <SheetTitle className="text-lg font-semibold tracking-[-0.025em]">Review &amp; confirm</SheetTitle>
-              <SheetDescription className="mt-1 leading-5">
+              <SheetTitle className="text-base font-semibold tracking-[-0.025em] sm:text-lg">Review &amp; confirm</SheetTitle>
+              <SheetDescription className="mt-1 hidden leading-5 sm:block">
                 Check every clinical detail before it enters the patient register.
               </SheetDescription>
             </div>
           </div>
         </SheetHeader>
 
-        <Alert variant="default" role="note" className="surface-inset mx-4 mb-3 mt-3 w-auto shrink-0 border-primary/20 bg-primary-soft sm:mx-6">
-          <ShieldCheck className="mt-0.5 size-4 text-primary" aria-hidden />
-          <AlertTitle className="text-xs font-semibold">Not saved yet</AlertTitle>
-          <AlertDescription>
-            Transcription and extraction are suggestions. You remain the final reviewer.
-          </AlertDescription>
-        </Alert>
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 sm:px-6 sm:pb-5">
+          <Alert variant="default" role="note" className="surface-inset mb-3 mt-3 w-auto border-primary/20 bg-primary-soft">
+            <ShieldCheck className="mt-0.5 size-4 text-primary" aria-hidden />
+            <AlertTitle className="text-xs font-semibold">Not saved yet</AlertTitle>
+            <AlertDescription className="hidden sm:block">
+              Transcription and extraction are suggestions. You remain the final reviewer.
+            </AlertDescription>
+          </Alert>
 
-        {(draft.warnings.length > 0 || degraded || retryError) && (
-          /* Warning stock: solid tinted card, full-strength border, and an icon.
-             The three cues are redundant on purpose — this banner is the only
-             thing standing between a bad transcription and a medical record. */
-          <div className="mx-4 mb-3 flex shrink-0 gap-2.5 rounded-xl border border-warning/30 bg-warning-soft px-3.5 py-3 sm:mx-6">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
-            <ul className="space-y-0.5 text-xs leading-5 text-foreground">
-              {degraded && (
-                <li>
-                  Transcribed by the backup engine — accuracy on mixed-language speech
-                  is lower than usual.
-                </li>
-              )}
-              {draft.warnings.map((warning) => (
-                <li key={warning}>{warning}</li>
-              ))}
-              {retryError && <li>{retryError}</li>}
-            </ul>
-          </div>
-        )}
+          {(draft.warnings.length > 0 || degraded || retryError) && (
+            /* Warning stock: solid tinted card, full-strength border, and an icon.
+               The three cues are redundant on purpose — this banner is the only
+               thing standing between a bad transcription and a medical record. */
+            <div className="mb-3 flex gap-2.5 rounded-xl border border-warning/30 bg-warning-soft px-3.5 py-3">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+              <ul className="space-y-0.5 text-xs leading-5 text-foreground">
+                {degraded && (
+                  <li>
+                    Transcribed by the backup engine — accuracy on mixed-language speech
+                    is lower than usual.
+                  </li>
+                )}
+                {draft.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+                {retryError && <li>{retryError}</li>}
+              </ul>
+            </div>
+          )}
 
-        {draft.transcriptId && (
-          <div className="surface-inset mx-4 mb-3 flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 sm:mx-6">
-            <p className="text-xs leading-4 text-muted-foreground">
-              Audio is retained temporarily if the transcription needs another pass.
-            </p>
-            <Button type="button" variant="outline" size="sm" onClick={retryFromAudio} disabled={retrying}>
-              {retrying ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-              {retrying ? "Retrying…" : "Retry from audio"}
-            </Button>
-          </div>
-        )}
+          {draft.transcriptId && (
+            <div className="surface-inset mb-3 flex items-center justify-between gap-3 rounded-xl px-3 py-2.5">
+              <p className="min-w-0 text-xs leading-4 text-muted-foreground">
+                <span className="sm:hidden">Audio kept temporarily for retry.</span>
+                <span className="hidden sm:inline">Audio is retained temporarily if the transcription needs another pass.</span>
+              </p>
+              <Button type="button" variant="outline" size="sm" onClick={retryFromAudio} disabled={retrying} className="shrink-0">
+                {retrying ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+                {retrying ? "Retrying…" : "Retry audio"}
+              </Button>
+            </div>
+          )}
 
-        {checklist.length > 0 && (
-          <ReviewNavigator
-            items={checklist}
-            activeIndex={reviewIndex}
-            reviewedKeys={reviewedKeys}
-            onFocus={focusReviewItem}
-          />
-        )}
+          {checklist.length > 0 && (
+            <ReviewNavigator
+              items={checklist}
+              activeIndex={reviewIndex}
+              reviewedKeys={reviewedKeys}
+              onFocus={focusReviewItem}
+            />
+          )}
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-5 sm:px-6">
+          <div className="space-y-3 sm:space-y-4">
           {/* ---- Patient ---------------------------------------------------- */}
-          <section className="surface-inset space-y-4 rounded-xl p-4">
+          <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
             <div className="flex items-center gap-2">
               <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">01</span>
               <h3 className="text-sm font-semibold tracking-[-0.015em]">Patient &amp; chart</h3>
@@ -575,7 +584,7 @@ export function ReviewSheet({
             </div>
           </section>
 
-          <section className="surface-inset space-y-4 rounded-xl p-4">
+          <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
             <div className="flex items-center gap-2">
               <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">02</span>
               <h3 className="text-sm font-semibold tracking-[-0.015em]">Clinical assessment</h3>
@@ -614,7 +623,7 @@ export function ReviewSheet({
           </section>
 
           {/* ---- Prescription ------------------------------------------------ */}
-          <section className="surface-inset rounded-xl p-4">
+          <section className="surface-inset rounded-xl p-3 sm:p-4">
             <div className="mb-4 flex items-center gap-2">
               <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">03</span>
               <h3 className="text-sm font-semibold tracking-[-0.015em]">Prescription</h3>
@@ -658,14 +667,20 @@ export function ReviewSheet({
             </AnimatePresence>
           </div>
         </div>
+        </div>
 
-        <SheetFooter className="flex-col items-stretch gap-2 px-4 sm:px-6">
+        <SheetFooter className="flex-col items-stretch gap-2 px-3 pt-2 sm:px-6 sm:pt-3">
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
-            <span className={cn("size-1.5 rounded-full", autosaveState === "error" || autosaveState === "conflict" ? "bg-destructive" : "bg-primary")} aria-hidden />
-            {autosaveState === "saving" && "Saving draft…"}
-            {autosaveState === "saved" && "Draft saved for recovery"}
-            {autosaveState === "error" && "Autosave failed — your edits remain on screen"}
-            {autosaveState === "conflict" && "This draft changed elsewhere — reload before saving"}
+            <span className={cn("size-1.5 rounded-full", pendingReviewCount > 0 ? "bg-warning" : autosaveState === "error" || autosaveState === "conflict" ? "bg-destructive" : "bg-primary")} aria-hidden />
+            {pendingReviewCount > 0
+              ? `${pendingReviewCount} flagged detail${pendingReviewCount === 1 ? "" : "s"} still need review`
+              : autosaveState === "saving"
+                ? "Saving draft…"
+                : autosaveState === "saved"
+                  ? "Draft saved for recovery"
+                  : autosaveState === "error"
+                    ? "Autosave failed — your edits remain on screen"
+                    : "This draft changed elsewhere — reload before saving"}
           </p>
           {failure && (
             <p role="alert" className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive">
@@ -676,7 +691,7 @@ export function ReviewSheet({
             <Button variant="outline" size="lg" onClick={onDiscard}>
               Discard
             </Button>
-            <Button size="lg" onClick={save} disabled={saving} className="flex-1">
+            <Button size="lg" onClick={save} disabled={saving || pendingReviewCount > 0} className="flex-1">
               {saving ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : (
@@ -850,7 +865,7 @@ function ReviewNavigator({
   const nextIndex = items.findIndex((item) => !reviewedKeys.has(item.key));
   const targetIndex = nextIndex >= 0 ? nextIndex : Math.min(activeIndex, items.length - 1);
   return (
-    <section aria-label="Fields to review" className="mx-4 mb-3 rounded-xl border border-warning/30 bg-warning-soft p-3.5 sm:mx-6">
+    <section aria-label="Fields to review" className="mb-3 rounded-xl border border-warning/30 bg-warning-soft p-3">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold">Review flagged details</p>
@@ -862,14 +877,14 @@ function ReviewNavigator({
           {nextIndex >= 0 ? "Review next" : "Review again"}
         </Button>
       </div>
-      <ol className="mt-2 flex flex-wrap gap-1.5">
+      <ol className="no-scrollbar mt-2 flex gap-1.5 overflow-x-auto pb-1">
         {items.map((item, index) => (
           <li key={item.key}>
             <button
               type="button"
               onClick={() => onFocus(index)}
               className={cn(
-                "min-h-8 touch-manipulation rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [@media(pointer:coarse)]:min-h-11",
+                "min-h-8 shrink-0 touch-manipulation rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [@media(pointer:coarse)]:min-h-11",
                 reviewedKeys.has(item.key)
                   ? "border-primary/20 bg-primary/8 text-primary"
                   : "border-warning/30 bg-warning-soft text-warning",

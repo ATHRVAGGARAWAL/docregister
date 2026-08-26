@@ -61,7 +61,7 @@ export function OverviewView({
             <CalendarDaysIcon className="size-3.5 text-primary" strokeWidth={1.8} aria-hidden />
             {todayLabel()}
           </p>
-          <h1 className="mt-2.5 max-w-3xl text-[2rem] font-semibold leading-[1.08] tracking-[-0.045em] text-balance text-foreground sm:mt-3 sm:text-4xl lg:text-[2.75rem] lg:leading-[1.05]">
+          <h1 className="mt-2.5 max-w-3xl text-[1.75rem] font-semibold leading-[1.08] tracking-[-0.045em] text-balance text-foreground sm:mt-3 sm:text-4xl lg:text-[2.75rem] lg:leading-[1.05]">
             {greeting()}, {doctorName}
           </h1>
           <p className="mt-2 text-sm leading-5 text-muted-foreground sm:leading-6">

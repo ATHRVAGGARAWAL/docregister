@@ -134,8 +134,8 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
   const signingUp = mode === "signup";
 
   return (
-    <main className="min-h-dvh bg-background">
-      <header className="mx-auto flex w-full max-w-[90rem] items-center justify-between border-b border-border px-5 py-4 sm:px-8 lg:px-10">
+    <main className="min-h-dvh bg-background pb-[env(safe-area-inset-bottom)]">
+      <header className="sticky top-0 z-20 mx-auto flex w-full max-w-[90rem] items-center justify-between border-b border-border bg-background px-5 pb-3 pt-[max(.75rem,env(safe-area-inset-top))] sm:px-8 sm:py-4 lg:px-10">
         <BrandMark className="sm:hidden" title="docregister" />
         <BrandLockup className="hidden sm:inline-flex" />
         <div className="flex items-center gap-2">
@@ -146,7 +146,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-[90rem] items-center gap-10 px-5 py-10 sm:px-8 lg:min-h-[calc(100dvh-73px)] lg:grid-cols-[minmax(0,1.08fr)_minmax(25rem,29rem)] lg:gap-20 lg:px-10 lg:py-14">
+      <div className="mx-auto grid w-full max-w-[90rem] items-center gap-10 px-5 py-6 sm:px-8 sm:py-10 lg:min-h-[calc(100dvh-73px)] lg:grid-cols-[minmax(0,1.08fr)_minmax(25rem,29rem)] lg:gap-20 lg:px-10 lg:py-14">
         <section className="hidden max-w-[44rem] lg:block">
           <Badge variant="outline" className="mb-6">
             <ShieldCheckIcon aria-hidden />
@@ -205,11 +205,11 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
         </section>
 
         <section className="w-full">
-          <div className="mb-7 lg:hidden">
-            <Badge className="mb-4">
+          <div className="mb-5 lg:hidden">
+            <Badge className="mb-3">
               <ShieldCheckIcon aria-hidden /> Secure clinical workspace
             </Badge>
-            <h1 className="max-w-[12ch] text-4xl font-semibold leading-[0.98] tracking-[-0.055em]">
+            <h1 className="max-w-[12ch] text-[2rem] font-semibold leading-[1.02] tracking-[-0.055em] sm:text-4xl">
               Your register, ready when you are.
             </h1>
           </div>
@@ -237,31 +237,31 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
               </div>
             ) : (
               <>
-                <CardHeader className="border-b border-border/60 px-6 py-7 sm:px-8 sm:py-8">
-                  <div className="mb-4 flex items-center gap-2 text-xs font-medium text-primary">
+                <CardHeader className="border-b border-border/60 px-5 py-5 sm:px-8 sm:py-8">
+                  <div className="mb-3 flex items-center gap-2 text-xs font-medium text-primary sm:mb-4">
                     <LockKeyholeIcon className="size-3.5" aria-hidden />
                     Secure clinic access
                   </div>
-                  <CardTitle className="text-[1.75rem] font-semibold leading-tight tracking-[-0.04em]">
+                  <CardTitle className="text-2xl font-semibold leading-tight tracking-[-0.04em] sm:text-[1.75rem]">
                     {signingUp ? "Create your clinical workspace" : "Welcome back, doctor"}
                   </CardTitle>
-                  <CardDescription className="mt-2 text-sm leading-6">
+                  <CardDescription className="mt-2 text-sm leading-5 sm:leading-6">
                     {signingUp
                       ? "Set up your private register with one secure email link."
                       : "Continue to today’s register with your clinic email."}
                   </CardDescription>
                 </CardHeader>
 
-                <CardContent className="px-6 py-7 sm:px-8 sm:py-8">
+                <CardContent className="px-5 py-5 sm:px-8 sm:py-8">
                   <Tabs value={mode} onValueChange={changeMode}>
-                    <TabsList className="mb-7 grid h-11 w-full grid-cols-2 rounded-xl">
+                    <TabsList className="mb-5 grid h-11 w-full grid-cols-2 rounded-xl sm:mb-7">
                       <TabsTrigger value="signin" className="h-9 text-sm">Sign in</TabsTrigger>
                       <TabsTrigger value="signup" className="h-9 text-sm">Create account</TabsTrigger>
                     </TabsList>
                   </Tabs>
 
                   <form onSubmit={submit} aria-busy={sending}>
-                    <div className="space-y-5">
+                    <div className="space-y-4 sm:space-y-5">
                       {signingUp && (
                         <div className="space-y-2.5">
                           <Label htmlFor="full-name">Your name</Label>
@@ -277,7 +277,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                               clearError();
                             }}
                             placeholder="Dr. Aditi Mehta"
-                            className="h-12"
+                            className="h-11 sm:h-12"
                           />
                         </div>
                       )}
@@ -299,7 +299,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                             clearError();
                           }}
                           placeholder="doctor@clinic.in"
-                          className="h-12"
+                          className="h-11 sm:h-12"
                         />
                         <p id="email-hint" className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
                           <MailCheckIcon className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
@@ -316,7 +316,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                       </Alert>
                     )}
 
-                    <Button type="submit" size="lg" disabled={sending} className="mt-7 w-full">
+                    <Button type="submit" size="lg" disabled={sending} className="mt-5 w-full sm:mt-7">
                       {sending ? (
                         <><LoaderCircleIcon className="animate-spin" aria-hidden /> Sending secure link</>
                       ) : (
@@ -324,7 +324,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                       )}
                     </Button>
 
-                    <div className="my-6 flex items-center gap-3">
+                    <div className="my-4 flex items-center gap-3 sm:my-6">
                       <Separator className="flex-1" />
                       <span className="text-xs font-medium text-muted-foreground">Private by design</span>
                       <Separator className="flex-1" />
