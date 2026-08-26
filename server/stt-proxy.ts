@@ -16,6 +16,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { resolve } from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
@@ -26,6 +27,7 @@ import {
   elevenLabsRealtimeUrl,
   parseElevenLabsEvent,
 } from "./elevenlabs-realtime.ts";
+import { sttHealthResponse } from "./stt-health.ts";
 
 loadEnvLocal();
 
@@ -36,9 +38,10 @@ const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
   "";
+const STT_PROVIDER = (process.env.STT_PROVIDER ?? "elevenlabs").toLowerCase();
 
 /** Without a key we still run, and stream a canned transcript instead. */
-const MOCK = !ELEVENLABS_KEY || process.env.STT_PROVIDER === "mock";
+const MOCK = !ELEVENLABS_KEY || STT_PROVIDER === "mock";
 
 const supabase =
   SUPABASE_URL && SUPABASE_KEY
@@ -54,8 +57,38 @@ interface StartMessage {
   sampleRate?: number;
 }
 
+const httpServer = createServer((request, response) => {
+  const health = sttHealthResponse({
+    method: request.method,
+    requestUrl: request.url,
+    config: {
+      supabaseUrl: SUPABASE_URL,
+      supabaseKey: SUPABASE_KEY,
+      elevenLabsKey: ELEVENLABS_KEY,
+      provider: STT_PROVIDER,
+      // Mock transcripts are useful locally, but a production deployment that
+      // accidentally selects them must fail readiness instead of looking fine.
+      allowMock:
+        process.env.NODE_ENV !== "production" && !process.env.RAILWAY_ENVIRONMENT_ID,
+    },
+  });
+
+  if (health) {
+    response.writeHead(health.statusCode, health.headers);
+    response.end(health.body);
+    return;
+  }
+
+  response.writeHead(404, {
+    "Cache-Control": "no-store",
+    "Content-Type": "application/json; charset=utf-8",
+    "X-Content-Type-Options": "nosniff",
+  });
+  response.end(JSON.stringify({ error: "Not found." }));
+});
+
 const server = new WebSocketServer({
-  port: PORT,
+  server: httpServer,
   // `ws` defaults to a 100 MB frame. Nothing here is remotely that big: the
   // worklet emits Int16 PCM in small chunks, so anything larger is either a bug
   // or someone using an authenticated socket as free memory.
@@ -65,8 +98,12 @@ const server = new WebSocketServer({
 // Without this an EADDRINUSE — or any socket-level error — is an unhandled
 // 'error' event, which takes the whole process down and with it every doctor's
 // live transcript, not just the one that failed.
+httpServer.on("error", (error) => {
+  console.error("[stt-proxy] HTTP server error", error);
+});
+
 server.on("error", (error) => {
-  console.error("[stt-proxy] server error", error);
+  console.error("[stt-proxy] WebSocket server error", error);
 });
 
 server.on("connection", (client) => {
@@ -296,9 +333,11 @@ function loadEnvLocal() {
   }
 }
 
-console.log(
-  `[stt-proxy] listening on ws://localhost:${PORT}` +
-    (MOCK
-      ? "  (mock mode — no ELEVENLABS_API_KEY set or STT_PROVIDER=mock)"
-      : "  (elevenlabs realtime)"),
-);
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log(
+    `[stt-proxy] listening on ws://localhost:${PORT} (health: /healthz)` +
+      (MOCK
+        ? "  (mock mode — no ELEVENLABS_API_KEY set or STT_PROVIDER=mock)"
+        : "  (elevenlabs realtime)"),
+  );
+});

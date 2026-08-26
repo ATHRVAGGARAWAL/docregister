@@ -38,6 +38,14 @@ export async function proxy(request: NextRequest) {
 
   const withRequestHeaders = { request: { headers: requestHeaders } };
   let response = NextResponse.next(withRequestHeaders);
+  const { pathname } = request.nextUrl;
+
+  // Uptime checks must still answer when the authentication provider is the
+  // thing that is down. The route itself returns no privileged information,
+  // and it still receives the same CSP and security headers as every response.
+  if (pathname === "/api/health") {
+    return decorate(response, { csp, dev, authenticated: false });
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -68,7 +76,6 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
   const isPublic =
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth") ||
