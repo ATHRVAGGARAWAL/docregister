@@ -242,8 +242,12 @@ function SummaryCards({ payload, loading }: { payload: AccountsPayload; loading:
     { label: "Expenses", value: payload.summary.expenses_paise, hint: "Paid expenses", icon: ArrowUpRightIcon, tone: "text-destructive bg-destructive/10" },
     { label: "Net", value: payload.summary.net_paise, hint: "Received minus expenses", icon: WalletCardsIcon, tone: "text-foreground bg-secondary" },
   ];
+  // Two across from the narrowest screen up. These four numbers are one
+  // reading — received, pending, expenses, and the net they produce — and
+  // stacking them full-width pushed Net off the bottom of a phone, so the
+  // figure the other three add up to was the one you had to scroll for.
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="list">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" role="list">
       {cards.map((card, index) => (
         <motion.div
           key={card.label}
@@ -255,10 +259,10 @@ function SummaryCards({ payload, loading }: { payload: AccountsPayload; loading:
           <Card className="h-full gap-3 py-4">
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle className="text-xs text-muted-foreground">{card.label}</CardTitle>
-              <span className={cn("grid size-8 place-items-center rounded-lg", card.tone)}><card.icon className="size-4" aria-hidden /></span>
+              <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", card.tone)}><card.icon className="size-4" aria-hidden /></span>
             </CardHeader>
             <CardContent>
-              <p className={cn("tnum text-2xl font-semibold tracking-tight", card.label === "Pending" && "text-money")}>
+              <p className={cn("tnum text-xl font-semibold tracking-tight sm:text-2xl", card.label === "Pending" && "text-money")}>
                 {loading ? "—" : formatPaise(card.value)}
               </p>
               <p className="mt-1 text-[11px] text-muted-foreground">{card.hint}</p>
