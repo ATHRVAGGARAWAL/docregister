@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { ApiError, readBody, requireString, withDoctor } from "@/lib/api/http";
 import { answerFromRecords, parseRecallQuery, type EncounterRecord } from "@/lib/llm/recall";
+import { resolveRecallCandidate } from "@/lib/patients/recall-match";
 import { callWorkflow } from "@/lib/supabase/workflows";
 
 /**
@@ -28,20 +29,6 @@ import { callWorkflow } from "@/lib/supabase/workflows";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/**
- * pg_trgm similarity at or above which a name is treated as the same name
- * rather than a lookalike. Below 1.0 so ordinary dictation noise — a missing
- * middle initial, "Devi" vs "Devii" — still counts as exact.
- */
-const CONFIDENT_MATCH = 0.85;
-
-/**
- * How far ahead of the runner-up the leader must be to answer without asking.
- * Surname-cohort noise trails an exact hit by ~0.6; two patients with the same
- * name are separated by ~0, which is what must still reach the doctor.
- */
-const DECISIVE_GAP = 0.25;
-
 export const POST = withDoctor(async ({ doctor, supabase, request }) => {
   const body = await readBody<{ question?: string; patientId?: string }>(request);
   const question = requireString(body.question, "question");
@@ -55,6 +42,9 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
     id: string;
     full_name: string;
     phone: string | null;
+    age_years: number | null;
+    last_visit: string | null;
+    visit_count: number | null;
     similarity: number;
   }[] = [];
 
@@ -91,19 +81,21 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
     // two real patients called Rajesh Kumar both sit at 1.0. So resolve only
     // when the leader is near-exact AND well clear of the runner-up; two
     // near-exact matches remain a tie and still go to the doctor.
-    const [top, next] = candidates;
-    const decisive =
-      top.similarity >= CONFIDENT_MATCH &&
-      (next === undefined || top.similarity - next.similarity >= DECISIVE_GAP);
+    const resolved = resolveRecallCandidate(candidates, query.patient_name);
 
-    if (decisive) {
-      patientId = top.id;
-      candidates = [top];
+    if (resolved) {
+      patientId = resolved.id;
+      candidates = [resolved];
     } else {
+      const onePossibleMatch = candidates.length === 1;
       return NextResponse.json({
-        answer: `More than one patient matches "${query.patient_name}".`,
+        answer: onePossibleMatch
+          ? `I found one possible match for "${query.patient_name}". Please confirm the patient.`
+          : `More than one patient matches "${query.patient_name}".`,
         confidence: "low",
-        caveat: "Choose the right patient and I will pull up their history.",
+        caveat: onePossibleMatch
+          ? "Confirm the patient before opening their history."
+          : "Choose the right patient and I will pull up their history.",
         encounters: [],
         resolvedPatient: null,
         candidates,

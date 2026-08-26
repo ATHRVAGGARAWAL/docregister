@@ -130,8 +130,8 @@ export function AppNavigation({
           </span>
         </header>
 
-        <SheetContent side="left" className="w-[min(90vw,22rem)] rounded-none border-r border-border bg-background p-0" showClose>
-          <SheetHeader className="border-b border-border px-5 pb-4 pt-5 text-left">
+        <SheetContent side="left" className="w-[min(82vw,19rem)] rounded-none border-r border-border bg-background p-0" showClose>
+          <SheetHeader className="border-b border-border px-4 py-4 text-left">
             <BrandLockup subtitle="Clinical workspace" />
             <SheetTitle className="sr-only">Workspace menu</SheetTitle>
             <SheetDescription className="sr-only">Choose a workspace or account action.</SheetDescription>
@@ -143,7 +143,8 @@ export function AppNavigation({
               speciality={speciality}
               role={role}
               initials={initials}
-              className="mx-4 mt-4"
+              className="mx-3 mt-3"
+              compact
             />
             <NavigationList
               active={active}
@@ -151,21 +152,21 @@ export function AppNavigation({
                 onChange(next);
                 setMobileOpen(false);
               }}
-              className="px-3 py-4"
+              className="px-2 py-2.5"
               closeItems
             />
           </div>
 
-          <div className="space-y-3 border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="space-y-2.5 border-t border-border p-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">
             <SheetClose asChild>
               <Button type="button" className="w-full justify-start" onClick={onManualEntry}>
                 <ClipboardPenLineIcon className="size-4" aria-hidden />
                 Enter visit manually
               </Button>
             </SheetClose>
-            <div>
-              <p className="mb-2 text-xs font-medium text-muted-foreground">Appearance</p>
-              <ThemeToggle />
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-muted-foreground">Appearance</p>
+              <ThemeToggle className="scale-90 origin-right" />
             </div>
             <SheetClose asChild>
               <Button type="button" variant="outline" className="w-full justify-start" onClick={onSignOut}>
@@ -223,17 +224,19 @@ function ProfileBlock({
   role,
   initials,
   className,
+  compact = false,
 }: {
   doctorName: string;
   speciality: string | null;
   role: string;
   initials: string;
   className?: string;
+  compact?: boolean;
 }) {
   return (
-    <div className={cn("surface-inset rounded-xl p-3", className)}>
+    <div className={cn("surface-inset rounded-xl", compact ? "p-2.5" : "p-3", className)}>
       <div className="flex items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+        <span className={cn("grid shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground", compact ? "size-9" : "size-10")}>
           {initials || "DR"}
         </span>
         <div className="min-w-0 flex-1">
@@ -241,7 +244,7 @@ function ProfileBlock({
           <p className="mt-0.5 truncate text-xs text-muted-foreground">{speciality || "Independent practice"}</p>
         </div>
       </div>
-      <Badge variant="outline" className="mt-3 text-xs">{role} workspace</Badge>
+      <Badge variant="outline" className={cn("text-xs", compact ? "mt-2" : "mt-3")}>{role} workspace</Badge>
     </div>
   );
 }

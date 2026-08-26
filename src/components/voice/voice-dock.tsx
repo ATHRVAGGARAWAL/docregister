@@ -232,7 +232,7 @@ export function VoiceDock({
   return (
     <div
       ref={dockRef}
-      className="voice-dock-frame pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] sm:px-5 lg:left-64"
+      className="voice-dock-frame pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:pb-[max(.75rem,env(safe-area-inset-bottom))] lg:left-64"
     >
       <p className="sr-only" role="status" aria-live="polite">
         {activity}
@@ -242,7 +242,7 @@ export function VoiceDock({
         layout
         transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className={cn(
-          "surface-dock pointer-events-auto relative isolate w-full max-w-[42rem] overflow-visible rounded-xl p-2",
+          "surface-dock pointer-events-auto relative isolate w-full max-w-[42rem] overflow-visible rounded-xl p-1.5 sm:p-2",
           !listening && !busy && "voice-dock-idle grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2",
         )}
       >
@@ -255,10 +255,10 @@ export function VoiceDock({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: reduceMotion ? 0 : 0.3 }}
-              className="min-w-0 px-2 pt-2 sm:px-3"
+              className="min-w-0 px-1.5 pt-1.5 sm:px-3 sm:pt-2"
             >
               <div className="flex items-center justify-between gap-3">
-                <span className="surface-inset tnum flex min-h-8 items-center gap-2 rounded-full px-3 text-xs font-semibold text-foreground">
+                <span className="surface-inset tnum flex min-h-7 items-center gap-2 rounded-full px-2.5 text-xs font-semibold text-foreground sm:min-h-8 sm:px-3">
                   <span
                     className="key-pulse relative size-2 rounded-full bg-destructive"
                     aria-hidden
@@ -266,22 +266,22 @@ export function VoiceDock({
                   {formatDuration(elapsedMs)}
                 </span>
                 {locked && (
-                  <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/20 bg-primary-soft px-2.5 py-1.5 text-xs font-semibold text-primary">
+                  <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/20 bg-primary-soft px-2 py-1 text-[11px] font-semibold text-primary sm:px-2.5 sm:py-1.5 sm:text-xs">
                     <Lock className="size-3" aria-hidden /> Hands-free
                   </span>
                 )}
               </div>
 
-              <div className="surface-inset relative mt-2 overflow-hidden rounded-xl px-3 py-2.5 sm:px-4">
+              <div className="surface-inset relative mt-1.5 overflow-hidden rounded-lg px-2 py-1.5 sm:mt-2 sm:rounded-xl sm:px-4 sm:py-2.5">
                 <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-primary" aria-hidden>
                   <Waveform spectrumRef={spectrumRef} active={phase === "listening"} />
                 </div>
-                <div className="relative h-12" aria-hidden />
+                <div className="relative h-8 sm:h-12" aria-hidden />
               </div>
 
               <p
                 aria-live="polite"
-                className="mt-2 line-clamp-2 min-h-[2.75rem] px-1 text-sm leading-6 text-foreground"
+                className="mt-1.5 line-clamp-1 min-h-5 px-1 text-xs leading-5 text-foreground sm:mt-2 sm:line-clamp-2 sm:min-h-[2.75rem] sm:text-sm sm:leading-6"
               >
                 {transcript ? (
                   <>
@@ -389,7 +389,7 @@ export function VoiceDock({
         <div
           className={cn(
             "flex items-center justify-center gap-3",
-            listening || busy ? "mt-3 pb-1" : "mt-0",
+            listening || busy ? "mt-2 pb-0.5 sm:mt-3 sm:pb-1" : "mt-0",
           )}
         >
           {listening && locked ? (
@@ -410,7 +410,7 @@ export function VoiceDock({
                 <button
                   type="button"
                   onClick={onStop}
-                  className="pressable grid size-16 place-items-center rounded-full border border-destructive bg-destructive text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
+                  className="pressable grid size-14 place-items-center rounded-full border border-destructive bg-destructive text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none sm:size-16"
                 >
                   <Square className="size-5 fill-current" aria-hidden />
                   <span className="sr-only">Stop recording and review this visit</span>

@@ -29,7 +29,7 @@ export interface RecallResult {
     patient_name: string;
     prescription: { drug_name: string; strength: string | null; frequency: string | null }[];
   }[];
-  candidates: { id: string; full_name: string }[];
+  candidates: (PatientMatch & { similarity?: number })[];
   resolvedPatient: { id: string; full_name: string | null } | null;
   /**
    * How the question was read. Carried back to the client because `intent`
@@ -201,21 +201,38 @@ export function RecallPanel({
             </button>
           )}
 
-          {/* Ambiguous name — the doctor disambiguates, the system never guesses. */}
-          {result.candidates.length > 1 && (
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {result.candidates.map((candidate) => (
-                <li key={candidate.id}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onPickPatient(candidate.id)}
-                  >
-                    {candidate.full_name}
-                  </Button>
-                </li>
-              ))}
-            </ul>
+          {/* Any unresolved match is shown. Previously a single low-scoring
+              candidate produced an ambiguity message but no button at all. */}
+          {!result.resolvedPatient && result.candidates.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {result.candidates.length === 1 ? "Confirm patient" : "Choose patient"}
+              </p>
+              <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+                {result.candidates.map((candidate) => (
+                  <li key={candidate.id}>
+                    <button
+                      type="button"
+                      onClick={() => onPickPatient(candidate.id)}
+                      className="group flex min-h-14 w-full items-center gap-3 rounded-xl border border-border bg-secondary px-3 py-2.5 text-left transition-colors hover:border-primary/35 hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-card text-primary">
+                        <UserRoundIcon className="size-4" aria-hidden />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-foreground">
+                          {candidate.full_name}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                          {candidateDetails(candidate)}
+                        </span>
+                      </span>
+                      <ChevronRightIcon className="size-4 shrink-0 text-primary transition-transform group-hover:translate-x-0.5" aria-hidden />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {result.encounters.length > 0 && (
@@ -276,4 +293,16 @@ export function RecallPanel({
       )}
     </motion.section>
   );
+}
+
+function candidateDetails(candidate: PatientMatch): string {
+  const details: string[] = [];
+  if (candidate.age_years !== null) details.push(`Age ${candidate.age_years}`);
+  if (candidate.phone) details.push(candidate.phone);
+  if (candidate.last_visit) {
+    details.push(`Last visit ${formatDayLong(candidate.last_visit.slice(0, 10))}`);
+  } else if (candidate.visit_count !== null) {
+    details.push(`${candidate.visit_count} recorded visit${candidate.visit_count === 1 ? "" : "s"}`);
+  }
+  return details.join(" · ") || "Open this patient record";
 }

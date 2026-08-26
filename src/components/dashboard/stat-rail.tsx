@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { CountUp } from "@/components/reactbits/count-up";
 import { formatCount } from "@/lib/format";
 import type { AnalyticsPayload } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 /** A continuous metric ribbon: four readings, one visual object. */
 export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
@@ -47,11 +48,10 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
   ];
 
   return (
-    <div className="no-scrollbar -mx-5 overflow-x-auto px-5 sm:mx-0 sm:px-0">
-      <div
-        className="surface-card grid min-w-[42rem] grid-cols-4 overflow-hidden rounded-[1.75rem] sm:min-w-0"
-        role="list"
-      >
+    <div
+      className="surface-card grid grid-cols-2 overflow-hidden rounded-[1.35rem] sm:grid-cols-4 sm:rounded-[1.75rem]"
+      role="list"
+    >
         {tiles.map((tile, index) => (
           <motion.div
             key={tile.label}
@@ -63,26 +63,25 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
               delay: reduceMotion ? 0 : 0.06 * index,
               ease: [0.22, 1, 0.36, 1],
             }}
-            className="group relative min-h-32 px-5 py-5 transition-colors duration-300 hover:bg-foreground/[0.025] sm:px-6"
-          >
-            {index > 0 && (
-              <span
-                aria-hidden
-                className="absolute inset-y-5 left-0 w-px bg-border"
-              />
+            className={cn(
+              "group relative min-h-28 px-3.5 py-4 transition-colors duration-300 hover:bg-foreground/[0.025] sm:min-h-32 sm:px-6 sm:py-5",
+              index % 2 === 1 && "border-l border-border",
+              index >= 2 && "border-t border-border sm:border-t-0",
+              index > 0 && "sm:border-l",
             )}
+          >
             <div className="flex items-center gap-2">
               <span
                 aria-hidden
                 className="h-1.5 w-5 rounded-full transition-all duration-300 group-hover:w-7"
                 style={{ background: tile.swatch, color: tile.swatch }}
               />
-              <p className="truncate text-xs font-semibold tracking-[0.13em] text-muted-foreground uppercase">
+              <p className="truncate text-[10px] font-semibold tracking-[0.1em] text-muted-foreground uppercase sm:text-xs sm:tracking-[0.13em]">
                 {tile.label}
               </p>
             </div>
 
-            <p className="tnum mt-3 text-[2rem] font-semibold leading-none tracking-[-0.055em] text-foreground">
+            <p className="tnum mt-2.5 text-[1.75rem] font-semibold leading-none tracking-[-0.055em] text-foreground sm:mt-3 sm:text-[2rem]">
               <CountUp
                 to={tile.value}
                 duration={0.9}
@@ -91,10 +90,9 @@ export function StatRail({ analytics }: { analytics: AnalyticsPayload }) {
               />
             </p>
 
-            <p className="mt-2 truncate text-xs text-muted-foreground">{tile.hint}</p>
+            <p className="mt-2 line-clamp-1 text-[11px] text-muted-foreground sm:text-xs">{tile.hint}</p>
           </motion.div>
         ))}
-      </div>
     </div>
   );
 }

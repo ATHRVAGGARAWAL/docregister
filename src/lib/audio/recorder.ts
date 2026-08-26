@@ -87,13 +87,18 @@ export class VoiceRecorder {
   private source?: MediaStreamAudioSourceNode;
   private analyser?: AnalyserNode;
   private worklet?: AudioWorkletNode;
+  private workletSink?: GainNode;
   private recorder?: MediaRecorder;
   private chunks: BlobPart[] = [];
   private rafId?: number;
   private startedAt = 0;
   private negotiatedMime = "";
+  private cancelled = false;
+  private readonly callbacks: RecorderCallbacks;
 
-  constructor(private readonly callbacks: RecorderCallbacks = {}) {}
+  constructor(callbacks: RecorderCallbacks = {}) {
+    this.callbacks = callbacks;
+  }
 
   get sampleRate(): number {
     return this.context?.sampleRate ?? 0;
@@ -131,39 +136,54 @@ export class VoiceRecorder {
       window.AudioContext ??
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
 
-    this.context = new AudioCtx();
+    this.cancelled = false;
+    const context = new AudioCtx();
+    this.context = context;
     // Resume before any await, while we are still inside the gesture.
-    const resumed = this.context.resume();
+    const resumed = context.resume();
+    // Attach a rejection handler immediately. Permission prompts can stay open
+    // for a long time, during which Safari may reject `resume()`; waiting to add
+    // the handler until after getUserMedia resolves produces an unhandled
+    // rejection even though the failure is handled below.
+    void resumed.catch(() => undefined);
 
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        channelCount: 1,
-        // Deliberately no `sampleRate` constraint: browsers largely ignore it,
-        // and pretending otherwise leads to code that assumes 48 kHz. The
-        // worklet reads the true rate at runtime instead.
-      },
-      video: false,
-    });
-
-    await resumed;
-
-    // Everything from here on can throw — `new MediaRecorder` rejects a mime the
-    // probe accepted on some engines — and by this point the microphone is
-    // already live. Without this the tracks stayed open on the failure path,
-    // leaving the OS recording indicator lit after an error the doctor was told
-    // was fatal. This file's own comment calls that "alarming… because it is".
     try {
-      await this.buildGraph();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+          // Deliberately no `sampleRate` constraint: browsers largely ignore it,
+          // and pretending otherwise leads to code that assumes 48 kHz. The
+          // worklet reads the true rate at runtime instead.
+        },
+        video: false,
+      });
+
+      // A doctor can cancel while the browser permission sheet is still open.
+      // getUserMedia is not abortable, so dispose of a stream that arrives after
+      // cancellation instead of turning the microphone back on behind the UI.
+      if (this.cancelled) {
+        stream.getTracks().forEach((track) => track.stop());
+        throw abortError();
+      }
+
+      this.stream = stream;
+      await resumed;
+      if (this.cancelled) throw abortError();
+
+      // MediaRecorder is started synchronously here. Live PCM is optional and
+      // initialises in the background, so a slow or unsupported AudioWorklet can
+      // never strand the capture state in "arming" with a frozen 0:00 timer.
+      this.buildGraph();
     } catch (cause) {
       this.teardown();
       throw cause;
     }
   }
 
-  private async buildGraph(): Promise<void> {
+  private buildGraph(): void {
     if (!this.context || !this.stream) throw new Error("Recorder was not started");
     this.source = this.context.createMediaStreamSource(this.stream);
 
@@ -174,27 +194,7 @@ export class VoiceRecorder {
     this.source.connect(this.analyser);
     this.pumpLevels();
 
-    // --- Branch 2: live PCM ------------------------------------------------
-    // Best-effort. If the worklet fails to load, recording still works and the
-    // doctor simply loses the live transcript, not the note.
-    try {
-      await this.context.audioWorklet.addModule("/worklets/pcm-downsampler.js");
-      this.worklet = new AudioWorkletNode(this.context, "pcm-downsampler");
-      this.worklet.port.onmessage = (event) => {
-        if (event.data?.type === "pcm") {
-          this.callbacks.onPcmFrame?.(event.data.payload as ArrayBuffer);
-        }
-      };
-      this.source.connect(this.worklet);
-      // Not connected to destination: we do not want to hear the doctor's own
-      // voice played back, and an unconnected worklet still receives input.
-    } catch (error) {
-      this.callbacks.onError?.(
-        new Error(`Live transcription unavailable: ${String(error)}`),
-      );
-    }
-
-    // --- Branch 3: archival recording -------------------------------------
+    // --- Branch 2: archival recording -------------------------------------
     const destination = this.context.createMediaStreamDestination();
     this.source.connect(destination);
 
@@ -217,6 +217,44 @@ export class VoiceRecorder {
     // one blob at the end avoids the whole class of bug.
     this.recorder.start();
     this.startedAt = performance.now();
+
+    // --- Branch 3: live PCM ------------------------------------------------
+    // Best-effort and deliberately not awaited. The archival recording above
+    // is the source of truth and must start even when WebKit takes a long time
+    // to load an AudioWorklet module (or never resolves that promise at all).
+    void this.startLivePcm(this.context, this.source);
+  }
+
+  private async startLivePcm(
+    context: AudioContext,
+    source: MediaStreamAudioSourceNode,
+  ): Promise<void> {
+    try {
+      await context.audioWorklet.addModule("/worklets/pcm-downsampler.js");
+      if (this.cancelled || this.context !== context || this.source !== source) return;
+
+      const worklet = new AudioWorkletNode(context, "pcm-downsampler");
+      const sink = context.createGain();
+      sink.gain.value = 0;
+
+      worklet.port.onmessage = (event) => {
+        if (!this.cancelled && event.data?.type === "pcm") {
+          this.callbacks.onPcmFrame?.(event.data.payload as ArrayBuffer);
+        }
+      };
+      source.connect(worklet);
+      // WebKit may prune an AudioWorklet graph that has no destination. A
+      // zero-gain sink keeps it processing without playing the microphone back.
+      worklet.connect(sink);
+      sink.connect(context.destination);
+      this.worklet = worklet;
+      this.workletSink = sink;
+    } catch (error) {
+      if (this.cancelled || this.context !== context) return;
+      this.callbacks.onError?.(
+        new Error(`Live transcription unavailable: ${String(error)}`),
+      );
+    }
   }
 
   async stop(): Promise<RecordingResult> {
@@ -269,6 +307,7 @@ export class VoiceRecorder {
 
   /** Abandon the recording without producing a blob. */
   cancel(): void {
+    this.cancelled = true;
     try {
       if (this.recorder && this.recorder.state !== "inactive") this.recorder.stop();
     } catch {
@@ -310,6 +349,7 @@ export class VoiceRecorder {
 
     this.worklet?.port.close();
     this.worklet?.disconnect();
+    this.workletSink?.disconnect();
     this.analyser?.disconnect();
     this.source?.disconnect();
 
@@ -325,6 +365,13 @@ export class VoiceRecorder {
     this.source = undefined;
     this.analyser = undefined;
     this.worklet = undefined;
+    this.workletSink = undefined;
     this.recorder = undefined;
   }
+}
+
+function abortError(): Error {
+  const error = new Error("Recording was cancelled.");
+  error.name = "AbortError";
+  return error;
 }

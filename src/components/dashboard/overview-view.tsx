@@ -54,24 +54,24 @@ export function OverviewView({
   onOpenPatient: (patient: PatientMatch) => void;
 }) {
   return (
-    <div className="space-y-9 sm:space-y-11">
-      <section className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+    <div className="space-y-6 sm:space-y-11">
+      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end sm:gap-6">
         <div>
           <p className="flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
             <CalendarDaysIcon className="size-3.5 text-primary" strokeWidth={1.8} aria-hidden />
             {todayLabel()}
           </p>
-          <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-[-0.045em] text-balance text-foreground sm:text-4xl lg:text-[2.75rem] lg:leading-[1.05]">
+          <h1 className="mt-2.5 max-w-3xl text-[2rem] font-semibold leading-[1.08] tracking-[-0.045em] text-balance text-foreground sm:mt-3 sm:text-4xl lg:text-[2.75rem] lg:leading-[1.05]">
             {greeting()}, {doctorName}
           </h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          <p className="mt-2 text-sm leading-5 text-muted-foreground sm:leading-6">
             Your practice, distilled into one calm clinical view.
           </p>
         </div>
         <Button
           size="lg"
           onClick={onStartDictation}
-          className="group h-12 rounded-full px-5 sm:w-auto"
+          className="group h-11 rounded-full px-5 sm:h-12 sm:w-auto"
         >
           <span className="relative grid size-7 place-items-center rounded-full border border-primary-foreground">
             <Mic2Icon className="size-4 transition-transform duration-300 group-hover:scale-110" aria-hidden />
@@ -89,7 +89,7 @@ export function OverviewView({
       <StatRail analytics={analytics} />
 
       <section aria-labelledby="clinic-trends-title">
-        <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div className="mb-4 flex flex-col justify-between gap-3 sm:mb-5 sm:flex-row sm:items-end sm:gap-4">
           <div>
             <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">
               Practice intelligence
@@ -178,14 +178,14 @@ export function OverviewView({
           />
         </section>
 
-        <aside className="surface-elevated group relative isolate h-fit min-h-72 overflow-hidden rounded-[1.5rem] p-6 sm:p-7">
+        <aside className="surface-elevated group relative isolate h-fit min-h-0 overflow-hidden rounded-[1.5rem] p-5 sm:min-h-72 sm:p-7">
           <div className="flex items-center justify-between">
             <span className="grid size-11 place-items-center rounded-[1.1rem] border border-primary/20 bg-primary-soft text-primary">
               <HistoryIcon className="size-5" strokeWidth={1.7} aria-hidden />
             </span>
             <SparklesIcon className="size-4 text-primary" strokeWidth={1.5} aria-hidden />
           </div>
-          <p className="mt-8 text-xs font-semibold tracking-[0.16em] text-primary uppercase">
+          <p className="mt-5 text-xs font-semibold tracking-[0.16em] text-primary uppercase sm:mt-8">
             Clinical recall
           </p>
           <h2 className="mt-2 max-w-xs text-xl font-semibold leading-7 tracking-[-0.035em] text-foreground">
@@ -196,7 +196,7 @@ export function OverviewView({
           </p>
           <Button
             variant="outline"
-            className="mt-7 w-full rounded-full border-border bg-secondary shadow-none hover:bg-primary-soft hover:text-primary"
+            className="mt-5 w-full rounded-full border-border bg-secondary shadow-none hover:bg-primary-soft hover:text-primary sm:mt-7"
             onClick={onOpenRecall}
           >
             Search patient history

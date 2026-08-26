@@ -51,7 +51,7 @@ export function RecallWorkspace({
   }
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-5 sm:space-y-7">
       <section>
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary-soft">
@@ -59,7 +59,7 @@ export function RecallWorkspace({
           </span>
           Evidence-grounded recall
         </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
+        <h1 className="mt-2.5 text-2xl font-semibold tracking-[-0.04em] sm:mt-3 sm:text-4xl">
           Patient recall
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -68,7 +68,7 @@ export function RecallWorkspace({
       </section>
 
       <Card className="surface-elevated relative gap-0 overflow-hidden rounded-[1.65rem] border-border bg-card py-0">
-        <CardContent className="relative p-4 sm:p-7">
+        <CardContent className="relative p-3 sm:p-7">
           <div className="mb-4 flex items-center justify-between gap-3 px-1">
             <div>
               <p className="text-xs font-semibold text-foreground">Search the clinical memory</p>
@@ -87,14 +87,14 @@ export function RecallWorkspace({
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder="What did I prescribe Sunita last time?"
                 aria-label="Ask about patient history"
-                className="h-12 rounded-[0.9rem] border-0 bg-transparent pl-11 shadow-none focus-visible:ring-0"
+                className="h-11 rounded-[0.9rem] border-0 bg-transparent pl-11 shadow-none focus-visible:ring-0 sm:h-12"
               />
             </div>
-            <Button type="submit" size="lg" disabled={loading} className="h-12 rounded-[0.9rem] px-5">
+            <Button type="submit" size="lg" disabled={loading} className="h-11 rounded-[0.9rem] px-5 sm:h-12">
               Search history <ArrowUpRightIcon className="size-4" aria-hidden />
             </Button>
           </form>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="no-scrollbar -mx-1 mt-3 flex items-center gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:mt-4 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
             <span className="mr-1 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Try</span>
             {suggestions.map((suggestion) => (
               <button
@@ -104,7 +104,7 @@ export function RecallWorkspace({
                   setDraft(suggestion);
                   onAsk(suggestion);
                 }}
-                className="touch-manipulation rounded-full border border-border bg-secondary px-3 py-1.5 text-xs text-muted-foreground transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11"
+                className="shrink-0 touch-manipulation rounded-full border border-border bg-secondary px-3 py-1.5 text-xs text-muted-foreground transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11"
               >
                 {suggestion}
               </button>

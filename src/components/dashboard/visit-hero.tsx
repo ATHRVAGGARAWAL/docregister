@@ -26,9 +26,9 @@ export function VisitHero({
       initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.99 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-      className="surface-elevated grid min-h-[18rem] overflow-hidden rounded-[1.25rem] md:grid-cols-[minmax(15rem,0.72fr)_minmax(22rem,1.28fr)]"
+      className="surface-elevated grid overflow-hidden rounded-[1.25rem] md:min-h-[18rem] md:grid-cols-[minmax(15rem,0.72fr)_minmax(22rem,1.28fr)]"
     >
-      <div className="flex flex-col justify-between p-5 sm:p-6 md:border-r md:border-border">
+      <div className="flex flex-col justify-between p-4 sm:p-6 md:border-r md:border-border">
         <div>
           <p className="flex items-center gap-2 text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase">
             <span className="relative flex size-2" aria-hidden>
@@ -37,15 +37,15 @@ export function VisitHero({
             </span>
             Live practice
           </p>
-          <p className="mt-5 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground">
+          <p className="mt-3 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground sm:mt-5">
             Today&rsquo;s visits
           </p>
-          <p className="tnum mt-1 text-[4rem] font-semibold leading-[0.9] tracking-[-0.07em] text-foreground sm:text-[5rem]">
+          <p className="tnum mt-1 text-[3.25rem] font-semibold leading-[0.9] tracking-[-0.07em] text-foreground sm:text-[5rem]">
             <CountUp to={todayVisits} duration={1} format={formatCount} />
           </p>
         </div>
 
-        <div className="mt-8 flex flex-wrap items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-2.5 sm:mt-8 sm:gap-3">
           {delta !== null && (
             <span
               className={cn(
@@ -70,13 +70,13 @@ export function VisitHero({
         </div>
       </div>
 
-      <div className="flex min-h-[16rem] flex-col justify-between p-5 sm:p-6">
+      <div className="flex min-h-[11rem] flex-col justify-between border-t border-border p-4 sm:min-h-[16rem] sm:p-6 md:border-t-0">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase">
               Clinical tempo
             </p>
-            <p className="mt-1.5 max-w-sm text-sm leading-6 text-muted-foreground">
+            <p className="mt-1.5 hidden max-w-sm text-sm leading-6 text-muted-foreground sm:block">
               A quiet view of patient flow across the latest twelve clinic days.
             </p>
           </div>
@@ -113,11 +113,11 @@ function VisitSparkline({ points }: { points: DailyPoint[] }) {
   const end = coords.at(-1)!;
 
   return (
-    <figure className="mt-7 w-full">
+    <figure className="mt-4 w-full sm:mt-7">
       <svg
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
-        className="h-36 w-full overflow-visible"
+        className="h-24 w-full overflow-visible sm:h-36"
         role="img"
         aria-label={`Visits over the last ${points.length} days, ${formatCount(values[0])} to ${formatCount(values.at(-1))}`}
       >

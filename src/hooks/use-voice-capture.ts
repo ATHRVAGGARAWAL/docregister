@@ -234,6 +234,11 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
       // reached from the gesture, so this call is the first await in the chain.
       await recorder.start();
     } catch (cause) {
+      // Cancel can happen while the browser permission sheet is still open.
+      // That deliberately retires this recorder, so its eventual AbortError (or
+      // a WebKit InvalidStateError caused by closing its AudioContext) must not
+      // replace the idle UI with a false hardware error.
+      if (recorderRef.current !== recorder) return;
       teardownCapture();
       recorderRef.current = null;
       if (!aliveRef.current) return;
@@ -253,7 +258,7 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
       return;
     }
 
-    if (!aliveRef.current) {
+    if (!aliveRef.current || recorderRef.current !== recorder) {
       recorder.cancel();
       return;
     }
@@ -358,7 +363,24 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
 
   const stop = useCallback(async () => {
     const recorder = recorderRef.current;
-    if (!recorder || phase !== "listening") return;
+    if (!recorder) return;
+
+    // "Arming" includes the permission prompt. getUserMedia cannot itself be
+    // aborted, but VoiceRecorder.cancel() marks the attempt as retired and will
+    // stop any stream that arrives later. This makes the visible Stop control a
+    // real escape hatch instead of a no-op while the timer is frozen at 0:00.
+    if (phase === "arming") {
+      recorder.cancel();
+      recorderRef.current = null;
+      teardownCapture();
+      setInterimText("");
+      setFinalText("");
+      setElapsedMs(0);
+      setPhase("idle");
+      return;
+    }
+
+    if (phase !== "listening") return;
 
     teardownCapture();
     recorderRef.current = null;
@@ -411,7 +433,11 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
   useEffect(() => {
     if (phase !== "listening") return;
     if (elapsedMs < HARD_LIMIT_MS) return;
-    void stop();
+    // Cross the effect boundary through a task. `stop` intentionally performs
+    // immediate UI teardown before awaiting MediaRecorder, which should not be
+    // invoked synchronously from an effect body.
+    const timeout = window.setTimeout(() => void stop(), 0);
+    return () => window.clearTimeout(timeout);
   }, [elapsedMs, phase, stop]);
 
   return {
