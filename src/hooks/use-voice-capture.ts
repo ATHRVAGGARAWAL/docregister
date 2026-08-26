@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { LiveTranscriptSocket } from "@/lib/audio/live-transcript";
+import { RECORDING_LIMIT_MS, RECORDING_WARNING_MS } from "@/lib/audio/limits";
 import { VoiceRecorder, type RecordingResult } from "@/lib/audio/recorder";
 import type { Extraction } from "@/lib/llm/schema";
 
@@ -88,10 +89,6 @@ export interface UseVoiceCaptureOptions {
    */
   onQuestion?: (transcript: CaptureTranscript) => void;
 }
-
-/** Sarvam's synchronous endpoint rejects audio over ~30s. */
-const SOFT_LIMIT_MS = 27_000;
-const HARD_LIMIT_MS = 29_000;
 
 /** Hindi first, Indian English second — what most dictation here is a mix of. */
 const DEFAULT_LANGUAGES = ["hi-IN", "en-IN"];
@@ -428,11 +425,11 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
     setPhase("idle");
   }, []);
 
-  // Auto-stop at the provider's hard ceiling rather than letting the upload be
-  // rejected after the doctor has already finished speaking.
+  // Stop at one minute so a consultation stays bounded and the upload remains
+  // reliable on a clinic's mobile connection.
   useEffect(() => {
     if (phase !== "listening") return;
-    if (elapsedMs < HARD_LIMIT_MS) return;
+    if (elapsedMs < RECORDING_LIMIT_MS) return;
     // Cross the effect boundary through a task. `stop` intentionally performs
     // immediate UI teardown before awaiting MediaRecorder, which should not be
     // invoked synchronously from an effect body.
@@ -457,8 +454,8 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
      * error and never as colour alone.
      */
     liveTextUnavailable,
-    approachingLimit: phase === "listening" && elapsedMs > SOFT_LIMIT_MS,
-    remainingMs: Math.max(0, HARD_LIMIT_MS - elapsedMs),
+    approachingLimit: phase === "listening" && elapsedMs > RECORDING_WARNING_MS,
+    remainingMs: Math.max(0, RECORDING_LIMIT_MS - elapsedMs),
     start,
     stop,
     cancel,

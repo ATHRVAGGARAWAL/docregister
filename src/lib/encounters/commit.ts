@@ -32,6 +32,12 @@ export function parseCommitOutcome(value: unknown): CommitOutcome {
   if (typeof candidate.alreadyCommitted !== "boolean") {
     throw new Error("The saved visit response had invalid commit status.");
   }
+  if (candidate.accountEntryId !== null && typeof candidate.accountEntryId !== "string") {
+    throw new Error("The saved visit response had an invalid account entry.");
+  }
+  if (typeof candidate.accountEntryError !== "boolean") {
+    throw new Error("The saved visit response had invalid account status.");
+  }
 
   return candidate as CommitOutcome;
 }

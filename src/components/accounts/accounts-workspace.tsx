@@ -75,7 +75,7 @@ const EMPTY: AccountsPayload = {
 };
 
 /** Dedicated income and expense ledger with compact, responsive transaction cards. */
-export function AccountsWorkspace() {
+export function AccountsWorkspace({ refreshKey = 0 }: { refreshKey?: number }) {
   const [data, setData] = useState<AccountsPayload>(EMPTY);
   const [days, setDays] = useState(30);
   const [kind, setKind] = useState<"all" | AccountEntryKind>("all");
@@ -113,7 +113,7 @@ export function AccountsWorkspace() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [load]);
+  }, [load, refreshKey]);
 
   async function markPaid(entry: AccountEntry) {
     setError(null);

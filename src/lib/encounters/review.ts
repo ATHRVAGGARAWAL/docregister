@@ -75,6 +75,7 @@ const FIELD_LABELS: Record<string, string> = {
   age_years: "Age",
   diagnosis: "Diagnosis",
   treatment: "Treatment",
+  consultation_fee_inr: "Consultation amount",
 };
 
 const MEDICATION_LABELS: Record<string, string> = {

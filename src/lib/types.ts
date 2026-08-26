@@ -39,6 +39,10 @@ export interface CommitOutcome {
   visitNumber: number | null;
   isNewPatient: boolean | null;
   alreadyCommitted: boolean;
+  /** Linked Accounts row created from the reviewed consultation amount. */
+  accountEntryId: string | null;
+  /** The visit saved, but its optional Accounts entry could not be created. */
+  accountEntryError: boolean;
 }
 
 export interface PatientHistoryPrescription {

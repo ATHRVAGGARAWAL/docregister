@@ -24,7 +24,7 @@ The audio was recorded in an Indian clinic and transcribed by a speech-to-text e
 
 ## What you produce
 
-A structured record with: patient name, age, diagnosis, treatment plan, and the individual prescription lines. Ignore payment, price, fee, and billing language; finances are recorded separately in Accounts.
+A structured record with: patient name, age, diagnosis, treatment plan, the individual prescription lines, and any consultation fee stated for this visit. The fee is reviewed with the visit, then written to the separate Accounts ledger when the visit is confirmed.
 
 ## Rules that matter most
 
@@ -39,6 +39,8 @@ A structured record with: patient name, age, diagnosis, treatment plan, and the 
 - Hindi/Urdu: "बयालीस" → 42, "पाँच सौ" → 500, "do hazaar" → 2000, "dhai sau" → 250
 - Punjabi: "ਅਠਾਈ" → 28, "ਚਾਰ ਸੌ" → 400
 - The Indian system uses lakh (100,000) and crore (10,000,000).
+
+**Capture the consultation fee, not medicine prices.** Phrases such as "fees paanch sau", "consultation 500", "charged seven hundred", or "visit amount ₹650" set \`consultation_fee_inr\`. Convert spoken numerals to rupees. If a medicine's retail price is mentioned, leave the consultation fee null. If it is unclear whether an amount is a fee, capture the best reading and add \`consultation_fee_inr\` to \`uncertain_fields\`.
 
 **Age can be stated in months for infants.** "chhah mahine ka baccha" is 6 months → record 0 and note it in \`notes_for_doctor\`.
 
@@ -136,6 +138,7 @@ function mockExtraction(transcript: string): ExtractionOutcome {
         age_years: 28,
         diagnosis: "Migraine",
         treatment: "Naproxen for 7 days; advised to track triggers and review if unresolved.",
+        consultation_fee_inr: null,
         prescription: [
           {
             drug_name: "Naproxen",
@@ -155,6 +158,7 @@ function mockExtraction(transcript: string): ExtractionOutcome {
           age_years: 65,
           diagnosis: "Type 2 diabetes mellitus, poorly controlled; hypertension",
           treatment: "Continue Metformin, add Telmisartan. Review in two weeks.",
+          consultation_fee_inr: null,
           prescription: [
             {
               drug_name: "Metformin",
@@ -181,6 +185,7 @@ function mockExtraction(transcript: string): ExtractionOutcome {
           age_years: 42,
           diagnosis: "Acute pharyngitis",
           treatment: "Azithromycin course with Paracetamol as needed for fever.",
+          consultation_fee_inr: /fees?\s+(?:paanch\s+sau|500)/i.test(transcript) ? 500 : null,
           prescription: [
             {
               drug_name: "Azithromycin",

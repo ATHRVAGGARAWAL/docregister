@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { ApiError, withDoctor } from "@/lib/api/http";
-import { SARVAM_SYNC_LIMIT_MS, SttError, transcribeWithFailover } from "@/lib/stt";
+import { RECORDING_UPLOAD_LIMIT_MS } from "@/lib/audio/limits";
+import { SttError, transcribeWithFailover } from "@/lib/stt";
 import { callWorkflow } from "@/lib/supabase/workflows";
 
 /**
@@ -40,9 +41,9 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
     .map((value) => value.trim())
     .filter(Boolean);
 
-  if (durationMs && durationMs > SARVAM_SYNC_LIMIT_MS) {
+  if (durationMs && durationMs > RECORDING_UPLOAD_LIMIT_MS) {
     throw new ApiError(
-      "That recording is longer than 30 seconds. Dictate one patient at a time.",
+      "That recording is longer than one minute. Dictate one patient at a time.",
       413,
     );
   }

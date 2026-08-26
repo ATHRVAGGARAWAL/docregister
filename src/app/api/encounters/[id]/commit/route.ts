@@ -29,6 +29,8 @@ interface CommitBody {
   };
   /** Client-generated, stable across retries. Guards double-taps on flaky 3G. */
   idempotencyKey?: string;
+  /** Reviewed consultation amount. Written to Accounts, never the clinical row. */
+  consultationFeeInr?: unknown;
 }
 
 interface CommitResult {
@@ -37,11 +39,17 @@ interface CommitResult {
   visit_number: number | null;
   is_new_patient: boolean | null;
   already_committed: boolean;
+  account_entry_id?: string | null;
+}
+
+interface AccountEntryResult {
+  id: string;
 }
 
 export const POST = withDoctor<Params>(async ({ supabase, request, params }) => {
   const body = await readBody<CommitBody>(request);
   const idempotencyKey = body.idempotencyKey?.trim() || null;
+  const amountPaise = optionalAmountPaise(body.consultationFeeInr);
 
   if ((body.patientId == null) === (body.newPatient == null)) {
     throw new ApiError("Choose an existing patient or add a new one before saving.");
@@ -51,16 +59,58 @@ export const POST = withDoctor<Params>(async ({ supabase, request, params }) => 
   // assignment and the draft-to-committed transition all happen in this single
   // transaction. A duplicate phone is deliberately a conflict: a number is a
   // search hint, never enough evidence to silently attach a visit to a chart.
-  const { data, error } = await callWorkflow<CommitResult[]>(
+  let { data, error } = await callWorkflow<CommitResult[]>(
     supabase,
-    "commit_encounter_workflow",
+    "commit_encounter_with_income_workflow",
     {
       p_encounter_id: params.id,
       p_patient_id: body.patientId ?? null,
       p_new_patient: body.newPatient ?? null,
       p_idempotency_key: idempotencyKey,
+      p_amount_paise: amountPaise,
     },
   );
+
+  let fallbackAccountEntryId: string | null = null;
+  let accountEntryError = false;
+
+  // Keep rolling deployments safe: Vercel may receive this route a few minutes
+  // before migration 0018 reaches Supabase. The existing workflows still
+  // complete the visit and create the linked Accounts row; once the migration
+  // is installed, the same work happens atomically in PostgreSQL.
+  if (error && (error.code === "PGRST202" || error.code === "42883")) {
+    ({ data, error } = await callWorkflow<CommitResult[]>(supabase, "commit_encounter_workflow", {
+      p_encounter_id: params.id,
+      p_patient_id: body.patientId ?? null,
+      p_new_patient: body.newPatient ?? null,
+      p_idempotency_key: idempotencyKey,
+    }));
+
+    const committed = data?.[0];
+    if (!error && committed && amountPaise !== null) {
+      const account = await callWorkflow<AccountEntryResult | AccountEntryResult[]>(
+        supabase,
+        "create_account_entry",
+        {
+          p_kind: "income",
+          p_status: "paid",
+          p_amount_paise: amountPaise,
+          p_category: "Consultation",
+          p_payment_method: null,
+          p_counterparty: body.newPatient?.full_name?.trim() || null,
+          p_note: "Captured from the reviewed visit amount",
+          p_occurred_at: new Date().toISOString(),
+          p_patient_id: committed.patient_id,
+          p_encounter_id: committed.encounter_id,
+          p_idempotency_key: `visit-${committed.encounter_id}`,
+        },
+      );
+      const entry = Array.isArray(account.data) ? account.data[0] : account.data;
+      fallbackAccountEntryId = entry?.id ?? null;
+      accountEntryError = Boolean(account.error || !entry);
+      if (account.error) console.error("[commit] fallback account entry failed", account.error);
+    }
+  }
 
   if (error) {
     console.error("[commit] workflow failed", error);
@@ -94,5 +144,21 @@ export const POST = withDoctor<Params>(async ({ supabase, request, params }) => 
     visitNumber: result.visit_number,
     isNewPatient: result.is_new_patient,
     alreadyCommitted: result.already_committed,
+    accountEntryId: result.account_entry_id ?? fallbackAccountEntryId,
+    accountEntryError,
   });
 }, { rateLimit: "commit" });
+
+function optionalAmountPaise(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const text = typeof value === "number" ? String(value) : typeof value === "string" ? value.trim() : "";
+  if (!/^\d+(?:\.\d{1,2})?$/.test(text)) {
+    throw new ApiError("Enter the consultation amount with up to two decimal places.");
+  }
+  const [rupees, paise = ""] = text.split(".");
+  const amount = Number(rupees) * 100 + Number(paise.padEnd(2, "0"));
+  if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 100_000_000) {
+    throw new ApiError("Consultation amount must be between ₹0.01 and ₹10,00,000.");
+  }
+  return amount;
+}

@@ -59,6 +59,7 @@ export const GET = withDoctor<Params>(async ({ doctor, supabase, params }) => {
       age_years: row.age_years ?? numberValue(extracted.age_years),
       diagnosis: row.diagnosis ?? stringValue(extracted.diagnosis),
       treatment: row.treatment ?? stringValue(extracted.treatment),
+      consultation_fee_inr: numberValue(extracted.consultation_fee_inr),
       prescription: items.map((item: any) => ({
         drug_name: item.drug_name,
         strength: item.strength ?? null,
@@ -93,6 +94,7 @@ interface DraftPatch {
   age_years?: unknown;
   diagnosis?: unknown;
   treatment?: unknown;
+  consultation_fee_inr?: unknown;
   prescription?: unknown;
 }
 
@@ -115,12 +117,22 @@ export const PATCH = withDoctor<Params>(async ({ doctor, supabase, request, para
   if ("diagnosis" in body) patch.diagnosis = text(body.diagnosis);
   if ("treatment" in body) patch.treatment = text(body.treatment);
 
-  const { data: updated, error } = await callWorkflow<Record<string, unknown>>(supabase, "update_draft_workflow", {
-    p_encounter_id: params.id,
-    p_patch: patch,
-    p_prescription: Array.isArray(body.prescription) ? body.prescription : null,
-    p_expected_version: expected,
-  });
+  const hasConsultationFee = "consultation_fee_inr" in body;
+  const consultationFeeInr = hasConsultationFee
+    ? optionalConsultationFee(body.consultation_fee_inr)
+    : null;
+
+  const { data: updated, error } = await callWorkflow<Record<string, unknown>>(
+    supabase,
+    hasConsultationFee ? "update_draft_with_consultation_fee_workflow" : "update_draft_workflow",
+    {
+      p_encounter_id: params.id,
+      p_patch: patch,
+      p_prescription: Array.isArray(body.prescription) ? body.prescription : null,
+      p_expected_version: expected,
+      ...(hasConsultationFee ? { p_consultation_fee_inr: consultationFeeInr } : {}),
+    },
+  );
   if (error) {
     if (error.code === "P0001" || error.code === "40001" || error.code === "409") {
       const latest = await loadDraft(db, doctor.id, params.id);
@@ -182,6 +194,19 @@ function stringValue(value: unknown): string | null {
 }
 function numberValue(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function optionalConsultationFee(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const text = typeof value === "number" ? String(value) : typeof value === "string" ? value.trim() : "";
+  if (!/^\d+(?:\.\d{1,2})?$/.test(text)) {
+    throw new ApiError("Enter the consultation amount with up to two decimal places.");
+  }
+  const amount = Number(text);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) {
+    throw new ApiError("Consultation amount must be between ₹0.01 and ₹10,00,000.");
+  }
+  return amount;
 }
 function isPatientSex(value: unknown): value is PatientSex {
   return value === "female" || value === "male" || value === "intersex" || value === "not_recorded";

@@ -72,6 +72,12 @@ export const ExtractionSchema = z.object({
     .describe(
       "Free-text treatment plan summary in English, including advice and follow-up. This is the narrative; individual drugs also go in `prescription`.",
     ),
+  consultation_fee_inr: z
+    .number()
+    .nullable()
+    .describe(
+      "Consultation fee or visit amount in Indian rupees, converted from spoken numerals. Capture only a fee for this visit; do not treat medicine prices as the consultation fee. Null if no consultation amount was stated.",
+    ),
   prescription: z
     .array(PrescriptionItemSchema)
     .describe("One entry per drug. Empty array if nothing was prescribed."),
@@ -121,6 +127,18 @@ export function validateExtraction(value: Extraction): ValidationIssue[] {
     issues.push({
       field: "patient_name",
       message: "No patient name was captured. Add one before saving.",
+    });
+  }
+
+  if (
+    value.consultation_fee_inr !== null &&
+    (!Number.isFinite(value.consultation_fee_inr) ||
+      value.consultation_fee_inr <= 0 ||
+      value.consultation_fee_inr > 1_000_000)
+  ) {
+    issues.push({
+      field: "consultation_fee_inr",
+      message: "The consultation amount looks unusual — please confirm it.",
     });
   }
 

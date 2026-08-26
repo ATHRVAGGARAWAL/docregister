@@ -89,6 +89,7 @@ export const POST = withDoctor(async ({ supabase, request }) => {
       age_years: age,
       diagnosis,
       treatment,
+      consultation_fee_inr: null,
       prescription,
       uncertain_fields: [],
       notes_for_doctor: null,

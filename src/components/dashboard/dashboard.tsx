@@ -78,6 +78,7 @@ export function Dashboard({
   const [accessToken, setAccessToken] = useState<string | undefined>();
   const [manualVisitOpen, setManualVisitOpen] = useState(false);
   const [followUpContext, setFollowUpContext] = useState<CommitOutcome | null>(null);
+  const [accountsRefreshKey, setAccountsRefreshKey] = useState(0);
   const [sessionExpired, setSessionExpired] = useState(false);
   const signingOut = useRef(false);
 
@@ -432,6 +433,7 @@ export function Dashboard({
 
   const onCommitted = useCallback(() => {
     setDiscardedDraftId(null);
+    setAccountsRefreshKey((current) => current + 1);
     router.refresh();
     void loadRange(range);
     void loadRegister(registerDays, registerStatus, registerQuery, registerOffset);
@@ -695,7 +697,7 @@ export function Dashboard({
                   } : null}
                 />
               )}
-              {view === "accounts" && <AccountsWorkspace />}
+              {view === "accounts" && <AccountsWorkspace refreshKey={accountsRefreshKey} />}
               {view === "settings" && (
                 <SettingsWorkspace
                   profile={profile}

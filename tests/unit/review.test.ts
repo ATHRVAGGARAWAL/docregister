@@ -7,6 +7,7 @@ import {
   patientPhoneError,
   type ReviewExtraction,
 } from "../../src/lib/encounters/review.ts";
+import { validateExtraction } from "../../src/lib/llm/schema.ts";
 
 function extraction(overrides: Partial<ReviewExtraction> = {}): ReviewExtraction {
   return {
@@ -14,6 +15,7 @@ function extraction(overrides: Partial<ReviewExtraction> = {}): ReviewExtraction
     age_years: 42,
     diagnosis: "Fever",
     treatment: null,
+    consultation_fee_inr: 500,
     prescription: [
       {
         drug_name: "Dolo",
@@ -36,6 +38,23 @@ test("review checklist normalises extractor array paths and missing frequencies"
   assert.deepEqual(
     items.map((item) => item.key),
     ["prescription.0.strength", "prescription.0.frequency_spoken"],
+  );
+});
+
+test("review checklist includes an uncertain spoken consultation amount", () => {
+  const items = buildReviewChecklist(
+    extraction({ uncertain_fields: ["consultation_fee_inr"] }),
+  );
+  assert.deepEqual(items.map((item) => item.key), ["consultation_fee_inr", "prescription.0.frequency_spoken"]);
+});
+
+test("consultation amounts are range-checked before review", () => {
+  assert.equal(validateExtraction(extraction()).some((issue) => issue.field === "consultation_fee_inr"), false);
+  assert.equal(
+    validateExtraction(extraction({ consultation_fee_inr: 1_000_001 })).some(
+      (issue) => issue.field === "consultation_fee_inr",
+    ),
+    true,
   );
 });
 

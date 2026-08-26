@@ -10,6 +10,8 @@ test("commit results are validated and propagated without losing workflow contex
     visitNumber: 7,
     isNewPatient: false,
     alreadyCommitted: true,
+    accountEntryId: "33333333-3333-4333-8333-333333333333",
+    accountEntryError: false,
   };
   let received: unknown;
 

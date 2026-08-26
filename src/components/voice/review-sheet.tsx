@@ -78,6 +78,9 @@ export function ReviewSheet({
   const [age, setAge] = useState(draft.extraction.age_years?.toString() ?? "");
   const [diagnosis, setDiagnosis] = useState(draft.extraction.diagnosis ?? "");
   const [treatment, setTreatment] = useState(draft.extraction.treatment ?? "");
+  const [consultationFee, setConsultationFee] = useState(
+    draft.extraction.consultation_fee_inr?.toString() ?? "",
+  );
   const [phone, setPhone] = useState(draft.patientIdentity?.phone ?? "");
   const [sex, setSex] = useState<PatientSex | "">(draft.patientIdentity?.sex ?? "");
   const [drugs, setDrugs] = useState<ReviewMedication[]>(draft.extraction.prescription);
@@ -135,6 +138,7 @@ export function ReviewSheet({
     age !== (draft.extraction.age_years?.toString() ?? "") ||
     diagnosis !== (draft.extraction.diagnosis ?? "") ||
     treatment !== (draft.extraction.treatment ?? "") ||
+    consultationFee !== (draft.extraction.consultation_fee_inr?.toString() ?? "") ||
     drugs !== draft.extraction.prescription ||
     phone !== (draft.patientIdentity?.phone ?? "") ||
     sex !== (draft.patientIdentity?.sex ?? "") ||
@@ -212,6 +216,7 @@ export function ReviewSheet({
         setAge(body.extraction.age_years?.toString() ?? "");
         setDiagnosis(body.extraction.diagnosis ?? "");
         setTreatment(body.extraction.treatment ?? "");
+        setConsultationFee(body.extraction.consultation_fee_inr?.toString() ?? "");
         setDrugs(body.extraction.prescription ?? []);
         const nextUncertain = new Set(
           buildReviewChecklist(body.extraction).map((item) => item.key),
@@ -234,9 +239,10 @@ export function ReviewSheet({
       age_years: parseNumber(age),
       diagnosis: diagnosis.trim() || null,
       treatment: treatment.trim() || null,
+      consultation_fee_inr: parseOptionalMoney(consultationFee),
       prescription: drugs,
     }),
-    [age, diagnosis, draftVersion, drugs, name, treatment],
+    [age, consultationFee, diagnosis, draftVersion, drugs, name, treatment],
   );
 
   // Voice capture already creates the draft server-side. Once a doctor starts
@@ -302,6 +308,11 @@ export function ReviewSheet({
       setFailure("Age must be a number, or left blank.");
       return;
     }
+    const feeIssue = consultationFeeError(consultationFee);
+    if (feeIssue) {
+      setFailure(feeIssue);
+      return;
+    }
     const phoneIssue = patientPhoneError(phone);
     if (phoneIssue) {
       setFailure(phoneIssue);
@@ -336,6 +347,7 @@ export function ReviewSheet({
                 sex: sex || null,
               },
           idempotencyKey,
+          consultationFeeInr: parseOptionalMoney(consultationFee),
         }),
       });
       const commitBody = await commit.json().catch(() => null);
@@ -382,9 +394,21 @@ export function ReviewSheet({
               </SheetDescription>
             </div>
             <div className="surface-inset mx-auto mt-6 w-full max-w-md rounded-xl p-3 text-center text-xs text-muted-foreground">
-              {commitOutcome.isNewPatient
-                ? "A new patient chart was created."
-                : "The existing patient chart was updated."}
+              <p>
+                {commitOutcome.isNewPatient
+                  ? "A new patient chart was created."
+                  : "The existing patient chart was updated."}
+              </p>
+              {commitOutcome.accountEntryId && (
+                <p className="mt-1 font-medium text-money">
+                  The consultation amount was added to Accounts.
+                </p>
+              )}
+              {commitOutcome.accountEntryError && (
+                <p className="mt-1 font-medium text-destructive">
+                  The visit was saved, but its amount could not be added to Accounts.
+                </p>
+              )}
             </div>
             <div className="mx-auto mt-6 w-full max-w-md">
               <PostCommitActions
@@ -622,10 +646,42 @@ export function ReviewSheet({
             </Field>
           </section>
 
+          {/* ---- Accounts -------------------------------------------------- */}
+          <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
+            <div className="flex items-center gap-2">
+              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">03</span>
+              <div>
+                <h3 className="text-sm font-semibold tracking-[-0.015em]">Consultation amount</h3>
+                <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
+                  Added to Accounts automatically when this visit is saved.
+                </p>
+              </div>
+            </div>
+
+            <div className="max-w-52">
+              <Field label="Amount" flagged={uncertain.has("consultation_fee_inr")}>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                  <Input
+                    id={reviewFieldId("consultation_fee_inr")}
+                    value={consultationFee}
+                    onChange={(event) => {
+                      setConsultationFee(event.target.value);
+                      markReviewed("consultation_fee_inr");
+                    }}
+                    inputMode="decimal"
+                    placeholder="Not stated"
+                    className="tnum h-11 pl-7 text-money"
+                  />
+                </div>
+              </Field>
+            </div>
+          </section>
+
           {/* ---- Prescription ------------------------------------------------ */}
           <section className="surface-inset rounded-xl p-3 sm:p-4">
             <div className="mb-4 flex items-center gap-2">
-              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">03</span>
+              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">04</span>
               <h3 className="text-sm font-semibold tracking-[-0.015em]">Prescription</h3>
             </div>
             <MedicationEditor
@@ -1076,6 +1132,23 @@ function parseNumber(value: string): number | null {
   if (value.trim() === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function consultationFeeError(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^\d+(?:\.\d{0,2})?$/.test(trimmed)) {
+    return "Enter the consultation amount with up to two decimal places.";
+  }
+  const amount = Number(trimmed);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) {
+    return "Consultation amount must be between ₹0.01 and ₹10,00,000.";
+  }
+  return null;
+}
+
+function parseOptionalMoney(value: string): number | null {
+  return consultationFeeError(value) ? null : parseNumber(value);
 }
 
 /**

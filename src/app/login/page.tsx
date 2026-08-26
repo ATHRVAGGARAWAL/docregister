@@ -9,7 +9,6 @@ import {
   CircleAlertIcon,
   Clock3Icon,
   LoaderCircleIcon,
-  LockKeyholeIcon,
   MailCheckIcon,
   Mic2Icon,
   ShieldCheckIcon,
@@ -24,7 +23,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -134,7 +132,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
   const signingUp = mode === "signup";
 
   return (
-    <main className="min-h-dvh bg-background pb-[env(safe-area-inset-bottom)]">
+    <main className="flex min-h-dvh flex-col bg-background pb-[env(safe-area-inset-bottom)]">
       <header className="sticky top-0 z-20 mx-auto flex w-full max-w-[90rem] items-center justify-between border-b border-border bg-background px-5 pb-3 pt-[max(.75rem,env(safe-area-inset-top))] sm:px-8 sm:py-4 lg:px-10">
         <BrandMark className="sm:hidden" title="docregister" />
         <BrandLockup className="hidden sm:inline-flex" />
@@ -146,7 +144,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-[90rem] items-center gap-10 px-5 py-6 sm:px-8 sm:py-10 lg:min-h-[calc(100dvh-73px)] lg:grid-cols-[minmax(0,1.08fr)_minmax(25rem,29rem)] lg:gap-20 lg:px-10 lg:py-14">
+      <div className="mx-auto grid w-full max-w-[90rem] flex-1 items-center gap-10 px-5 py-8 sm:px-8 sm:py-12 lg:grid-cols-[minmax(0,1.08fr)_minmax(25rem,29rem)] lg:gap-20 lg:px-10 lg:py-14">
         <section className="hidden max-w-[44rem] lg:block">
           <Badge variant="outline" className="mb-6">
             <ShieldCheckIcon aria-hidden />
@@ -205,23 +203,25 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
         </section>
 
         <section className="w-full">
-          <div className="mb-5 lg:hidden">
-            <Badge className="mb-3">
-              <ShieldCheckIcon aria-hidden /> Secure clinical workspace
-            </Badge>
-            <h1 className="max-w-[12ch] text-[2rem] font-semibold leading-[1.02] tracking-[-0.055em] sm:text-4xl">
+          <div className="mx-auto mb-7 max-w-[29rem] lg:hidden">
+            <p className="flex items-center gap-2 text-[0.6875rem] font-semibold tracking-[0.11em] text-primary uppercase">
+              <ShieldCheckIcon className="size-3.5" aria-hidden /> Secure clinical workspace
+            </p>
+            <h1 className="mt-3 max-w-[17ch] text-[1.75rem] font-semibold leading-[1.12] tracking-[-0.035em] text-balance sm:text-4xl sm:leading-[1.05]">
               Your register, ready when you are.
             </h1>
           </div>
 
-          <Card className="mx-auto w-full max-w-[29rem] gap-0 overflow-hidden rounded-[1.5rem] py-0">
+          <Card className="mx-auto w-full max-w-[29rem] gap-0 overflow-hidden rounded-[1.25rem] py-0 sm:rounded-[1.5rem]">
             {status === "sent" ? (
-              <div className="px-6 py-9 sm:px-8 sm:py-10">
+              <div className="px-6 py-8 sm:px-8 sm:py-10">
                 <span className="grid size-14 place-items-center rounded-full bg-primary/10 text-primary">
                   <MailCheckIcon className="size-6" aria-hidden />
                 </span>
-                <p className="section-kicker mt-8">Link sent securely</p>
-                <h2 className="mt-2 text-3xl font-semibold tracking-[-0.045em]">Check your inbox</h2>
+                <p className="section-kicker mt-7">Link sent securely</p>
+                <h2 className="mt-2 text-[1.625rem] font-semibold leading-tight tracking-[-0.035em] sm:text-3xl">
+                  Check your inbox
+                </h2>
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">
                   We sent a secure {signingUp ? "account setup" : "sign-in"} link to{" "}
                   <span className="font-medium text-foreground">{email.trim()}</span>.
@@ -237,33 +237,29 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
               </div>
             ) : (
               <>
-                <CardHeader className="border-b border-border/60 px-5 py-5 sm:px-8 sm:py-8">
-                  <div className="mb-3 flex items-center gap-2 text-xs font-medium text-primary sm:mb-4">
-                    <LockKeyholeIcon className="size-3.5" aria-hidden />
-                    Secure clinic access
-                  </div>
-                  <CardTitle className="text-2xl font-semibold leading-tight tracking-[-0.04em] sm:text-[1.75rem]">
+                <CardHeader className="border-b border-border/60 px-6 pb-5 pt-6 sm:px-8 sm:py-8">
+                  <CardTitle className="text-[1.625rem] font-semibold leading-[1.15] tracking-[-0.035em] sm:text-[1.75rem]">
                     {signingUp ? "Create your clinical workspace" : "Welcome back, doctor"}
                   </CardTitle>
-                  <CardDescription className="mt-2 text-sm leading-5 sm:leading-6">
+                  <CardDescription className="mt-2.5 text-sm leading-5 sm:leading-6">
                     {signingUp
                       ? "Set up your private register with one secure email link."
                       : "Continue to today’s register with your clinic email."}
                   </CardDescription>
                 </CardHeader>
 
-                <CardContent className="px-5 py-5 sm:px-8 sm:py-8">
+                <CardContent className="px-6 py-6 sm:px-8 sm:py-8">
                   <Tabs value={mode} onValueChange={changeMode}>
-                    <TabsList className="mb-5 grid h-11 w-full grid-cols-2 rounded-xl sm:mb-7">
-                      <TabsTrigger value="signin" className="h-9 text-sm">Sign in</TabsTrigger>
-                      <TabsTrigger value="signup" className="h-9 text-sm">Create account</TabsTrigger>
+                    <TabsList className="mb-6 grid h-12 w-full grid-cols-2 rounded-xl sm:mb-7">
+                      <TabsTrigger value="signin" className="h-10 text-sm">Sign in</TabsTrigger>
+                      <TabsTrigger value="signup" className="h-10 text-sm">Create account</TabsTrigger>
                     </TabsList>
                   </Tabs>
 
                   <form onSubmit={submit} aria-busy={sending}>
-                    <div className="space-y-4 sm:space-y-5">
+                    <div className="space-y-5">
                       {signingUp && (
-                        <div className="space-y-2.5">
+                        <div className="space-y-2">
                           <Label htmlFor="full-name">Your name</Label>
                           <Input
                             id="full-name"
@@ -277,12 +273,12 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                               clearError();
                             }}
                             placeholder="Dr. Aditi Mehta"
-                            className="h-11 sm:h-12"
+                            className="h-12"
                           />
                         </div>
                       )}
 
-                      <div className="space-y-2.5">
+                      <div className="space-y-2">
                         <Label htmlFor="email">Work email</Label>
                         <Input
                           id="email"
@@ -299,7 +295,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                             clearError();
                           }}
                           placeholder="doctor@clinic.in"
-                          className="h-11 sm:h-12"
+                          className="h-12"
                         />
                         <p id="email-hint" className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
                           <MailCheckIcon className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
@@ -316,7 +312,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                       </Alert>
                     )}
 
-                    <Button type="submit" size="lg" disabled={sending} className="mt-5 w-full sm:mt-7">
+                    <Button type="submit" size="lg" disabled={sending} className="mt-6 h-12 w-full sm:mt-7">
                       {sending ? (
                         <><LoaderCircleIcon className="animate-spin" aria-hidden /> Sending secure link</>
                       ) : (
@@ -324,32 +320,26 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                       )}
                     </Button>
 
-                    <div className="my-4 flex items-center gap-3 sm:my-6">
-                      <Separator className="flex-1" />
-                      <span className="text-xs font-medium text-muted-foreground">Private by design</span>
-                      <Separator className="flex-1" />
-                    </div>
-
-                    <p className="text-center text-xs leading-5 text-muted-foreground">
-                      {signingUp ? "Already have a clinic workspace?" : "New to docregister?"}{" "}
-                      <button
-                        type="button"
-                        onClick={() => changeMode(signingUp ? "signin" : "signup")}
-                        className="inline-flex touch-manipulation items-center rounded-md font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-2"
-                      >
+                    <button
+                      type="button"
+                      onClick={() => changeMode(signingUp ? "signin" : "signup")}
+                      className="mt-4 flex min-h-11 w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg px-3 text-[0.8125rem] font-medium text-muted-foreground outline-none hover:bg-background focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span>{signingUp ? "Already have a clinic workspace?" : "New to docregister?"}</span>
+                      <span className="font-semibold text-primary">
                         {signingUp ? "Sign in" : "Create an account"}
-                      </button>
-                    </p>
+                      </span>
+                    </button>
                   </form>
                 </CardContent>
               </>
             )}
           </Card>
 
-          <div className="mx-auto mt-5 flex max-w-[28rem] flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium text-muted-foreground">
-            <span className="flex items-center gap-1.5"><CheckIcon className="size-3 text-primary" aria-hidden /> Passwordless</span>
-            <span className="flex items-center gap-1.5"><CheckIcon className="size-3 text-primary" aria-hidden /> Mumbai region</span>
-            <span className="flex items-center gap-1.5"><CheckIcon className="size-3 text-primary" aria-hidden /> Mobile ready</span>
+          <div className="mx-auto mt-6 grid max-w-[28rem] grid-cols-3 gap-2 text-center text-[0.6875rem] font-medium leading-4 text-muted-foreground sm:flex sm:items-center sm:justify-center sm:gap-6 sm:text-xs">
+            <span className="flex items-center justify-center gap-1.5"><CheckIcon className="size-3 shrink-0 text-primary" aria-hidden /> Passwordless</span>
+            <span className="flex items-center justify-center gap-1.5"><CheckIcon className="size-3 shrink-0 text-primary" aria-hidden /> Mumbai region</span>
+            <span className="flex items-center justify-center gap-1.5"><CheckIcon className="size-3 shrink-0 text-primary" aria-hidden /> Mobile ready</span>
           </div>
         </section>
       </div>
