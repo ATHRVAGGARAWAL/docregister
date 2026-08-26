@@ -7,6 +7,7 @@ import { BookOpenCheckIcon, CalendarDaysIcon } from "lucide-react";
 
 import { AccountsWorkspace } from "@/components/accounts/accounts-workspace";
 import { AppNavigation, type AppView } from "@/components/dashboard/app-navigation";
+import { type DashboardUrlState, type RegisterStatus } from "@/lib/url-state";
 import { OverviewView } from "@/components/dashboard/overview-view";
 import { RecallWorkspace } from "@/components/dashboard/recall-workspace";
 import { patientFromRecall, type RecallResult } from "@/components/dashboard/recall-panel";
@@ -41,24 +42,25 @@ const viewTitles: Record<AppView, string> = {
   settings: "Settings",
 };
 
-type RegisterStatus = "all" | "committed" | "draft";
 
 /** The register opens on a month; the Today chip narrows it. */
-const DEFAULT_REGISTER_DAYS = 30;
 
 export function Dashboard({
   initialProfile,
   initialAnalytics,
   initialEntries,
+  initialUrlState,
   liveProxyUrl,
 }: {
   initialProfile: DoctorProfile;
   initialAnalytics: AnalyticsPayload;
   initialEntries: RegisterEntry[];
+  /** Parsed on the server from `?view=…`, so the first paint is the right tab. */
+  initialUrlState: DashboardUrlState;
   liveProxyUrl: string;
 }) {
   const router = useRouter();
-  const [view, setView] = useState<AppView>(() => initialUrlState().view);
+  const [view, setView] = useState<AppView>(initialUrlState.view);
   const [profile, setProfile] = useState(initialProfile);
   const [analytics, setAnalytics] = useState(initialAnalytics);
   const [range, setRange] = useState(30);
@@ -80,10 +82,10 @@ export function Dashboard({
   const [spokenQuestion, setSpokenQuestion] = useState<CaptureTranscript | null>(null);
 
   const [registerEntries, setRegisterEntries] = useState(initialEntries);
-  const [registerDays, setRegisterDays] = useState(() => initialUrlState().days);
-  const [registerStatus, setRegisterStatus] = useState<RegisterStatus>(() => initialUrlState().status);
-  const [registerQuery, setRegisterQuery] = useState(() => initialUrlState().query);
-  const [registerOffset, setRegisterOffset] = useState(() => initialUrlState().offset);
+  const [registerDays, setRegisterDays] = useState(initialUrlState.days);
+  const [registerStatus, setRegisterStatus] = useState<RegisterStatus>(initialUrlState.status);
+  const [registerQuery, setRegisterQuery] = useState(initialUrlState.query);
+  const [registerOffset, setRegisterOffset] = useState(initialUrlState.offset);
   const registerLimit = 50;
   const [registerLoading, setRegisterLoading] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
@@ -761,32 +763,6 @@ async function getJson(input: string, init?: RequestInit): Promise<unknown> {
 
 function messageFor(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
-}
-
-function initialUrlState(): {
-  view: AppView;
-  days: number;
-  status: RegisterStatus;
-  query: string;
-  offset: number;
-} {
-  if (typeof window === "undefined") {
-    return { view: "overview", days: DEFAULT_REGISTER_DAYS, status: "all", query: "", offset: 0 };
-  }
-  const params = new URLSearchParams(window.location.search);
-  const rawView = params.get("view");
-  const view: AppView = rawView === "register" || rawView === "patients" || rawView === "recall" || rawView === "accounts" || rawView === "settings" ? rawView : "overview";
-  const rawStatus = params.get("status");
-  const status: RegisterStatus = rawStatus === "committed" || rawStatus === "draft" ? rawStatus : "all";
-  const daysValue = Number(params.get("days"));
-  const offsetValue = Number(params.get("offset"));
-  return {
-    view,
-    days: [1, 7, 30, 90].includes(daysValue) ? daysValue : DEFAULT_REGISTER_DAYS,
-    status,
-    query: params.get("q") ?? "",
-    offset: Number.isFinite(offsetValue) && offsetValue > 0 ? Math.floor(offsetValue) : 0,
-  };
 }
 
 async function errorMessage(response: Response, fallback: string): Promise<string> {

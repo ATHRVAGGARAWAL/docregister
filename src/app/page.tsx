@@ -5,6 +5,7 @@ import { emptyAnalytics, loadDailyStats } from "@/lib/analytics";
 import { liveProxyUrl } from "@/lib/env";
 import { loadTodayRegister } from "@/lib/register";
 import { getCurrentDoctor, getSupabaseServerClient } from "@/lib/supabase/server";
+import { parseDashboardUrlState, type RawSearchParams } from "@/lib/url-state";
 
 /**
  * The register.
@@ -19,9 +20,18 @@ import { getCurrentDoctor, getSupabaseServerClient } from "@/lib/supabase/server
 // and a stale register would be actively wrong.
 export const dynamic = "force-dynamic";
 
-export default async function RegisterPage() {
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<RawSearchParams>;
+}) {
   const doctor = await getCurrentDoctor();
   if (!doctor) redirect("/login");
+
+  // Parsed here rather than in the client, so the server renders the same view
+  // the URL asks for. Reading it after hydration meant a deep link to
+  // `?view=patients` painted the overview first and then threw it away.
+  const urlState = parseDashboardUrlState(await searchParams);
 
   const supabase = await getSupabaseServerClient();
 
@@ -47,6 +57,7 @@ export default async function RegisterPage() {
       }}
       initialAnalytics={analytics}
       initialEntries={entries}
+      initialUrlState={urlState}
       liveProxyUrl={liveProxyUrl}
     />
   );
