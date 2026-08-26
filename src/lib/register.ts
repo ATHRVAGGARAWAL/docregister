@@ -85,6 +85,7 @@ export interface RegisterSearchResult {
   totalCount: number;
   committedCount: number;
   draftCount: number;
+  discardedCount: number;
   limit: number;
   offset: number;
 }
@@ -104,6 +105,7 @@ interface RegisterSearchRow {
   total_count: number | string;
   committed_count?: number | string;
   draft_count?: number | string;
+  discarded_count?: number | string;
 }
 
 /**
@@ -154,6 +156,13 @@ export async function searchRegister(
 
   const rows = (data ?? []) as RegisterSearchRow[];
   const summary = (totals?.[0] ?? rows[0]) as RegisterSearchRow | undefined;
+  const selectedCount = options.status === "committed"
+    ? summary?.committed_count
+    : options.status === "draft"
+      ? summary?.draft_count
+      : options.status === "discarded"
+        ? summary?.discarded_count
+        : summary?.total_count;
   return {
     entries: rows.map((row) => ({
       id: row.id,
@@ -168,9 +177,13 @@ export async function searchRegister(
       status: row.status,
       drugs: row.drugs ?? [],
     })),
-    totalCount: Number(rows[0]?.total_count ?? 0),
+    // An empty page can still have matches before its offset. Fall back to the
+    // independently queried total for the selected status instead of claiming
+    // there are zero results.
+    totalCount: Number(rows[0]?.total_count ?? selectedCount ?? 0),
     committedCount: Number(summary?.committed_count ?? 0),
     draftCount: Number(summary?.draft_count ?? 0),
+    discardedCount: Number(summary?.discarded_count ?? 0),
     limit,
     offset,
   };

@@ -71,13 +71,14 @@ class DraftSaveError extends Error {
  * It opens as a sheet rather than a modal dialog because it is the natural
  * continuation of a gesture that started at the bottom of the screen — and it
  * is built on Radix Dialog, so focus is trapped and restored, the register
- * behind it is inert, and Escape discards. Tabbing out of a half-reviewed visit
- * into the list underneath is how a doctor signs off on the wrong patient.
+ * behind it is inert. Tabbing out of a half-reviewed visit into the list
+ * underneath is how a doctor signs off on the wrong patient.
  */
 export function ReviewSheet({
   draft,
   onCommitted,
   onDiscard,
+  onKeepForLater,
   onDismissAfterCommit,
   onScheduleFollowUp,
   onViewRegister,
@@ -86,6 +87,7 @@ export function ReviewSheet({
   draft: ReviewDraft;
   onCommitted: (outcome: CommitOutcome) => void;
   onDiscard: () => void;
+  onKeepForLater: () => void;
   onDismissAfterCommit?: () => void;
   onScheduleFollowUp?: (outcome: CommitOutcome) => void;
   onViewRegister?: () => void;
@@ -108,6 +110,7 @@ export function ReviewSheet({
   const [asNew, setAsNew] = useState(draft.suggestedPatients.length === 0);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const [saveFailureRecovery, setSaveFailureRecovery] = useState<"saved" | "screen" | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
   const [draftSaveQueue] = useState(() => {
     const version = (draft as ReviewDraft & { version?: number }).version;
@@ -323,6 +326,7 @@ export function ReviewSheet({
   }, [commitOutcome, draftPayload, draftSaveQueue, isDirty, saving]);
 
   async function save() {
+    setSaveFailureRecovery(null);
     const firstPendingReview = checklist.findIndex((item) => !reviewedKeys.has(item.key));
     if (firstPendingReview >= 0) {
       setFailure("Review every flagged detail before saving this visit.");
@@ -411,9 +415,10 @@ export function ReviewSheet({
       const message = error instanceof Error ? error.message : "Could not save the visit.";
       setFailure(
         draftPersisted
-          ? `${message} Your reviewed draft is saved — correct anything mentioned, then try saving again.`
-          : `${message} Your edits are still on screen — try saving again.`,
+          ? `${message} Your reviewed draft is in Register → Needs review. Try saving again now, or keep it for later.`
+          : `${message} Your edits are still on this screen. Keep it open and try saving again.`,
       );
+      setSaveFailureRecovery(draftPersisted ? "saved" : "screen");
     } finally {
       setSaving(false);
     }
@@ -482,6 +487,11 @@ export function ReviewSheet({
         open
         onOpenChange={(next) => {
           if (next || historyPatient) return;
+          if (saveFailureRecovery === "saved") {
+            onKeepForLater();
+            return;
+          }
+          if (saveFailureRecovery === "screen") return;
           // Radix closes on Escape and on an outside pointer-down by default,
           // and closing routes straight to `onDiscard`, which DELETEs the
           // encounter. On a phone that put an irreversible delete one mistimed
@@ -502,6 +512,11 @@ export function ReviewSheet({
         // prompted: on a phone the sheet occupies most of the screen and the
         // strip beside it is exactly where a thumb lands by mistake.
         onEscapeKeyDown={(event) => {
+          if (saveFailureRecovery === "screen") {
+            event.preventDefault();
+            return;
+          }
+          if (saveFailureRecovery === "saved") return;
           if (isDirty && !confirmDiscard()) event.preventDefault();
         }}
         onPointerDownOutside={(event) => event.preventDefault()}
@@ -796,8 +811,12 @@ export function ReviewSheet({
             </p>
           )}
           <div className="flex gap-3">
-            <Button variant="outline" size="lg" onClick={onDiscard}>
-              Discard
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={saveFailureRecovery === "saved" ? onKeepForLater : onDiscard}
+            >
+              {saveFailureRecovery === "saved" ? "Keep for later" : "Discard"}
             </Button>
             <Button size="lg" onClick={save} disabled={saving || pendingReviewCount > 0} className="flex-1">
               {saving ? (
@@ -805,7 +824,7 @@ export function ReviewSheet({
               ) : (
                 <Check className="size-4" aria-hidden />
               )}
-              Confirm &amp; save
+              {saveFailureRecovery ? "Try saving again" : "Confirm & save"}
             </Button>
           </div>
         </SheetFooter>

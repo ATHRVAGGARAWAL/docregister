@@ -4,6 +4,7 @@ import {
   ArrowUpRightIcon,
   CircleCheckIcon,
   ClipboardPenLineIcon,
+  HistoryIcon,
   NotebookPenIcon,
   PillIcon,
   StethoscopeIcon,
@@ -22,12 +23,14 @@ export function RegisterTimeline({
   compact = false,
   onOpenPatient,
   onOpenDraft,
+  onRestoreDraft,
   onOpenVisit,
 }: {
   entries: RegisterEntry[];
   compact?: boolean;
   onOpenPatient?: (patient: PatientMatch) => void;
   onOpenDraft?: (entry: RegisterEntry) => void;
+  onRestoreDraft?: (entry: RegisterEntry) => void;
   onOpenVisit?: (entry: RegisterEntry) => void;
 }) {
   const reduceMotion = useReducedMotion();
@@ -53,6 +56,7 @@ export function RegisterTimeline({
           const day = entry.occurred_at.slice(0, 10);
           const previousDay = entries[index - 1]?.occurred_at.slice(0, 10);
           const showDay = !compact && day !== previousDay;
+          const canOpenVisit = entry.status === "committed" && Boolean(onOpenVisit);
 
           return (
             <motion.li
@@ -79,26 +83,30 @@ export function RegisterTimeline({
               <article
                 className={cn(
                   "surface-card group relative isolate overflow-hidden rounded-[1.35rem] p-4 transition-all duration-300 sm:p-5",
-                  onOpenVisit && "hover:-translate-y-0.5 hover:border-primary/20",
+                  canOpenVisit && "hover:-translate-y-0.5 hover:border-primary/20",
                 )}
               >
                 <div
                   className={cn(
                     "pointer-events-none absolute inset-y-5 left-0 w-0.5 rounded-full",
-                    entry.status === "draft" ? "bg-warning" : "bg-primary",
+                    entry.status === "draft"
+                      ? "bg-warning"
+                      : entry.status === "discarded"
+                        ? "bg-muted-foreground/50"
+                        : "bg-primary",
                   )}
                   aria-hidden
                 />
-                {onOpenVisit && (
+                {canOpenVisit && (
                   <button
                     type="button"
-                    onClick={() => onOpenVisit(entry)}
+                    onClick={() => onOpenVisit?.(entry)}
                     className="absolute inset-0 z-0 rounded-[1.35rem] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none"
                     aria-label={`Open ${entry.patient_name}'s visit from ${formatDayLong(day)} at ${formatClock(entry.occurred_at)}`}
                   />
                 )}
 
-                <div className={cn("relative z-10 flex items-start gap-3 sm:gap-4", onOpenVisit && "pointer-events-none")}>
+                <div className={cn("relative z-10 flex items-start gap-3 sm:gap-4", canOpenVisit && "pointer-events-none")}>
                   <div className="hidden w-16 shrink-0 pt-1 sm:block">
                     <time
                       dateTime={entry.occurred_at}
@@ -113,11 +121,15 @@ export function RegisterTimeline({
                       "mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl border",
                       entry.status === "draft"
                         ? "border-warning/25 bg-warning-soft text-warning"
-                        : "border-primary/20 bg-primary-soft text-primary",
+                        : entry.status === "discarded"
+                          ? "border-border bg-secondary text-muted-foreground"
+                          : "border-primary/20 bg-primary-soft text-primary",
                     )}
                   >
                     {entry.status === "draft" ? (
                       <ClipboardPenLineIcon className="size-4" aria-hidden />
+                    ) : entry.status === "discarded" ? (
+                      <HistoryIcon className="size-4" aria-hidden />
                     ) : (
                       <CircleCheckIcon className="size-4" aria-hidden />
                     )}
@@ -151,6 +163,8 @@ export function RegisterTimeline({
                           )}
                           {entry.status === "draft" ? (
                             <Badge variant="warning" className="rounded-full border-warning/20 bg-warning-soft px-2.5">Needs review</Badge>
+                          ) : entry.status === "discarded" ? (
+                            <Badge variant="secondary" className="rounded-full border-border bg-secondary px-2.5 text-muted-foreground">Discarded</Badge>
                           ) : entry.is_new_patient ? (
                             <Badge variant="default" className="rounded-full border-primary/20 bg-primary-soft px-2.5 text-primary">First visit</Badge>
                           ) : (
@@ -171,7 +185,7 @@ export function RegisterTimeline({
                         </p>
                       </div>
 
-                      {onOpenVisit && (
+                      {canOpenVisit && (
                         <span className="hidden items-center gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground transition-colors group-hover:text-primary md:flex">
                           Open <ArrowUpRightIcon className="size-3.5" aria-hidden />
                         </span>
@@ -185,6 +199,17 @@ export function RegisterTimeline({
                         className="pointer-events-auto relative z-20 mt-3 inline-flex min-h-9 touch-manipulation items-center rounded-xl border border-warning/25 bg-warning-soft px-3 text-xs font-semibold text-warning transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [@media(pointer:coarse)]:min-h-11"
                       >
                         Review this draft
+                      </button>
+                    )}
+
+                    {entry.status === "discarded" && onRestoreDraft && (
+                      <button
+                        type="button"
+                        onClick={() => onRestoreDraft(entry)}
+                        className="pointer-events-auto relative z-20 mt-3 inline-flex min-h-9 touch-manipulation items-center gap-1.5 rounded-xl border border-border bg-secondary px-3 text-xs font-semibold text-foreground transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [@media(pointer:coarse)]:min-h-11"
+                      >
+                        <HistoryIcon className="size-3.5" aria-hidden />
+                        Restore &amp; review
                       </button>
                     )}
 

@@ -10,3 +10,10 @@ test("follow-ups is a supported dashboard deep link", () => {
 test("unknown dashboard views still fall back to overview", () => {
   assert.equal(parseDashboardUrlState({ view: "billing" }).view, "overview");
 });
+
+test("discarded drafts are a supported register recovery deep link", () => {
+  assert.equal(
+    parseDashboardUrlState({ view: "register", status: "discarded" }).status,
+    "discarded",
+  );
+});

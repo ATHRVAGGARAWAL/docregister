@@ -108,6 +108,7 @@ export function Dashboard({
     count: 0,
     committedCount: initialEntries.filter((entry) => entry.status === "committed").length,
     draftCount: initialEntries.filter((entry) => entry.status === "draft").length,
+    discardedCount: 0,
   });
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [chartPatient, setChartPatient] = useState<PatientMatch | null>(null);
@@ -222,6 +223,7 @@ export function Dashboard({
         totalCount?: number;
         committedCount?: number;
         draftCount?: number;
+        discardedCount?: number;
       };
       if (ticket !== registerTicket.current) return;
       setRegisterEntries(payload.entries ?? []);
@@ -230,6 +232,7 @@ export function Dashboard({
         count: payload.totalCount ?? 0,
         committedCount: payload.committedCount ?? 0,
         draftCount: payload.draftCount ?? 0,
+        discardedCount: payload.discardedCount ?? 0,
       });
     } catch (error) {
       if (ticket !== registerTicket.current) return;
@@ -494,15 +497,28 @@ export function Dashboard({
     }
   }, [capture, loadRegister, recoveredDraft, registerDays, registerOffset, registerQuery, registerStatus]);
 
-  async function restoreDraft() {
-    if (!discardedDraftId) return;
+  const keepDraftForLater = useCallback(() => {
+    setRecoveredDraft(null);
+    capture.reset();
+    setDraftError(null);
+    setView("register");
+    setRegisterStatus("draft");
+    setRegisterQuery("");
+    setRegisterOffset(0);
+    void loadRegister(registerDays, "draft", "", 0);
+  }, [capture, loadRegister, registerDays]);
+
+  async function restoreDraft(id = discardedDraftId) {
+    if (!id) return;
     try {
-      const response = await fetch(`/api/drafts/${discardedDraftId}`, { method: "POST" });
+      const response = await fetch(`/api/drafts/${id}`, { method: "POST" });
       if (!response.ok) throw new Error(await errorMessage(response, "Could not restore the draft."));
-      const id = discardedDraftId;
       setDiscardedDraftId(null);
+      setRegisterStatus("draft");
+      setRegisterQuery("");
+      setRegisterOffset(0);
       await openDraft({ id });
-      void loadRegister(registerDays, registerStatus, registerQuery, registerOffset);
+      void loadRegister(registerDays, "draft", "", 0);
     } catch (error) {
       setDraftError(messageFor(error, "Could not restore the draft."));
     }
@@ -615,6 +631,7 @@ export function Dashboard({
                   totalCount={registerTotals.count}
                   committedCount={registerTotals.committedCount}
                   draftCount={registerTotals.draftCount}
+                  discardedCount={registerTotals.discardedCount}
                   offset={registerOffset}
                   limit={registerLimit}
                   hasMore={registerOffset + registerLimit < registerTotals.count}
@@ -642,6 +659,7 @@ export function Dashboard({
                   onReviewNext={() => void reviewNext()}
                   onOpenPatient={setChartPatient}
                   onOpenDraft={(entry) => void openDraft(entry)}
+                  onRestoreDraft={(entry) => void restoreDraft(entry.id)}
                   onOpenVisit={(entry) => setVisitDetailId(entry.id)}
                 />
               )}
@@ -738,6 +756,7 @@ export function Dashboard({
           draft={(recoveredDraft ?? capture.draft)!}
           onCommitted={onCommitted}
           onDiscard={() => void onDiscard()}
+          onKeepForLater={keepDraftForLater}
           onDismissAfterCommit={finishCommittedReview}
           onScheduleFollowUp={scheduleCommittedFollowUp}
           onViewRegister={viewRegisterAfterCommit}
@@ -749,6 +768,7 @@ export function Dashboard({
         open={manualVisitOpen}
         onOpenChange={setManualVisitOpen}
         onCommitted={onCommitted}
+        onKeepForLater={keepDraftForLater}
         onScheduleFollowUp={scheduleCommittedFollowUp}
         onViewRegister={viewRegisterAfterCommit}
         onStartNext={startNextVisit}

@@ -49,6 +49,7 @@ export function ManualVisitFlow({
   onScheduleFollowUp,
   onViewRegister,
   onStartNext,
+  onKeepForLater,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -56,6 +57,7 @@ export function ManualVisitFlow({
   onScheduleFollowUp?: (outcome: CommitOutcome) => void;
   onViewRegister?: () => void;
   onStartNext?: () => void;
+  onKeepForLater?: () => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -175,6 +177,10 @@ export function ManualVisitFlow({
         onDiscard={() => {
           void fetch(`/api/encounters/${draft.encounterId}`, { method: "DELETE" });
           close();
+        }}
+        onKeepForLater={() => {
+          close();
+          onKeepForLater?.();
         }}
       />
     );

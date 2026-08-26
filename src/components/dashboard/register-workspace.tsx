@@ -6,6 +6,7 @@ import {
   CalendarRangeIcon,
   CircleCheckBigIcon,
   ClipboardClockIcon,
+  HistoryIcon,
   LoaderCircleIcon,
   SearchIcon,
 } from "@/components/icons";
@@ -15,6 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
+import type { RegisterStatus } from "@/lib/url-state";
 import { cn } from "@/lib/utils";
 import type { RegisterEntry } from "@/lib/types";
 import { registerPageRange } from "@/lib/register-pagination";
@@ -30,6 +32,7 @@ const STATUSES = [
   { label: "All", value: "all" },
   { label: "Confirmed", value: "committed" },
   { label: "Needs review", value: "draft" },
+  { label: "Discarded", value: "discarded" },
 ] as const;
 
 export function RegisterWorkspace({
@@ -37,6 +40,7 @@ export function RegisterWorkspace({
   totalCount,
   committedCount,
   draftCount,
+  discardedCount,
   offset,
   limit,
   hasMore,
@@ -53,35 +57,44 @@ export function RegisterWorkspace({
   onReviewNext,
   onOpenPatient,
   onOpenDraft,
+  onRestoreDraft,
   onOpenVisit,
 }: {
   entries: RegisterEntry[];
   totalCount: number;
   committedCount: number;
   draftCount: number;
+  discardedCount: number;
   offset: number;
   limit: number;
   hasMore: boolean;
   loading: boolean;
   error: string | null;
   days: number;
-  status: "all" | "committed" | "draft";
+  status: RegisterStatus;
   query: string;
   onDaysChange: (days: number) => void;
-  onStatusChange: (status: "all" | "committed" | "draft") => void;
+  onStatusChange: (status: RegisterStatus) => void;
   onQueryChange: (query: string) => void;
   onSearch: () => void;
   onPageChange: (offset: number) => void;
   onReviewNext: () => void;
   onOpenPatient: (patient: PatientMatch) => void;
   onOpenDraft: (entry: RegisterEntry) => void;
+  onRestoreDraft: (entry: RegisterEntry) => void;
   onOpenVisit: (entry: RegisterEntry) => void;
 }) {
   // Both figures come from the query, not from this page. Summing `entries`
   // here made the headline the total of the first 300 rows the server returned,
   // presented as the total for the period.
   const showingPartial = totalCount > entries.length;
-  const headlineCount = status === "draft" ? draftCount : status === "committed" ? committedCount : totalCount;
+  const headlineCount = status === "draft"
+    ? draftCount
+    : status === "committed"
+      ? committedCount
+      : status === "discarded"
+        ? discardedCount
+        : totalCount;
   const page = registerPageRange(totalCount, offset, entries.length || limit);
 
   return (
@@ -213,6 +226,21 @@ export function RegisterWorkspace({
         </div>
       </section>
 
+      {discardedCount > 0 && status !== "discarded" && (
+        <Alert role="status" className="border-border bg-secondary/55">
+          <HistoryIcon className="size-4 text-muted-foreground" aria-hidden />
+          <AlertTitle>Discarded drafts are recoverable</AlertTitle>
+          <AlertDescription className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              {discardedCount} discarded draft{discardedCount === 1 ? "" : "s"} still keep their transcript and reviewed details.
+            </span>
+            <Button type="button" size="sm" variant="outline" onClick={() => onStatusChange("discarded")}>
+              View discarded
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <section aria-busy={loading} aria-labelledby="register-results-title">
         <h2 id="register-results-title" className="sr-only">
           Visit log
@@ -232,7 +260,13 @@ export function RegisterWorkspace({
             </AlertDescription>
           </Alert>
         ) : (
-          <RegisterTimeline entries={entries} onOpenPatient={onOpenPatient} onOpenDraft={onOpenDraft} onOpenVisit={onOpenVisit} />
+          <RegisterTimeline
+            entries={entries}
+            onOpenPatient={onOpenPatient}
+            onOpenDraft={onOpenDraft}
+            onRestoreDraft={onRestoreDraft}
+            onOpenVisit={onOpenVisit}
+          />
         )}
       </section>
 

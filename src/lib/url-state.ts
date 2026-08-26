@@ -16,7 +16,7 @@
 
 import type { AppView } from "@/components/dashboard/app-navigation";
 
-export type RegisterStatus = "all" | "committed" | "draft";
+export type RegisterStatus = "all" | "committed" | "draft" | "discarded";
 
 export const DEFAULT_REGISTER_DAYS = 30;
 
@@ -54,7 +54,9 @@ export function parseDashboardUrlState(params: RawSearchParams): DashboardUrlSta
 
   const rawStatus = first(params.status);
   const status: RegisterStatus =
-    rawStatus === "committed" || rawStatus === "draft" ? rawStatus : "all";
+    rawStatus === "committed" || rawStatus === "draft" || rawStatus === "discarded"
+      ? rawStatus
+      : "all";
 
   const days = Number(first(params.days));
   const offset = Number(first(params.offset));
