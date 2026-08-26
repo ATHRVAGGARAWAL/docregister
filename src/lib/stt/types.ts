@@ -7,9 +7,9 @@
  * change. Independent benchmarking (Voice of India, arXiv 2604.19151, May 2026)
  * put word error rate on unscripted Hindi / Punjabi at:
  *
- *   Sarvam Saaras          5.0 / 11.2   <- default
+ *   Sarvam Saaras          5.0 / 11.2   <- optional fallback
  *   Gemini 3 Pro           6.0 / 14.4
- *   ElevenLabs Scribe v2   7.7 / 15.6   <- fallback
+ *   ElevenLabs Scribe v2   7.7 / 15.6   <- configured primary
  *   IndicConformer-600M    8.2 / 14.9   (open weights, self-hostable)
  *   Deepgram Nova-3       13.0 /  n/a   (no Punjabi support at all)
  *   AssemblyAI Universal  19.3 / 101.0  (accepts Punjabi, returns garbage)

@@ -38,8 +38,12 @@ export function getSttProvider(): SttProvider {
  * turn a keyless dev run into a live billed request.
  */
 function fallbackFor(primary: SttProvider): SttProvider | undefined {
-  if (primary.name === "sarvam") return new ElevenLabsProvider();
-  if (primary.name === "elevenlabs") return new SarvamProvider();
+  if (primary.name === "sarvam" && process.env.ELEVENLABS_API_KEY) {
+    return new ElevenLabsProvider();
+  }
+  if (primary.name === "elevenlabs" && process.env.SARVAM_API_KEY) {
+    return new SarvamProvider();
+  }
   return undefined;
 }
 

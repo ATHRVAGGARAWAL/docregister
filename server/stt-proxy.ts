@@ -1,16 +1,15 @@
 /**
  * Live transcription proxy.
  *
- * Why this process exists at all: Sarvam authenticates realtime WebSocket
- * connections with a subprotocol that carries the raw API key
- * (`api-subscription-key.<key>`). A browser can technically do that — their
- * docs even show it — and it would put a billable, unscoped production key in
- * every visitor's devtools. So the browser talks to us, we talk to Sarvam.
+ * Why this process exists at all: connecting from the browser would require a
+ * temporary vendor token or expose a billable ElevenLabs key. The browser
+ * talks to this authenticated proxy instead, and only the proxy holds that
+ * key.
  *
  * The browser presents its Supabase access token instead. That token is
  * already scoped to one doctor, expires on its own, and is revocable.
  *
- *   browser --(ws, supabase JWT + Int16 PCM @16k)--> proxy --(ws, api key)--> Sarvam
+ *   browser --(ws, supabase JWT + Int16 PCM @16k)--> proxy --> ElevenLabs
  *
  * Run with `npm run dev` (started alongside Next by concurrently) or
  * `npm run dev:proxy` on its own.
@@ -22,10 +21,16 @@ import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 
+import {
+  elevenLabsAudioMessage,
+  elevenLabsRealtimeUrl,
+  parseElevenLabsEvent,
+} from "./elevenlabs-realtime.ts";
+
 loadEnvLocal();
 
-const PORT = Number(process.env.STT_PROXY_PORT ?? 8787);
-const SARVAM_KEY = process.env.SARVAM_API_KEY ?? "";
+const PORT = Number(process.env.PORT ?? process.env.STT_PROXY_PORT ?? 8787);
+const ELEVENLABS_KEY = process.env.ELEVENLABS_API_KEY ?? "";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
@@ -33,7 +38,7 @@ const SUPABASE_KEY =
   "";
 
 /** Without a key we still run, and stream a canned transcript instead. */
-const MOCK = !SARVAM_KEY || process.env.STT_PROVIDER === "mock";
+const MOCK = !ELEVENLABS_KEY || process.env.STT_PROVIDER === "mock";
 
 const supabase =
   SUPABASE_URL && SUPABASE_KEY
@@ -66,6 +71,7 @@ server.on("error", (error) => {
 
 server.on("connection", (client) => {
   let upstream: WebSocket | null = null;
+  let upstreamReady = false;
   let authorised = false;
   let mockTimer: ReturnType<typeof setInterval> | null = null;
   // Frames that arrived while the upstream handshake was still in flight.
@@ -81,6 +87,7 @@ server.on("connection", (client) => {
       /* already closed */
     }
     upstream = null;
+    upstreamReady = false;
   };
 
   client.on("message", async (data: RawData, isBinary: boolean) => {
@@ -94,6 +101,12 @@ server.on("connection", (client) => {
       }
 
       if (message.type === "stop") {
+        if (upstreamReady && upstream?.readyState === WebSocket.OPEN) {
+          // ElevenLabs documents an empty audio chunk with `commit: true` as
+          // the manual end-of-segment signal. VAD normally committed the last
+          // phrase already; this catches speech right against the stop press.
+          upstream.send(elevenLabsAudioMessage(Buffer.alloc(0), { commit: true }));
+        }
         shutdown();
         client.close(1000, "stopped");
         return;
@@ -147,9 +160,16 @@ server.on("connection", (client) => {
         return;
       }
 
-      upstream = openSarvam(start.languages ?? ["hi-IN"], client, () => {
-        for (const frame of queue) upstream?.send(frame);
+      upstream = openElevenLabs(client, () => {
+        upstreamReady = true;
+        for (const frame of queue) {
+          if (upstream?.readyState === WebSocket.OPEN) {
+            upstream.send(elevenLabsAudioMessage(frame));
+          }
+        }
         queue = [];
+      }, () => {
+        upstreamReady = false;
       });
       return;
     }
@@ -159,8 +179,8 @@ server.on("connection", (client) => {
 
     const frame = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
 
-    if (upstream?.readyState === WebSocket.OPEN) {
-      upstream.send(frame);
+    if (upstreamReady && upstream?.readyState === WebSocket.OPEN) {
+      upstream.send(elevenLabsAudioMessage(frame));
     } else if (!MOCK && queue.length < 100) {
       queue.push(frame);
     }
@@ -171,56 +191,63 @@ server.on("connection", (client) => {
 });
 
 /**
- * Open the upstream Sarvam socket.
- *
- * Note: the exact query parameters here are the one thing in this file that
- * cannot be verified without a live key. If interim results never arrive,
- * check the current realtime docs at docs.sarvam.ai before assuming the audio
- * pipeline is at fault — the batch path in `src/lib/stt/sarvam.ts` is
- * independent and will still be working.
+ * Open the upstream ElevenLabs Scribe v2 Realtime socket. Audio is not flushed
+ * until `session_started`; an open WebSocket is only the transport handshake,
+ * not confirmation that the transcription session accepted its configuration.
  */
-function openSarvam(
-  languages: string[],
+function openElevenLabs(
   client: WebSocket,
-  onOpen: () => void,
+  onReady: () => void,
+  onClosed: () => void,
 ): WebSocket {
-  const url = new URL("wss://api.sarvam.ai/speech-to-text/ws");
-  url.searchParams.set("model", "saarika:v2.5");
-  url.searchParams.set("language-code", languages[0] ?? "unknown");
-  url.searchParams.set("input-audio-codec", "pcm_s16le");
-  url.searchParams.set("input-audio-sample-rate", "16000");
+  const upstream = new WebSocket(elevenLabsRealtimeUrl(), {
+    headers: { "xi-api-key": ELEVENLABS_KEY },
+  });
 
-  const upstream = new WebSocket(url.toString(), [
-    `api-subscription-key.${SARVAM_KEY}`,
-  ]);
-
-  upstream.on("open", onOpen);
+  let ready = false;
 
   upstream.on("message", (raw: RawData) => {
-    try {
-      const event = JSON.parse(raw.toString()) as {
-        type?: string;
-        data?: { transcript?: string; is_final?: boolean };
-        transcript?: string;
-      };
+    const event = parseElevenLabsEvent(raw.toString());
+    if (!event) return;
 
-      const text = event.data?.transcript ?? event.transcript;
-      if (!text) return;
+    if (event.type === "ready") {
+      if (!ready) {
+        ready = true;
+        onReady();
+      }
+      return;
+    }
 
-      const isFinal = event.data?.is_final ?? event.type?.includes("final") ?? false;
-      send(client, { type: isFinal ? "final" : "interim", text });
-    } catch {
-      /* non-JSON keepalive */
+    if (event.type === "error") {
+      console.error("[stt-proxy] ElevenLabs rejected stream", event.code);
+      send(client, { type: "status", state: "unavailable" });
+      if (client.readyState === WebSocket.OPEN) {
+        client.close(1011, "transcription upstream rejected stream");
+      }
+      upstream.close();
+      return;
+    }
+
+    send(client, event);
+  });
+
+  upstream.on("error", (error) => {
+    console.error("[stt-proxy] ElevenLabs websocket error", error.message);
+    send(client, { type: "status", state: "unavailable" });
+    if (client.readyState === WebSocket.OPEN) {
+      // 1012 is retryable in the browser client. Live text is cosmetic and the
+      // separate MediaRecorder/batch path remains the transcript of record.
+      client.close(1012, "transcription upstream unavailable");
     }
   });
 
-  upstream.on("error", () => {
-    // Deliberately quiet toward the client: losing live text is cosmetic,
-    // because the recording is still being captured for the batch pass.
-    send(client, { type: "status", state: "unavailable" });
+  upstream.on("close", () => {
+    onClosed();
+    send(client, { type: "status", state: "closed" });
+    if (client.readyState === WebSocket.OPEN) {
+      client.close(1012, "transcription upstream closed");
+    }
   });
-
-  upstream.on("close", () => send(client, { type: "status", state: "closed" }));
 
   return upstream;
 }
@@ -271,5 +298,7 @@ function loadEnvLocal() {
 
 console.log(
   `[stt-proxy] listening on ws://localhost:${PORT}` +
-    (MOCK ? "  (mock mode — no SARVAM_API_KEY set)" : "  (sarvam realtime)"),
+    (MOCK
+      ? "  (mock mode — no ELEVENLABS_API_KEY set or STT_PROVIDER=mock)"
+      : "  (elevenlabs realtime)"),
 );

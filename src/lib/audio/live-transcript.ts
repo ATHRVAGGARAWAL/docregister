@@ -3,11 +3,9 @@
 /**
  * Client for our own live-transcription proxy (`server/stt-proxy.ts`).
  *
- * The browser never opens a socket to Sarvam directly. Sarvam authenticates
- * realtime connections with a WebSocket subprotocol (`api-subscription-key.<key>`),
- * which means a browser-side connection would ship the API key to every visitor
- * with devtools. The proxy holds the key; the browser presents its Supabase
- * access token instead, which is already scoped to one doctor and expires.
+ * The browser never opens a socket to ElevenLabs with a long-lived API key.
+ * The proxy holds that key; the browser presents its Supabase access token
+ * instead, which is already scoped to one doctor and expires.
  *
  * Everything here is best-effort. A failed live socket degrades to "no interim
  * text" — the batch transcript still lands, because that is a separate path.

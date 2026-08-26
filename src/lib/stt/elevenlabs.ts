@@ -12,15 +12,15 @@ import {
 const MODEL = "scribe_v2";
 
 /**
- * ElevenLabs Scribe v2 — fallback provider.
+ * ElevenLabs Scribe v2 — primary provider.
  *
  * Second-best measured Indic accuracy (Hindi 7.7 / Punjabi 15.6 WER) and the
  * only non-Indian vendor with an actual India storage region. Note the caveat
  * before relying on that for compliance: storage is in-region but processing
  * may still occur outside India via affiliates, so it satisfies "data
  * residency" in the marketing sense and not necessarily ABDM's storage
- * requirement. Treat it as a degraded-mode fallback when Sarvam is down, not
- * as an equivalent primary.
+ * requirement. Confirm the account's processing and residency terms before
+ * using it for identifiable clinical data.
  *
  * Punjabi is tiered by ElevenLabs' own docs as "Good" (10–25% WER) against
  * Hindi's "High Accuracy" (5–10%) — so a Punjabi-heavy clinic should not be
@@ -28,7 +28,7 @@ const MODEL = "scribe_v2";
  */
 export class ElevenLabsProvider implements SttProvider {
   readonly name = "elevenlabs";
-  readonly supportsLive = false;
+  readonly supportsLive = true;
 
   async transcribe(input: TranscribeInput): Promise<TranscribeResult> {
     const apiKey = env.elevenLabsApiKey;

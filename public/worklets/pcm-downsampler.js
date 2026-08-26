@@ -1,11 +1,10 @@
 /**
  * AudioWorklet processor: float32 @ context rate -> Int16 PCM @ 16 kHz mono.
  *
- * This exists because of a hard constraint in Sarvam's realtime API: the
- * WebSocket accepts only raw mono PCM (linear16) at exactly 8000 or 16000 Hz,
- * and closes with code 4000 on anything else. MediaRecorder cannot produce raw
- * PCM at all — it only emits container formats — so the live path cannot reuse
- * the archival recorder's output and needs its own tap on the audio graph.
+ * ElevenLabs realtime accepts raw mono PCM (linear16), while MediaRecorder
+ * produces container formats such as WebM or MP4. The live path therefore
+ * cannot reuse the archival recorder's output and needs its own tap on the
+ * audio graph.
  *
  * It runs as a Worklet rather than a ScriptProcessorNode because Worklets run
  * off the main thread. A ScriptProcessorNode drops samples whenever React

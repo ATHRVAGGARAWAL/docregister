@@ -4,10 +4,9 @@ import "server-only";
  * Server-side environment access.
  *
  * Every key here is a secret. None of them may ever be prefixed with
- * `NEXT_PUBLIC_` — in particular the Sarvam key, which their browser
- * WebSocket subprotocol auth (`api-subscription-key.<key>`) would happily
- * accept from the client. We proxy that socket server-side instead precisely
- * so the key never reaches a browser.
+ * `NEXT_PUBLIC_` — in particular the ElevenLabs key. We proxy realtime STT
+ * server-side precisely so that long-lived provider credentials never reach a
+ * browser.
  */
 
 function required(name: string): string {
@@ -76,7 +75,7 @@ export const env = {
 export type SttProviderName = "sarvam" | "elevenlabs" | "mock";
 
 export function sttProviderName(): SttProviderName {
-  const raw = (process.env.STT_PROVIDER ?? "sarvam").toLowerCase();
+  const raw = (process.env.STT_PROVIDER ?? "elevenlabs").toLowerCase();
   if (raw === "sarvam" || raw === "elevenlabs" || raw === "mock") return raw;
   throw new Error(`Unknown STT_PROVIDER "${raw}"`);
 }
