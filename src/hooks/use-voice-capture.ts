@@ -379,6 +379,11 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
 
     if (phase !== "listening") return;
 
+    // Leave the listening UI as soon as the stop tap is accepted. Some mobile
+    // browsers take a noticeable moment to deliver MediaRecorder's final blob;
+    // keeping the red microphone visible during that delay makes a successful
+    // stop look ignored and invites duplicate taps.
+    setPhase("transcribing");
     teardownCapture();
     recorderRef.current = null;
 

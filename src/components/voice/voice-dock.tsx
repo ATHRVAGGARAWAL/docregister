@@ -2,19 +2,14 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { AudioLines, FilePenLine, Lock, Mic, Search, SendHorizontal, Square, X } from "@/components/icons";
+import { AudioLines, FilePenLine, Mic, Search, SendHorizontal, Square, X } from "@/components/icons";
 
 import { Waveform } from "@/components/voice/waveform";
 import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/format";
 import type { CapturePhase } from "@/hooks/use-voice-capture";
 import { cn } from "@/lib/utils";
-import {
-  isKeyboardVoiceActivation,
-  voicePointerDownIntent,
-  voicePointerReleaseIntent,
-  type VoicePointerIntent,
-} from "@/lib/audio/voice-gesture";
+import { voiceTapAction } from "@/lib/audio/voice-gesture";
 
 /**
  * The floating dock — the app's one persistent control.
@@ -31,31 +26,11 @@ import {
  * and travels 1px: the shadow collapses inward and the bevel inverts, which is
  * what a key doing down actually looks like. Everything else on screen is paper.
  *
- * ## Three ways to start a recording, not one
- *
- * Hold-to-talk with slide-up-to-lock is borrowed from WhatsApp, because it is
- * the gesture Indian doctors already have in their fingers. It is also, on its
- * own, unusable by a large number of people: a sustained press plus a drag is
- * exactly the interaction that tremor, arthritis, a prosthetic, a stylus or a
- * switch device cannot produce, and keyboard activation of a button emits a
- * `click` and nothing else — no `pointerdown`, no `pointerup` — so a
- * pointer-only dock leaves the app's entire purpose behind a gesture a keyboard
- * cannot make. That is a WCAG 2.1.1 failure on the primary function, and
- * "slide up to lock" with no alternative is a 2.5.7 failure on top of it.
- *
- * So all three of these do the same thing:
- *
- *   hold and release   — record while held (the fast path between patients)
- *   tap                — start hands-free, tap again to stop
- *   Enter / Space      — identical to tap, via the button's own click event
- *
- * Hold and tap are told apart by how long the press lasted and whether it
- * moved, which is decided on release. Nothing is guessed at press time: the
- * recorder starts on `pointerdown` either way, because a microphone that waits
- * 300ms to find out what kind of press this is loses the first word.
+ * The microphone is deliberately a plain toggle. A click or tap starts a
+ * hands-free recording; the next click or tap stops it and opens review. Using
+ * the button's normal click event keeps touch, mouse, keyboard and assistive
+ * technology on the same predictable path.
  */
-
-const LOCK_DISTANCE = 64;
 
 export function VoiceDock({
   phase,
@@ -90,15 +65,7 @@ export function VoiceDock({
   onAsk: (question: string) => void;
   onManualEntry: () => void;
 }) {
-  const [locked, setLocked] = useState(false);
-  const [slide, setSlide] = useState(0);
   const [question, setQuestion] = useState("");
-  const originY = useRef(0);
-  const pressedAt = useRef(0);
-  // Capture what this particular pointer intended before `onStart` changes the
-  // phase. Without this, the release of the first tap can look like a second
-  // recording gesture after React re-renders the dock as `arming`.
-  const pointerIntent = useRef<VoicePointerIntent>("none");
   const dockRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
 
@@ -116,102 +83,13 @@ export function VoiceDock({
       ? "Transcribing."
       : "Reading the details."
     : listening
-      ? locked
-        ? "Recording, hands-free. Press stop when finished."
-        : "Recording."
+      ? "Recording. Tap stop when finished."
       : "";
 
-  /* ---- Pointer: hold, or tap ------------------------------------------- */
-
-  const handlePointerDown = useCallback(
-    (event: React.PointerEvent) => {
-      if (!event.isPrimary || event.button !== 0) return;
-
-      const intent = voicePointerDownIntent({ listening, busy });
-      pointerIntent.current = intent;
-      if (intent === "none") return;
-
-      // A second tap is unambiguously a stop. Do it on pointer-down so a mobile
-      // browser cannot lose the action if the control changes during pointer-up
-      // or before its delayed synthetic click.
-      if (intent === "stop") {
-        setSlide(0);
-        onStop();
-        return;
-      }
-
-      // Capture the pointer so the slide keeps tracking even when the finger
-      // leaves the 64px key — which it always does, that being the point.
-      event.currentTarget.setPointerCapture(event.pointerId);
-      originY.current = event.clientY;
-      pressedAt.current = performance.now();
-      setSlide(0);
-      setLocked(false);
-      onStart();
-    },
-    [busy, listening, onStart, onStop],
-  );
-
-  const handlePointerMove = useCallback(
-    (event: React.PointerEvent) => {
-      if (!listening || locked) return;
-      const delta = Math.max(0, originY.current - event.clientY);
-      setSlide(delta);
-      if (delta >= LOCK_DISTANCE) {
-        setLocked(true);
-        // A short haptic is the confirmation — the doctor is looking at the
-        // patient, not at the screen.
-        navigator.vibrate?.(12);
-      }
-    },
-    [listening, locked],
-  );
-
-  const handlePointerUp = useCallback(
-    (event: React.PointerEvent) => {
-      const travel = Math.abs(originY.current - event.clientY);
-      const heldFor = performance.now() - pressedAt.current;
-      const intent = pointerIntent.current;
-      pointerIntent.current = "none";
-      setSlide(0);
-
-      const releaseIntent = voicePointerReleaseIntent({
-        pointerIntent: intent,
-        listening,
-        locked,
-        cancelled: event.type === "pointercancel",
-        heldForMs: heldFor,
-        travelPx: travel,
-      });
-
-      if (releaseIntent === "lock") {
-        setLocked(true);
-        navigator.vibrate?.(12);
-        return;
-      }
-
-      if (releaseIntent === "stop") onStop();
-    },
-    [listening, locked, onStop],
-  );
-
-  /* ---- Keyboard: Enter / Space ------------------------------------------ */
-
-  const handleClick = useCallback((event: React.MouseEvent) => {
-    // Pointer input already ran on pointer-down. Keyboard and assistive
-    // technology clicks have detail 0 and use this accessible toggle path.
-    if (!isKeyboardVoiceActivation(event.detail)) return;
-    if (busy) return;
-
-    if (listening) {
-      onStop();
-      return;
-    }
-
-    // Keyboard operation is always hands-free — there is no "hold" a keyboard
-    // can express, so the first press starts and the second one stops.
-    setLocked(true);
-    onStart();
+  const handleToggle = useCallback(() => {
+    const action = voiceTapAction({ listening, busy });
+    if (action === "start") onStart();
+    if (action === "stop") onStop();
   }, [busy, listening, onStart, onStop]);
 
   // Escape abandons a recording. Useful to everyone, and for a keyboard user it
@@ -236,8 +114,6 @@ export function VoiceDock({
   }
 
   const transcript = [finalText, interimText].filter(Boolean).join(" ");
-  const holding = listening && !locked;
-
   return (
     <div
       ref={dockRef}
@@ -274,11 +150,7 @@ export function VoiceDock({
                   />
                   {formatDuration(elapsedMs)}
                 </span>
-                {locked && (
-                  <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/20 bg-primary-soft px-2 py-1 text-[11px] font-semibold text-primary sm:px-2.5 sm:py-1.5 sm:text-xs">
-                    <Lock className="size-3" aria-hidden /> Hands-free
-                  </span>
-                )}
+                <span className="shrink-0 text-xs font-medium text-muted-foreground">Tap stop to finish</span>
               </div>
 
               <div className="surface-inset relative mt-1.5 overflow-hidden rounded-lg px-2 py-1.5 sm:mt-2 sm:rounded-xl sm:px-4 sm:py-2.5">
@@ -401,7 +273,7 @@ export function VoiceDock({
             listening || busy ? "mt-2 pb-0.5 sm:mt-3 sm:pb-1" : "mt-0",
           )}
         >
-          {listening && locked ? (
+          {listening ? (
             <>
               <Button variant="outline" size="icon" onClick={onCancel} className="size-11 rounded-full">
                 <X className="size-4" aria-hidden />
@@ -418,8 +290,7 @@ export function VoiceDock({
                 )}
                 <button
                   type="button"
-                  onPointerDown={handlePointerDown}
-                  onClick={handleClick}
+                  onClick={handleToggle}
                   className="pressable grid size-14 place-items-center rounded-full border border-destructive bg-destructive text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none sm:size-16"
                 >
                   <Square className="size-5 fill-current" aria-hidden />
@@ -433,52 +304,20 @@ export function VoiceDock({
             </span>
           ) : (
             <div className="relative flex flex-col items-center">
-              {holding && (
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 - slide / LOCK_DISTANCE }}
-                  className="surface-elevated absolute -top-12 flex flex-col items-center rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <Lock className="size-3.5" aria-hidden />
-                    Slide to lock
-                  </span>
-                </motion.span>
-              )}
-
               <div className="relative grid place-items-center">
                   <button
                     type="button"
                     disabled={busy}
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    onPointerCancel={handlePointerUp}
-                    onClick={handleClick}
-                    aria-pressed={listening}
-                    // Without `touchAction: none`, dragging up scrolls the page
-                    // instead of locking. The scale tracks input level, so the key
-                    // physically responds to the voice hitting it — but only when
-                    // motion is welcome; for someone who asked for less of it, a
-                    // control that breathes under their finger is not decoration
-                    // they can ignore.
-                    style={{
-                      touchAction: "none",
-                      transform: `translateY(${-Math.min(slide, LOCK_DISTANCE)}px) scale(${
-                        reduceMotion ? 1 : 1 + level * 0.1
-                      })`,
-                    }}
+                    onClick={handleToggle}
+                    aria-pressed={false}
+                    style={{ transform: `scale(${reduceMotion ? 1 : 1 + level * 0.1})` }}
                     className={cn(
                       "relative grid place-items-center rounded-full border border-primary bg-primary text-primary-foreground shadow-flat transition-[transform,background-color] duration-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none disabled:opacity-50",
-                      listening ? "size-[4.5rem]" : "size-14",
+                      "size-14",
                     )}
-                    aria-label={
-                      listening
-                        ? "Stop recording and review this visit"
-                        : "Record a visit. Tap to start hands-free, or hold to record while pressed."
-                    }
+                    aria-label="Start recording a visit"
                   >
-                    <Mic className={listening ? "size-7" : "size-5"} aria-hidden />
+                    <Mic className="size-5" aria-hidden />
                   </button>
               </div>
             </div>
