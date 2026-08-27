@@ -85,7 +85,7 @@ function groupIds(results: SearchResults, key: (typeof SEARCH_GROUP_ORDER)[numbe
   return results.groups.find((group) => group.key === key)?.hits.map((hit) => hit.id) ?? [];
 }
 
-test("results are grouped by type in rank order and by recency inside a group", () => {
+test("groups keep their own order: patients as ranked, the rest by recency", () => {
   const results = buildSearchResults("sunita", [
     accountHit("a-old", "2026-01-02T10:00:00.000Z"),
     visitHit("v-old", "2026-03-01T09:00:00.000Z"),
@@ -99,17 +99,29 @@ test("results are grouped by type in rank order and by recency inside a group", 
     results.groups.map((group) => group.key),
     ["patients", "visits", "accounts"],
   );
-  assert.deepEqual(groupIds(results, "patients"), ["p-new", "p-old"]);
+  // Patients arrive in the order `list_patients` produced — relevance first,
+  // and no `rank` column comes with them, so row order is the only thing
+  // carrying it. Re-sorting by recency here would answer "sun" with whichever
+  // Sunita was seen most recently instead of the closest match to what was
+  // typed. Input order in, input order out.
+  assert.deepEqual(groupIds(results, "patients"), ["p-old", "p-new"]);
+
+  // Visits and accounts are chronological records, so recency IS their
+  // relevance and the sort stays.
   assert.deepEqual(groupIds(results, "visits"), ["v-new", "v-old"]);
   assert.deepEqual(groupIds(results, "accounts"), ["a-new", "a-old"]);
   assert.equal(results.totalCount, 6);
   assert.equal(results.truncated, false);
 });
 
-test("a chart with no committed visit is still found, but ranks last", () => {
+test("a chart with no committed visit is still found", () => {
+  // `list_patients` already orders `last_visit desc nulls last`, so a chart with
+  // no committed visit arrives last and stays there. This asserts it is not
+  // dropped — being unfindable is the failure that matters, and a patient
+  // registered today has no visit yet.
   const results = buildSearchResults("sun", [
-    patientHit("never-seen", null),
     patientHit("seen", "2026-08-25T09:00:00.000Z"),
+    patientHit("never-seen", null),
   ]);
 
   assert.deepEqual(groupIds(results, "patients"), ["seen", "never-seen"]);

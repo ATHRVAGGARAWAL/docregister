@@ -30,6 +30,29 @@ for (const workspace of WORKSPACES) {
     await expect(page.getByRole("heading", { name: workspace.heading })).toBeVisible();
     await page.waitForLoadState("networkidle");
 
+    // `networkidle` is not the same as "the layout has stopped moving". Several
+    // panels on these screens mount after their own fetch resolves — the due
+    // banner, the onboarding checklist, the export control — and a measurement
+    // taken between two of those arriving reports a layout that existed for one
+    // frame. This test failed exactly once that way, in a full run and never in
+    // isolation, which is the signature of a race rather than a defect.
+    //
+    // So: wait for the document height to hold still across two frames before
+    // measuring. Cheap, and it makes a failure mean what it says.
+    await page.waitForFunction(
+      () =>
+        new Promise<boolean>((resolve) => {
+          const first = document.documentElement.scrollHeight;
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() =>
+              resolve(document.documentElement.scrollHeight === first),
+            ),
+          );
+        }),
+      undefined,
+      { timeout: 10_000 },
+    );
+
     const { overflowing, smallTargets } = await measureLayout(page);
 
     expect(overflowing, `wider than the 393px viewport:\n${overflowing.join("\n")}`).toEqual([]);

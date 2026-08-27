@@ -839,6 +839,13 @@ export function Dashboard({
           onOpenVisit={(entry) => setVisitDetailId(entry.id)}
           onOpenPatient={setChartPatient}
           onStartDictation={() => void capture.start()}
+          onExportRegister={() => {
+            // The palette runs the command and closes. The export control,
+            // its progress and any error live on the register, so this takes
+            // the doctor there rather than starting a download from behind a
+            // dialog that is about to disappear.
+            changeView("register");
+          }}
         />
 
         <VoiceDock

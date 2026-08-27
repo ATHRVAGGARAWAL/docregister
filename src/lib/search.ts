@@ -176,7 +176,22 @@ export function buildSearchResults(
 
   const groups = SEARCH_GROUP_ORDER.map<SearchGroup>((key) => {
     const matching = hits.filter((hit) => GROUP_OF[hit.type] === key);
-    const ranked = [...matching].sort(byRecencyThenId).slice(0, cap);
+
+    // Patients arrive already ranked and must not be re-sorted.
+    //
+    // `list_patients` orders by `rank desc, last_visit desc nulls last,
+    // full_name` and does NOT return `rank` as a column, so the row order it
+    // produces is the only carrier of relevance that reaches this function.
+    // Sorting by recency here discards exactly the ranking that RPC exists to
+    // compute: a doctor typing "sun" would get whichever Sunita was seen most
+    // recently rather than the closest match to what they typed.
+    //
+    // Visits and accounts are different — those are chronological records and
+    // recency IS their relevance, so the sort stays for them.
+    const ranked = (key === "patients" ? matching : [...matching].sort(byRecencyThenId)).slice(
+      0,
+      cap,
+    );
     const isUnavailable = unavailable.includes(key);
     // A group that failed has no honest count of its own, and reporting the
     // rows it did not return as zero would read as "none found".

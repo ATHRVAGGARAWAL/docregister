@@ -11,6 +11,7 @@ import {
   SearchIcon,
 } from "@/components/icons";
 
+import { RegisterExportButton } from "@/components/dashboard/register-export-button";
 import { RegisterTimeline } from "@/components/dashboard/register-timeline";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -119,6 +120,10 @@ export function RegisterWorkspace({
               Every consultation, transcription and pending review in one calm,
               searchable timeline.
             </p>
+
+            {/* Exports the range on screen rather than everything, so the file
+                matches what the doctor is looking at when they ask for it. */}
+            <RegisterExportButton days={days} className="mt-4" />
           </div>
 
           {/* Equal thirds leave little room on a phone: at 393px "Confirmed" and its

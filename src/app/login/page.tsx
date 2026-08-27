@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import {
   ArrowRightIcon,
@@ -60,6 +60,28 @@ function readable(error: unknown): string {
   return message || NETWORK_ERROR;
 }
 
+/**
+ * Seconds left on the auth provider's send cooldown, or null.
+ *
+ * The provider answers a repeat request with its own sentence — "For security
+ * purposes, you can only request this after 52 seconds." — and that number is
+ * stale the instant it is painted. Showing it as static text asks a doctor to
+ * guess when it expired, and the button stays enabled the whole time so every
+ * press earns another refusal.
+ *
+ * Parsed rather than pattern-matched on a code, because Supabase's rate-limit
+ * responses have not carried a stable code across versions and the number is
+ * the part worth having. A missed match falls through to the plain message,
+ * which is what happened before.
+ */
+function cooldownSeconds(error: unknown): number | null {
+  const message = error instanceof Error ? error.message : "";
+  const match = /after (\d+) seconds?/i.exec(message);
+  if (!match) return null;
+  const seconds = Number(match[1]);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds, 600) : null;
+}
+
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
   const query = use(searchParams);
   const callbackError = Array.isArray(query.error) ? query.error[0] : query.error;
@@ -74,7 +96,37 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
   const [clinicName, setClinicName] = useState("");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>(callbackError ? "error" : "idle");
+  /** Epoch ms when the provider will accept another link request. */
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
   const [message, setMessage] = useState(callbackMessage);
+
+  // One interval, only while a cooldown is live. Reading the deadline rather
+  // than decrementing a counter means a backgrounded tab — a doctor switching
+  // apps while they wait — comes back with the right number instead of one that
+  // stopped counting.
+  useEffect(() => {
+    if (cooldownUntil === null) return;
+
+    const tick = () => {
+      const left = Math.ceil((cooldownUntil - Date.now()) / 1000);
+      // Both cleared together: `cooldownUntil` retires the effect, and
+      // `secondsLeft` is what the button reads, so leaving either behind either
+      // keeps the interval alive or keeps the button disabled.
+      if (left <= 0) {
+        setCooldownUntil(null);
+        setSecondsLeft(0);
+        return;
+      }
+      setSecondsLeft(left);
+    };
+    const first = setTimeout(tick, 0);
+    const id = setInterval(tick, 250);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [cooldownUntil]);
 
   function clearError() {
     if (status !== "error") return;
@@ -123,12 +175,32 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
 
       if (error) {
         setStatus("error");
-        setMessage(readable(error));
+        const wait = cooldownSeconds(error);
+        if (wait !== null) {
+          setCooldownUntil(Date.now() + wait * 1000);
+          // Deliberately not the provider's sentence. It names a number that is
+          // already counting down, and the doctor is looking at the countdown.
+          setMessage(
+            "A sign-in link was sent to this address a moment ago. Check your inbox and spam — " +
+              "a new one can be sent shortly.",
+          );
+        } else {
+          setMessage(readable(error));
+        }
         return;
       }
     } catch (thrown) {
       setStatus("error");
-      setMessage(readable(thrown));
+      const wait = cooldownSeconds(thrown);
+      if (wait !== null) {
+        setCooldownUntil(Date.now() + wait * 1000);
+        setMessage(
+          "A sign-in link was sent to this address a moment ago. Check your inbox and spam — " +
+            "a new one can be sent shortly.",
+        );
+      } else {
+        setMessage(readable(thrown));
+      }
       return;
     }
 
@@ -348,9 +420,21 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                       </Alert>
                     )}
 
-                    <Button type="submit" size="lg" disabled={sending} className="mt-6 h-12 w-full sm:mt-7">
+                    <Button
+                      type="submit"
+                      size="lg"
+                      disabled={sending || secondsLeft > 0}
+                      className="mt-6 h-12 w-full sm:mt-7"
+                    >
                       {sending ? (
                         <><LoaderCircleIcon className="animate-spin" aria-hidden /> Sending secure link</>
+                      ) : secondsLeft > 0 ? (
+                        // The wait is on the button rather than only in the error,
+                        // because the button is the thing being pressed. A live
+                        // number also says the app is still working, where a
+                        // greyed-out control with a stale sentence above it reads
+                        // as broken.
+                        <>Try again in {secondsLeft}s</>
                       ) : (
                         <>{signingUp ? "Create account" : "Continue with email"}<ArrowRightIcon aria-hidden /></>
                       )}
