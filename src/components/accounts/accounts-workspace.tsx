@@ -305,7 +305,11 @@ function BadgeTabs({
             onClick={() => onChange(item.value)}
             aria-pressed={active}
             className={cn(
-              "relative inline-flex h-7 shrink-0 touch-manipulation items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-11",
+              // `min-w-11` beside `min-h-11`: the height floor alone left "All"
+              // at 38x44, because a short label plus `px-3` is narrower than the
+              // 44px a coarse pointer owes on both axes. Same fix the register
+              // status chips already carry.
+              "relative inline-flex h-7 shrink-0 touch-manipulation items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11",
               active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground",
             )}
           >

@@ -62,8 +62,11 @@ export function authRequirement(): { ready: boolean; reason: string } {
     ready: false,
     reason:
       `Signed-in end-to-end tests need ${read.missing.join(", ")}. ` +
-      "Set them in .env.local (E2E_DOCTOR_EMAIL is the address of a doctor that already " +
-      "exists in that Supabase project) and re-run.",
+      "Set them in .env.local and re-run. `E2E_DOCTOR_EMAIL` should be a doctor account " +
+      "kept for this suite, NOT the address a real doctor signs in with: every run mints a " +
+      "magic link, and Supabase enforces a per-address cooldown of roughly a minute. " +
+      "Pointing this at a working account locks that person out of their own register for " +
+      "as long as the suite is running.",
   };
 }
 

@@ -152,7 +152,11 @@ test("the ledger lists every entry the server sent, or says plainly there are no
     // A quiet month is a legitimate answer, and it has to be distinguishable
     // from a ledger that never arrived.
     await expect(page.getByRole("heading", { name: "No account entries found" })).toBeVisible();
-    await expect(page.getByRole("alert")).toHaveCount(0);
+    // Not `toHaveCount(0)`: a global live region is mounted on every screen with
+    // `role="alert"` and no content, which is how an announcer has to work — the
+    // region must exist before anything is written into it or a screen reader
+    // misses the change. What this asserts is that nothing is being *said*.
+    await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toHaveCount(0);
     return;
   }
 
