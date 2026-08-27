@@ -41,6 +41,7 @@ import { createDraftSaveQueue } from "@/lib/encounters/draft-save-queue";
 import { formatVisitDay, maskPhone } from "@/lib/format";
 import type { CommitOutcome } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { InteractionWarnings } from "@/components/clinical/interaction-warning";
 import { MedicationEditor } from "@/components/voice/medication-editor";
 
 interface DraftUpdatePayload {
@@ -247,13 +248,31 @@ export function ReviewSheet({
     setRetrying(true);
     setRetryError(null);
     try {
-      const response = await fetch(`/api/drafts/${draft.encounterId}/retry`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body?.error ?? "Could not retry transcription.");
+      // Two requests, because the server cannot do both inside the 60s its
+      // platform allows — transcription can spend 40s failing over and
+      // extraction another 36. The transcript is committed between them, so a
+      // failure on the second leg leaves a draft with fresh text rather than
+      // nothing, and pressing retry again pays for extraction only.
+      const call = async (stage: "transcribe" | "extract") => {
+        const response = await fetch(`/api/drafts/${draft.encounterId}/retry`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stage }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.error ?? "Could not retry transcription.");
+        return payload;
+      };
+
+      const transcribed = await call("transcribe");
+      // Shown as soon as it exists: the doctor watches the words they dictated
+      // come back before the structured fields do, which is the part of the
+      // wait that tells them it is working.
+      setRawText(transcribed.rawText ?? rawText);
+      setRomanText(transcribed.romanText ?? null);
+      setDegraded(Boolean(transcribed.degraded));
+
+      const body = await call("extract");
       setRawText(body.rawText ?? rawText);
       setRomanText(body.romanText ?? null);
       setDegraded(Boolean(body.degraded));
@@ -758,6 +777,12 @@ export function ReviewSheet({
               reviewedKeys={reviewedKeys}
               onFieldChange={markReviewed}
             />
+
+            {/* Below the editor, not above it: the doctor is reading the list
+                they just dictated, and a note about it belongs after the thing
+                it is about. Recomputed as they edit, so removing one of a pair
+                clears the note without a save. */}
+            <InteractionWarnings prescription={drugs} className="mt-4" />
           </section>
 
           {/* The evidence behind every field above. Provider output, never

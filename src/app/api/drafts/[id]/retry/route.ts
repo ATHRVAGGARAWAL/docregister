@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { ApiError, withDoctor } from "@/lib/api/http";
+import { ApiError, readBody, withDoctor } from "@/lib/api/http";
 import { extractEncounter } from "@/lib/llm/extract";
 import { normaliseDuration, normaliseFrequency, normaliseRoute } from "@/lib/llm/dosage";
 import { transcribeWithFailover, type SttProviderName } from "@/lib/stt";
@@ -20,17 +20,23 @@ export const runtime = "nodejs";
  * could not fit under, so the case it exists for — a draft that failed once
  * already — was the case most likely to be killed halfway through.
  *
- * Left at 60 deliberately, and that is a compromise rather than a fix. Vercel
- * caps a Node function at 60s on Hobby and allows more only on a paid plan, and
- * this app is deployed there and live — a declaration the plan rejects fails the
- * deploy, which is worse for a clinical register than the rare mid-retry kill it
- * would prevent.
+ * 60 is the ceiling this deployment actually has — Vercel caps a Node function
+ * there on Hobby — so the work is split to fit inside it instead of a longer
+ * declaration the plan would reject.
  *
- * So the overflow is written down rather than papered over. Closing it properly
- * is one of: raise this to ~120 once the plan allows it, split retry into two
- * requests (transcribe, then extract) so neither leg carries both budgets, or
- * thread a deadline through both legs so extraction takes what transcription
- * left. The third is the best of the three and the largest.
+ * `stage: "transcribe"` re-runs speech-to-text from the retained audio and
+ * writes the transcript. `stage: "extract"` reads that transcript back and
+ * rebuilds the draft from it. Neither leg carries both budgets: transcription
+ * is at worst 20s + 20s of failover, extraction at worst
+ * `BUDGET_MS.precise.total`, and each has the rest of the minute for its own
+ * queries. Together they were ~80s against 60, so the case this route exists
+ * for — a draft that already failed once — was the case most likely to be
+ * killed halfway through.
+ *
+ * The transcript write is the seam on purpose. It is committed at the end of
+ * stage one, so a stage two that never runs leaves a draft with a fresh, usable
+ * transcript rather than nothing, and stage two can be retried on its own
+ * without paying for transcription again.
  */
 export const maxDuration = 60;
 
@@ -42,7 +48,13 @@ export const maxDuration = 60;
  * It never accepts a caller-supplied storage path; the path comes from a
  * transcript already owned by the signed-in doctor.
  */
-export const POST = withDoctor<{ id: string }>(async ({ doctor, supabase, params }) => {
+export const POST = withDoctor<{ id: string }>(async ({ doctor, supabase, params, request }) => {
+  const body = await readBody<{ stage?: string }>(request).catch(() => ({}) as { stage?: string });
+  // Defaults to the first leg, so a caller that sends nothing gets the stage
+  // that has to happen first rather than an error about a field it did not know
+  // to send.
+  const stage = body.stage === "extract" ? "extract" : "transcribe";
+
   const { data: encounter, error: encounterError } = await supabase
     .from("encounters")
     .select("id, status, transcript_id")
@@ -54,6 +66,37 @@ export const POST = withDoctor<{ id: string }>(async ({ doctor, supabase, params
   if (encounter.status !== "draft") throw new ApiError("Only an open draft can be retried.", 409);
   if (!encounter.transcript_id) {
     throw new ApiError("This draft has no retained recording to retry.", 409);
+  }
+
+  // Stage two reads the transcript stage one committed, and never touches the
+  // audio again. Re-transcribing here would put both budgets back in one
+  // request, which is the whole thing this split exists to avoid — and it would
+  // also charge a second provider call for text already on disk.
+  if (stage === "extract") {
+    const { data: stored, error: storedError } = await supabase
+      .from("transcripts")
+      .select("id, raw_text, roman_text, language_code, degraded")
+      .eq("id", encounter.transcript_id)
+      .eq("doctor_id", doctor.id)
+      .maybeSingle();
+    if (storedError) throw new ApiError("Could not load the retried transcript.", 500);
+    if (!stored?.raw_text) {
+      // Reachable when stage one was never run, or ran and failed after the
+      // audio but before the write. Saying which step is missing is more use
+      // than "something went wrong".
+      throw new ApiError("Re-transcribe this draft before rebuilding it.", 409);
+    }
+
+    return await rebuildDraft({
+      supabase,
+      doctorId: doctor.id,
+      encounterId: params.id,
+      transcriptId: stored.id,
+      text: stored.raw_text,
+      romanText: stored.roman_text,
+      languageCode: stored.language_code,
+      degraded: Boolean(stored.degraded),
+    });
   }
 
   const { data: transcript, error: transcriptError } = await supabase
@@ -108,9 +151,69 @@ export const POST = withDoctor<{ id: string }>(async ({ doctor, supabase, params
     throw new ApiError("Could not save the retried transcript.", 500);
   }
 
-  const outcome = await extractEncounter(result.text, {
-    frequentDrugs: (topDrugs ?? []).map((row: { drug_name: string }) => row.drug_name),
-    detectedLanguage: result.detectedLanguage,
+  if (stage === "transcribe") {
+    // The transcript is committed, so this is a complete outcome rather than
+    // half of one. If the caller never asks for the second leg, the draft still
+    // has a fresh transcript, and asking again costs extraction only.
+    return NextResponse.json({
+      stage: "transcribe",
+      encounterId: params.id,
+      transcriptId,
+      rawText: result.text,
+      romanText: result.romanText ?? null,
+      languageCode: result.detectedLanguage ?? null,
+      degraded: result.degraded,
+    });
+  }
+
+  return await rebuildDraft({
+    supabase,
+    doctorId: doctor.id,
+    encounterId: params.id,
+    transcriptId,
+    text: result.text,
+    romanText: result.romanText ?? null,
+    languageCode: result.detectedLanguage ?? null,
+    degraded: result.degraded,
+  });
+});
+
+/**
+ * Turn a transcript into a rebuilt draft.
+ *
+ * Shared by both stages so the two paths cannot drift: whichever leg produced
+ * the text, what gets written to the draft is assembled the same way.
+ */
+async function rebuildDraft({
+  supabase,
+  doctorId,
+  encounterId,
+  transcriptId,
+  text,
+  romanText,
+  languageCode,
+  degraded,
+}: {
+  supabase: Parameters<Parameters<typeof withDoctor>[0]>[0]["supabase"];
+  doctorId: string;
+  encounterId: string;
+  transcriptId: string;
+  text: string;
+  romanText: string | null;
+  languageCode: string | null;
+  degraded: boolean;
+}) {
+  const { data: topDrugs } = await supabase.rpc("doctor_top_drugs", {
+    p_doctor_id: doctorId,
+    p_limit: 40,
+  });
+  const frequent = (topDrugs ?? []).map((row: { drug_name: string }) => row.drug_name);
+
+  const outcome = await extractEncounter(text, {
+    frequentDrugs: frequent,
+    // `undefined` rather than `null`: the extractor treats a missing hint as
+    // "detect it", and a stored transcript with no language code is exactly that.
+    detectedLanguage: languageCode ?? undefined,
   });
   const extraction = outcome.extraction;
   const items = extraction.prescription.map((item, index) => {
@@ -130,7 +233,7 @@ export const POST = withDoctor<{ id: string }>(async ({ doctor, supabase, params
     };
   });
   const { error: saveError } = await callWorkflow(supabase, "save_clinical_draft", {
-    p_encounter_id: params.id,
+    p_encounter_id: encounterId,
     p_transcript_id: transcriptId,
     p_patient_name_spoken: extraction.patient_name,
     p_age_years: extraction.age_years,
@@ -157,12 +260,13 @@ export const POST = withDoctor<{ id: string }>(async ({ doctor, supabase, params
     : { data: [] };
 
   return NextResponse.json({
-    encounterId: params.id,
+    stage: "extract",
+    encounterId: encounterId,
     transcriptId,
-    rawText: result.text,
-    romanText: result.romanText ?? null,
-    languageCode: result.detectedLanguage ?? null,
-    degraded: result.degraded,
+    rawText: text,
+    romanText: romanText,
+    languageCode: languageCode ?? null,
+    degraded: degraded,
     extraction,
     warnings: [
       ...outcome.issues.map((issue) => issue.message),
@@ -170,4 +274,4 @@ export const POST = withDoctor<{ id: string }>(async ({ doctor, supabase, params
     ],
     suggestedPatients: matches ?? [],
   });
-});
+}
