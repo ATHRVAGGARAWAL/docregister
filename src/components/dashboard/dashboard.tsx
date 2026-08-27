@@ -11,6 +11,8 @@ import { FollowUpWorkspace } from "@/components/follow-ups/follow-up-workspace";
 import { type DashboardUrlState, type RegisterStatus } from "@/lib/url-state";
 import { OverviewView } from "@/components/dashboard/overview-view";
 import { CommandPalette, useCommandPalette } from "@/components/command";
+import { DueBanner } from "@/components/follow-ups/due-banner";
+import { OnboardingChecklist } from "@/components/onboarding";
 import { ShortcutProvider } from "@/components/shortcuts";
 import { RecallWorkspace } from "@/components/dashboard/recall-workspace";
 import { patientFromRecall, type RecallResult } from "@/components/dashboard/recall-panel";
@@ -680,6 +682,31 @@ export function Dashboard({
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               >
+                {view === "overview" && (
+                  <div className="space-y-4">
+                    {/* Above the overview, because both are about what to do
+                        next rather than what already happened, and a patient
+                        overdue for a follow-up is the most time-sensitive thing
+                        on this screen. Both render nothing when they have
+                        nothing to say — an established doctor with no one due
+                        sees neither. */}
+                    <DueBanner
+                      onOpenChart={setChartPatient}
+                      refreshKey={registerEntries.length}
+                    />
+                    <OnboardingChecklist
+                      profile={{
+                        fullName: profile.fullName,
+                        registrationNo: profile.registrationNo,
+                        dictationLangs: profile.dictationLangs,
+                      }}
+                      onOpenSettings={() => changeView("settings")}
+                      onStartDictation={() => void capture.start()}
+                      onOpenRegister={() => changeView("register")}
+                      refreshKey={registerEntries.length}
+                    />
+                  </div>
+                )}
                 {view === "overview" && (
                   <OverviewView
                     doctorName={shortName(profile.fullName)}

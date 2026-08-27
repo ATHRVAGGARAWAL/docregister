@@ -170,10 +170,18 @@ export function PatientTimeline({
             : null,
         isFirstVisit: encounter.id === firstVisitId,
       });
-      bucket.visits += 1;
+      // Committed only, for both. A draft is a consultation nobody has signed
+      // and a discarded one is a consultation that did not happen, so counting
+      // either as a visit inflates a number a doctor reads as their history —
+      // and counting their fees inflates money that was never charged. Rows for
+      // both still render, badged; it is the totals they must stay out of.
+      const status = encounter.status ?? "committed";
+      if (status === "committed") {
+        bucket.visits += 1;
 
-      const fee = encounter.fee_amount;
-      if (typeof fee === "number" && Number.isFinite(fee)) bucket.fee = (bucket.fee ?? 0) + fee;
+        const fee = encounter.fee_amount;
+        if (typeof fee === "number" && Number.isFinite(fee)) bucket.fee = (bucket.fee ?? 0) + fee;
+      }
     });
 
     return buckets;
@@ -202,9 +210,12 @@ export function PatientTimeline({
   const sinceLastVisit = useMemo(() => {
     if (clockNow == null) return null;
 
+    // Committed only, matching the month totals above. An unsigned draft is not
+    // evidence the patient was seen, and "no visits for four months" is a
+    // clinical statement — it should not be silenced by a draft nobody confirmed.
     const latest = ordered.find(
       (encounter) =>
-        (encounter.status ?? "committed") !== "discarded" &&
+        (encounter.status ?? "committed") === "committed" &&
         istDayOf(encounter.occurred_at) !== null,
     );
     if (!latest) return null;
@@ -257,6 +268,13 @@ export function PatientTimeline({
 
     const currentId = target.dataset.timelineEntry;
     if (!currentId) return;
+
+    // A modified arrow, Home or End belongs to the browser or the OS: Ctrl-Home
+    // goes to the top of the document, Shift-Down extends a selection, Alt-Left
+    // goes back. Swallowing them to move a highlight one row takes a navigation
+    // the doctor expects and gives them one they did not ask for.
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+
     if (moveFocus(currentId, event.key)) event.preventDefault();
   }
 

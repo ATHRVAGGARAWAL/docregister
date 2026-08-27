@@ -7,7 +7,6 @@ import {
   ClipboardListIcon,
   LoaderCircleIcon,
   PencilIcon,
-  PillIcon,
   SaveIcon,
   ShieldCheckIcon,
   StethoscopeIcon,
@@ -15,8 +14,8 @@ import {
 } from "@/components/icons";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PatientTimeline } from "@/components/patients/patient-timeline";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,8 +29,8 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
-import { formatClock, maskPhone } from "@/lib/format";
-import type { PatientHistoryEncounter, PatientHistoryPayload } from "@/lib/types";
+import { maskPhone } from "@/lib/format";
+import type { PatientHistoryPayload } from "@/lib/types";
 
 export function PatientHistorySheet({
   patient,
@@ -237,11 +236,16 @@ export function PatientHistorySheet({
                       </CardContent>
                     </Card>
                   ) : (
-                    <ol className="relative space-y-3 before:absolute before:bottom-4 before:left-[1.18rem] before:top-4 before:w-px before:bg-border sm:before:left-[1.43rem]">
-                      {history.encounters.map((encounter) => (
-                        <VisitCard key={encounter.id} encounter={encounter} />
-                      ))}
-                    </ol>
+                    /* Replaces a flat list of cards. What it adds is the thing a
+                       flat list cannot say: months grouped, and a stretch with no
+                       visits named rather than left for the reader to derive from
+                       two dates. A four-month gap in care is a clinical fact, and
+                       it was previously visible only to someone doing subtraction. */
+                    <PatientTimeline
+                      encounters={history.encounters}
+                      firstSeenAt={history.patient.first_seen_at}
+                      patientName={history.patient.full_name}
+                    />
                   )}
                 </section>
 
@@ -409,75 +413,6 @@ function SummaryCard({
   );
 }
 
-function VisitCard({ encounter }: { encounter: PatientHistoryEncounter }) {
-  return (
-    <li className="relative pl-9 sm:pl-11">
-      <span className="absolute left-[0.78rem] top-5 z-10 size-3 rounded-full border-[3px] border-card bg-primary sm:left-[1.03rem]" aria-hidden />
-      <Card className="surface-card gap-0 overflow-hidden rounded-[1.35rem] border-border bg-card py-0 transition-colors hover:border-primary/20 hover:bg-card">
-        <CardContent className="p-0">
-          <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3.5 sm:px-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold tracking-[-0.015em]">{formatPatientDate(encounter.occurred_at)}</p>
-              <span className="surface-inset rounded-full px-2 py-0.5 text-xs text-muted-foreground">{formatClock(encounter.occurred_at)}</span>
-              {encounter.visit_number != null && (
-                <Badge variant="outline">Visit {encounter.visit_number}</Badge>
-              )}
-            </div>
-          </header>
-
-          <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
-            <ClinicalField label="Diagnosis" value={encounter.diagnosis} />
-            <ClinicalField label="Treatment" value={encounter.treatment} />
-
-            <div className="sm:col-span-2">
-              <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                <PillIcon className="size-3.5" aria-hidden />
-                Prescription
-              </p>
-              {encounter.prescription.length > 0 ? (
-                <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-                  {encounter.prescription.map((medicine) => (
-                    <li key={medicine.id} className="surface-inset rounded-[0.9rem] px-3 py-2.5">
-                      <p className="text-sm font-medium">
-                        {[medicine.drug_name, medicine.strength].filter(Boolean).join(" ")}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {[medicine.form, medicine.frequency, medicine.duration]
-                          .filter(Boolean)
-                          .join(" · ") || "Dose details not recorded"}
-                      </p>
-                      {medicine.instructions && (
-                        <p className="mt-1 text-xs text-foreground">{medicine.instructions}</p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">No medicines recorded.</p>
-              )}
-            </div>
-
-            <p className="text-xs text-muted-foreground sm:col-span-2">
-              Recorded by {encounter.doctor_name || "clinic doctor"}
-              {encounter.age_years != null ? ` · Age at visit ${encounter.age_years}` : ""}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </li>
-  );
-}
-
-function ClinicalField({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6">
-        {value || "Not recorded"}
-      </p>
-    </div>
-  );
-}
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (

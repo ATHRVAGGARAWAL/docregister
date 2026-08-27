@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { AuditLogView } from "@/components/audit/audit-log-view";
 import { ClinicMembers } from "@/components/clinic/clinic-members";
 import {
   BadgeCheckIcon,
@@ -219,6 +220,12 @@ export function SettingsWorkspace({
 
         <div className="space-y-4">
           <ClinicMembers isOwner={profile.role === "owner"} />
+
+          {/* Owner only, matching the route: the trail records who read and
+              changed which patient's record, and a clinic where everyone can
+              audit everyone is a different arrangement than the one this app
+              assumes. The route re-checks — this only decides whether to ask. */}
+          {profile.role === "owner" && <AuditLogView />}
 
       <Card className="surface-card gap-0 rounded-[1.65rem] border-border bg-card py-0">
         <CardHeader className="border-b border-border px-5 py-5 sm:px-6">
