@@ -10,6 +10,8 @@ import { AppNavigation, type AppView } from "@/components/dashboard/app-navigati
 import { FollowUpWorkspace } from "@/components/follow-ups/follow-up-workspace";
 import { type DashboardUrlState, type RegisterStatus } from "@/lib/url-state";
 import { OverviewView } from "@/components/dashboard/overview-view";
+import { CommandPalette, useCommandPalette } from "@/components/command";
+import { ShortcutProvider } from "@/components/shortcuts";
 import { RecallWorkspace } from "@/components/dashboard/recall-workspace";
 import { patientFromRecall, type RecallResult } from "@/components/dashboard/recall-panel";
 import { RegisterWorkspace } from "@/components/dashboard/register-workspace";
@@ -104,6 +106,14 @@ export function Dashboard({
   const registerLimit = 50;
   // Raised by the settings form while it holds unsaved edits, so `changeView`
   // can ask before throwing them away.
+  const palette = useCommandPalette();
+
+  // Bounded here rather than inside the palette: twenty is a "recent visits"
+  // list, and the full directory is one keystroke away within the palette
+  // itself. Memoised because it is a memo dependency there — a fresh slice each
+  // render would rebuild every row on every keystroke.
+  const paletteVisits = useMemo(() => registerEntries.slice(0, 20), [registerEntries]);
+
   const settingsDirty = useRef(false);
   // Stable identity on purpose: the settings form reports through this from an
   // effect, and a new function each render would re-run that effect on every
@@ -593,315 +603,335 @@ export function Dashboard({
   }
 
   return (
-    <div className="min-h-dvh overflow-x-clip bg-background">
-      <AppNavigation
-        active={view}
-        doctorName={profile.fullName}
-        speciality={profile.speciality}
-        role={profile.role}
-        onChange={(next) => {
-          setFollowUpContext(null);
-          changeView(next);
-        }}
-        onManualEntry={() => setManualVisitOpen(true)}
-        onSignOut={() => void signOut()}
-      />
+    // Wrapped here rather than in the root layout: every shortcut this
+    // provider owns acts on dashboard state — the view, the dictation, the
+    // search box — so a login page that carried them would be advertising
+    // keys that cannot do anything.
+    <ShortcutProvider
+      onNavigate={changeView}
+      onNewDictation={() => void capture.start()}
+    >
+      <div className="min-h-dvh overflow-x-clip bg-background">
+        <AppNavigation
+          active={view}
+          doctorName={profile.fullName}
+          speciality={profile.speciality}
+          role={profile.role}
+          onChange={(next) => {
+            setFollowUpContext(null);
+            changeView(next);
+          }}
+          onManualEntry={() => setManualVisitOpen(true)}
+          onSignOut={() => void signOut()}
+        />
 
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 hidden border-b border-border bg-background lg:block">
-          <div className="mx-auto flex h-14 max-w-[94rem] items-center justify-between gap-4 px-8">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold tracking-[-0.025em]">
-                  {viewTitles[view]}
-                </p>
-                <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <CalendarDaysIcon className="size-3 text-primary" aria-hidden />
-                  {new Intl.DateTimeFormat("en-IN", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                    timeZone: "Asia/Kolkata",
-                  }).format(new Date())}
-                </p>
+        <div className="lg:pl-64">
+          <header className="sticky top-0 z-20 hidden border-b border-border bg-background lg:block">
+            <div className="mx-auto flex h-14 max-w-[94rem] items-center justify-between gap-4 px-8">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold tracking-[-0.025em]">
+                    {viewTitles[view]}
+                  </p>
+                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <CalendarDaysIcon className="size-3 text-primary" aria-hidden />
+                    {new Intl.DateTimeFormat("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                      timeZone: "Asia/Kolkata",
+                    }).format(new Date())}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setManualVisitOpen(true)}>
+                  <ClipboardPenLineIcon className="size-4" aria-hidden />
+                  Manual entry
+                </Button>
+                <ThemeToggle />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setManualVisitOpen(true)}>
-                <ClipboardPenLineIcon className="size-4" aria-hidden />
-                Manual entry
-              </Button>
-              <ThemeToggle />
-            </div>
-          </div>
-        </header>
+          </header>
 
-        <main className="mx-auto w-full max-w-[94rem] px-4 pb-[calc(var(--dock-height,7rem)+1.5rem)] pt-20 sm:px-6 lg:px-8 lg:pt-6">
-          {(discardedDraftId || draftError) && (
-            <Alert
-              variant={draftError ? "destructive" : "default"}
-              role={draftError ? "alert" : "status"}
-              className="mb-4"
-            >
-              <AlertTitle>{draftError ? "Draft action failed" : "Draft discarded"}</AlertTitle>
-              <AlertDescription className="flex items-center justify-between gap-3">
-                {draftError ?? "You can restore it while this message is visible."}
-                {discardedDraftId && !draftError && (
-                  <Button type="button" size="sm" variant="outline" onClick={() => void restoreDraft()}>
-                    Restore
-                  </Button>
+          <main className="mx-auto w-full max-w-[94rem] px-4 pb-[calc(var(--dock-height,7rem)+1.5rem)] pt-20 sm:px-6 lg:px-8 lg:pt-6">
+            {(discardedDraftId || draftError) && (
+              <Alert
+                variant={draftError ? "destructive" : "default"}
+                role={draftError ? "alert" : "status"}
+                className="mb-4"
+              >
+                <AlertTitle>{draftError ? "Draft action failed" : "Draft discarded"}</AlertTitle>
+                <AlertDescription className="flex items-center justify-between gap-3">
+                  {draftError ?? "You can restore it while this message is visible."}
+                  {discardedDraftId && !draftError && (
+                    <Button type="button" size="sm" variant="outline" onClick={() => void restoreDraft()}>
+                      Restore
+                    </Button>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={view}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {view === "overview" && (
+                  <OverviewView
+                    doctorName={shortName(profile.fullName)}
+                    analytics={analytics}
+                    entries={initialEntries}
+                    range={range}
+                    loadingRange={loadingRange}
+                    rangeError={analyticsError}
+                    onRangeChange={(days) => void loadRange(days)}
+                    dictationPhase={capture.phase}
+                    onStartDictation={() => void capture.start()}
+                    onStopDictation={() => void capture.stop()}
+                    onOpenRegister={() => changeView("register")}
+                    onOpenRecall={() => changeView("recall")}
+                    onOpenPatient={setChartPatient}
+                  />
                 )}
-              </AlertDescription>
-            </Alert>
-          )}
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={view}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            >
-              {view === "overview" && (
-                <OverviewView
-                  doctorName={shortName(profile.fullName)}
-                  analytics={analytics}
-                  entries={initialEntries}
-                  range={range}
-                  loadingRange={loadingRange}
-                  rangeError={analyticsError}
-                  onRangeChange={(days) => void loadRange(days)}
-                  dictationPhase={capture.phase}
-                  onStartDictation={() => void capture.start()}
-                  onStopDictation={() => void capture.stop()}
-                  onOpenRegister={() => changeView("register")}
-                  onOpenRecall={() => changeView("recall")}
-                  onOpenPatient={setChartPatient}
-                />
-              )}
-              {view === "register" && (
-                <RegisterWorkspace
-                  entries={registerEntries}
-                  totalCount={registerTotals.count}
-                  committedCount={registerTotals.committedCount}
-                  draftCount={registerTotals.draftCount}
-                  discardedCount={registerTotals.discardedCount}
-                  offset={registerOffset}
-                  limit={registerLimit}
-                  hasMore={registerOffset + registerLimit < registerTotals.count}
-                  loading={registerLoading}
-                  error={registerError}
-                  days={registerDays}
-                  status={registerStatus}
-                  query={registerQuery}
-                  onDaysChange={(days) => {
-                    setRegisterDays(days);
-                    setRegisterOffset(0);
-                    void loadRegister(days, registerStatus, registerQuery, 0);
-                  }}
-                  onStatusChange={(status) => {
-                    setRegisterStatus(status);
-                    setRegisterOffset(0);
-                    void loadRegister(registerDays, status, registerQuery, 0);
-                  }}
-                  onQueryChange={(query) => {
-                    setRegisterQuery(query);
-                    setRegisterOffset(0);
-                  }}
-                  onSearch={() => void loadRegister(registerDays, registerStatus, registerQuery, 0)}
-                  onPageChange={(nextOffset) => void loadRegister(registerDays, registerStatus, registerQuery, nextOffset)}
-                  onReviewNext={() => void reviewNext()}
-                  onOpenPatient={setChartPatient}
-                  onOpenDraft={(entry) => void openDraft(entry)}
-                  onRestoreDraft={(entry) => void restoreDraft(entry.id)}
-                  onOpenVisit={(entry) => setVisitDetailId(entry.id)}
-                />
-              )}
-              {view === "patients" && (
-                <PatientDirectory
-                  patients={patients}
-                  totalCount={patientsTotal}
-                  loading={patientsLoading}
-                  hasLoaded={patientsHasLoaded}
-                  error={patientsError}
-                  query={patientsQuery}
-                  onSearch={searchPatients}
-                  onOpenPatient={setChartPatient}
-                />
-              )}
-              {view === "recall" && (
-                <RecallWorkspace
-                  question={question}
-                  result={recall}
-                  loading={recallLoading}
-                  recentPatientNames={recentPatientNames}
-                  onAsk={(text) => {
-                    // Typed, so there is no recording behind it and nothing to
-                    // recover to a visit. Clearing this is what takes the
-                    // action off the panel for the new question.
-                    setSpokenQuestion(null);
-                    void ask(text);
-                  }}
-                  onDismiss={() => {
-                    setQuestion(null);
-                    setRecall(null);
-                    setSpokenQuestion(null);
-                  }}
-                  onPickPatient={(patientId) => {
-                    // `spokenQuestion` deliberately survives a pick. Choosing
-                    // between two patients called Sunita Devi says nothing
-                    // about whether the utterance was a consultation, so the
-                    // way back to a visit has to still be there afterwards.
-                    if (question) void ask(question, patientId);
-                  }}
-                  onOpenPatient={setChartPatient}
-                  onRecordAsVisit={spokenQuestion ? recordSpokenAsVisit : undefined}
-                />
-              )}
-              {view === "follow-ups" && (
-                <FollowUpWorkspace
-                  initialPatientId={followUpContext?.patientId}
-                  initialEncounterId={followUpContext?.encounterId}
-                  encounterContext={followUpContext ? {
-                    encounterId: followUpContext.encounterId,
-                    patientId: followUpContext.patientId,
-                    visitNumber: followUpContext.visitNumber ?? undefined,
-                    isNewPatient: followUpContext.isNewPatient ?? undefined,
-                    alreadyCommitted: followUpContext.alreadyCommitted,
-                  } : null}
-                />
-              )}
-              {view === "accounts" && <AccountsWorkspace refreshKey={accountsRefreshKey} />}
-              {view === "settings" && (
-                <SettingsWorkspace
-                  onDirtyChange={handleSettingsDirty}
-                  profile={profile}
-                  onProfileChange={setProfile}
-                  onSignOut={() => void signOut()}
-                />
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </main>
-      </div>
+                {view === "register" && (
+                  <RegisterWorkspace
+                    entries={registerEntries}
+                    totalCount={registerTotals.count}
+                    committedCount={registerTotals.committedCount}
+                    draftCount={registerTotals.draftCount}
+                    discardedCount={registerTotals.discardedCount}
+                    offset={registerOffset}
+                    limit={registerLimit}
+                    hasMore={registerOffset + registerLimit < registerTotals.count}
+                    loading={registerLoading}
+                    error={registerError}
+                    days={registerDays}
+                    status={registerStatus}
+                    query={registerQuery}
+                    onDaysChange={(days) => {
+                      setRegisterDays(days);
+                      setRegisterOffset(0);
+                      void loadRegister(days, registerStatus, registerQuery, 0);
+                    }}
+                    onStatusChange={(status) => {
+                      setRegisterStatus(status);
+                      setRegisterOffset(0);
+                      void loadRegister(registerDays, status, registerQuery, 0);
+                    }}
+                    onQueryChange={(query) => {
+                      setRegisterQuery(query);
+                      setRegisterOffset(0);
+                    }}
+                    onSearch={() => void loadRegister(registerDays, registerStatus, registerQuery, 0)}
+                    onPageChange={(nextOffset) => void loadRegister(registerDays, registerStatus, registerQuery, nextOffset)}
+                    onReviewNext={() => void reviewNext()}
+                    onOpenPatient={setChartPatient}
+                    onOpenDraft={(entry) => void openDraft(entry)}
+                    onRestoreDraft={(entry) => void restoreDraft(entry.id)}
+                    onOpenVisit={(entry) => setVisitDetailId(entry.id)}
+                  />
+                )}
+                {view === "patients" && (
+                  <PatientDirectory
+                    patients={patients}
+                    totalCount={patientsTotal}
+                    loading={patientsLoading}
+                    hasLoaded={patientsHasLoaded}
+                    error={patientsError}
+                    query={patientsQuery}
+                    onSearch={searchPatients}
+                    onOpenPatient={setChartPatient}
+                  />
+                )}
+                {view === "recall" && (
+                  <RecallWorkspace
+                    question={question}
+                    result={recall}
+                    loading={recallLoading}
+                    recentPatientNames={recentPatientNames}
+                    onAsk={(text) => {
+                      // Typed, so there is no recording behind it and nothing to
+                      // recover to a visit. Clearing this is what takes the
+                      // action off the panel for the new question.
+                      setSpokenQuestion(null);
+                      void ask(text);
+                    }}
+                    onDismiss={() => {
+                      setQuestion(null);
+                      setRecall(null);
+                      setSpokenQuestion(null);
+                    }}
+                    onPickPatient={(patientId) => {
+                      // `spokenQuestion` deliberately survives a pick. Choosing
+                      // between two patients called Sunita Devi says nothing
+                      // about whether the utterance was a consultation, so the
+                      // way back to a visit has to still be there afterwards.
+                      if (question) void ask(question, patientId);
+                    }}
+                    onOpenPatient={setChartPatient}
+                    onRecordAsVisit={spokenQuestion ? recordSpokenAsVisit : undefined}
+                  />
+                )}
+                {view === "follow-ups" && (
+                  <FollowUpWorkspace
+                    initialPatientId={followUpContext?.patientId}
+                    initialEncounterId={followUpContext?.encounterId}
+                    encounterContext={followUpContext ? {
+                      encounterId: followUpContext.encounterId,
+                      patientId: followUpContext.patientId,
+                      visitNumber: followUpContext.visitNumber ?? undefined,
+                      isNewPatient: followUpContext.isNewPatient ?? undefined,
+                      alreadyCommitted: followUpContext.alreadyCommitted,
+                    } : null}
+                  />
+                )}
+                {view === "accounts" && <AccountsWorkspace refreshKey={accountsRefreshKey} />}
+                {view === "settings" && (
+                  <SettingsWorkspace
+                    onDirtyChange={handleSettingsDirty}
+                    profile={profile}
+                    onProfileChange={setProfile}
+                    onSignOut={() => void signOut()}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </main>
+        </div>
 
-      <VoiceDock
-        phase={capture.phase}
-        level={capture.level}
-        elapsedMs={capture.elapsedMs}
-        remainingMs={capture.remainingMs}
-        approachingLimit={capture.approachingLimit}
-        spectrumRef={capture.spectrumRef}
-        interimText={capture.interimText}
-        finalText={capture.finalText}
-        error={capture.error}
-        liveTextUnavailable={capture.liveTextUnavailable}
-        onStart={() => void capture.start()}
-        onStop={() => void capture.stop()}
-        onCancel={capture.cancel}
-        canRetryTranscription={capture.canRetryTranscription}
-        onRetryTranscription={capture.retryTranscription}
-        onAsk={(text) => {
-          // The dock's own box is typed too, so the same rule applies as in the
-          // recall workspace above.
-          setSpokenQuestion(null);
-          void ask(text);
-        }}
-        onManualEntry={() => setManualVisitOpen(true)}
-      />
+        <CommandPalette
+          open={palette.open}
+          onOpenChange={palette.setOpen}
+          activeWorkspace={view}
+          onNavigate={changeView}
+          recentVisits={paletteVisits}
+          onOpenVisit={(entry) => setVisitDetailId(entry.id)}
+          onOpenPatient={setChartPatient}
+          onStartDictation={() => void capture.start()}
+        />
 
-      {(capture.phase === "review" && capture.draft || recoveredDraft) && (
-        <ReviewSheet
-          draft={(recoveredDraft ?? capture.draft)!}
+        <VoiceDock
+          phase={capture.phase}
+          level={capture.level}
+          elapsedMs={capture.elapsedMs}
+          remainingMs={capture.remainingMs}
+          approachingLimit={capture.approachingLimit}
+          spectrumRef={capture.spectrumRef}
+          interimText={capture.interimText}
+          finalText={capture.finalText}
+          error={capture.error}
+          liveTextUnavailable={capture.liveTextUnavailable}
+          onStart={() => void capture.start()}
+          onStop={() => void capture.stop()}
+          onCancel={capture.cancel}
+          canRetryTranscription={capture.canRetryTranscription}
+          onRetryTranscription={capture.retryTranscription}
+          onAsk={(text) => {
+            // The dock's own box is typed too, so the same rule applies as in the
+            // recall workspace above.
+            setSpokenQuestion(null);
+            void ask(text);
+          }}
+          onManualEntry={() => setManualVisitOpen(true)}
+        />
+
+        {(capture.phase === "review" && capture.draft || recoveredDraft) && (
+          <ReviewSheet
+            draft={(recoveredDraft ?? capture.draft)!}
+            onCommitted={onCommitted}
+            onDiscard={() => void onDiscard()}
+            onKeepForLater={keepDraftForLater}
+            onDismissAfterCommit={finishCommittedReview}
+            onScheduleFollowUp={scheduleCommittedFollowUp}
+            onViewRegister={viewRegisterAfterCommit}
+            onStartNext={startNextVisit}
+          />
+        )}
+
+        <ManualVisitFlow
+          open={manualVisitOpen}
+          onOpenChange={setManualVisitOpen}
           onCommitted={onCommitted}
-          onDiscard={() => void onDiscard()}
           onKeepForLater={keepDraftForLater}
-          onDismissAfterCommit={finishCommittedReview}
           onScheduleFollowUp={scheduleCommittedFollowUp}
           onViewRegister={viewRegisterAfterCommit}
           onStartNext={startNextVisit}
         />
-      )}
 
-      <ManualVisitFlow
-        open={manualVisitOpen}
-        onOpenChange={setManualVisitOpen}
-        onCommitted={onCommitted}
-        onKeepForLater={keepDraftForLater}
-        onScheduleFollowUp={scheduleCommittedFollowUp}
-        onViewRegister={viewRegisterAfterCommit}
-        onStartNext={startNextVisit}
-      />
-
-      <PatientHistorySheet
-        patient={chartPatient}
-        open={chartPatient !== null}
-        onOpenChange={(open) => {
-          if (!open) setChartPatient(null);
-        }}
-        onPatientUpdated={(updated) => {
-          setRegisterEntries((current) =>
-            current.map((entry) =>
-              entry.patient_id === updated.id
+        <PatientHistorySheet
+          patient={chartPatient}
+          open={chartPatient !== null}
+          onOpenChange={(open) => {
+            if (!open) setChartPatient(null);
+          }}
+          onPatientUpdated={(updated) => {
+            setRegisterEntries((current) =>
+              current.map((entry) =>
+                entry.patient_id === updated.id
+                  ? {
+                      ...entry,
+                      patient_name: updated.full_name,
+                      age_years: updated.age_years,
+                    }
+                  : entry,
+              ),
+            );
+            // The directory is very often where the sheet was opened from, and
+            // closing it back onto the old spelling of a name the doctor has just
+            // corrected reads as the correction not having saved.
+            setPatients((current) =>
+              current.map((entry) =>
+                entry.id === updated.id
+                  ? {
+                      ...entry,
+                      full_name: updated.full_name,
+                      phone: updated.phone,
+                      age_years: updated.age_years,
+                    }
+                  : entry,
+              ),
+            );
+            setChartPatient((current) =>
+              current?.id === updated.id
                 ? {
-                    ...entry,
-                    patient_name: updated.full_name,
-                    age_years: updated.age_years,
-                  }
-                : entry,
-            ),
-          );
-          // The directory is very often where the sheet was opened from, and
-          // closing it back onto the old spelling of a name the doctor has just
-          // corrected reads as the correction not having saved.
-          setPatients((current) =>
-            current.map((entry) =>
-              entry.id === updated.id
-                ? {
-                    ...entry,
+                    ...current,
                     full_name: updated.full_name,
                     phone: updated.phone,
                     age_years: updated.age_years,
                   }
-                : entry,
-            ),
-          );
-          setChartPatient((current) =>
-            current?.id === updated.id
-              ? {
-                  ...current,
-                  full_name: updated.full_name,
-                  phone: updated.phone,
-                  age_years: updated.age_years,
-                }
-              : current,
-          );
-          router.refresh();
-        }}
-      />
+                : current,
+            );
+            router.refresh();
+          }}
+        />
 
-      <VisitDetailSheet
-        visitId={visitDetailId}
-        open={visitDetailId !== null}
-        onOpenChange={(open) => {
-          if (!open) setVisitDetailId(null);
-        }}
-        onAmended={() => {
-          // The amendment is intentionally not merged into the register row:
-          // register rows remain the signed source snapshot. Re-opened details
-          // replay amendments from the append-only history.
-          void loadRegister(registerDays, registerStatus, registerQuery, registerOffset);
-        }}
-      />
+        <VisitDetailSheet
+          visitId={visitDetailId}
+          open={visitDetailId !== null}
+          onOpenChange={(open) => {
+            if (!open) setVisitDetailId(null);
+          }}
+          onAmended={() => {
+            // The amendment is intentionally not merged into the register row:
+            // register rows remain the signed source snapshot. Re-opened details
+            // replay amendments from the append-only history.
+            void loadRegister(registerDays, registerStatus, registerQuery, registerOffset);
+          }}
+        />
 
-      <SessionExpiredDialog
-        open={sessionExpired}
-        onContinue={() => {
-          router.replace("/login");
-          router.refresh();
-        }}
-      />
-    </div>
+        <SessionExpiredDialog
+          open={sessionExpired}
+          onContinue={() => {
+            router.replace("/login");
+            router.refresh();
+          }}
+        />
+      </div>
+    </ShortcutProvider>
   );
 }
 
