@@ -101,12 +101,26 @@ export function reviewFieldId(key: string): string {
 export function buildReviewChecklist(extraction: ReviewExtraction): ReviewChecklistItem[] {
   const keys = new Set<string>();
 
-  for (const raw of extraction.uncertain_fields) {
-    const key = normaliseReviewKey(raw, extraction.prescription.length);
+  // Both lists are defended rather than trusted, because this function runs in
+  // a `useState` initialiser inside the review sheet: anything it throws throws
+  // during render, and the doctor loses the sheet at the one moment it matters
+  // — after they have finished dictating and before anything is saved. An
+  // extraction is assembled from a model response, a stored draft row and a
+  // reconciliation pass, and a missing array from any of those is a bad review
+  // queue, not a lost consultation.
+  const uncertain = Array.isArray(extraction.uncertain_fields)
+    ? extraction.uncertain_fields
+    : [];
+  const prescription = Array.isArray(extraction.prescription)
+    ? extraction.prescription
+    : [];
+
+  for (const raw of uncertain) {
+    const key = normaliseReviewKey(raw, prescription.length);
     if (key) keys.add(key);
   }
 
-  extraction.prescription.forEach((medicine, index) => {
+  prescription.forEach((medicine, index) => {
     if (normaliseFrequency(medicine.frequency_spoken).needsReview) {
       keys.add(`prescription.${index}.frequency_spoken`);
     }

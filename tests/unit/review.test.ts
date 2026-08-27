@@ -63,3 +63,41 @@ test("phone matching normalises punctuation and rejects unsafe lengths", () => {
   assert.equal(patientPhoneError("123"), "Phone number must contain 7 to 15 digits.");
   assert.equal(patientPhoneError("+91 98765 43210"), null);
 });
+
+test("a checklist survives an extraction that is missing its arrays", () => {
+  // `buildReviewChecklist` runs in a `useState` initialiser inside the review
+  // sheet, so a throw here is a throw during render: the doctor finishes
+  // dictating and the sheet is replaced by an error boundary, with the visit
+  // unsaved. An extraction reaches it from three places — a model response, a
+  // stored draft row, and the reconciliation pass — and only the first is
+  // schema-checked, so the missing-array case is reachable rather than
+  // theoretical. It was, until this guard: an end-to-end dictation crashed with
+  // "extraction.uncertain_fields is not iterable".
+  // Losing `uncertain_fields` costs the model's own flags and nothing else: the
+  // frequency check still runs over the prescription, so the doctor keeps the
+  // half of the queue this codebase derives rather than trusts.
+  const noUncertain = {
+    ...extraction(),
+    uncertain_fields: undefined as unknown as string[],
+  };
+  const fromPrescriptionOnly = buildReviewChecklist(noUncertain);
+  assert.ok(
+    fromPrescriptionOnly.every((item) => item.key.startsWith("prescription.")),
+    "only prescription-derived entries should survive a missing uncertain_fields",
+  );
+
+  const noPrescription = {
+    ...extraction(),
+    prescription: undefined as unknown as ReviewExtraction["prescription"],
+    uncertain_fields: [],
+  };
+  assert.deepEqual(buildReviewChecklist(noPrescription), []);
+
+  // Both gone at once is the shape an empty draft row produces.
+  const neither = {
+    ...extraction(),
+    prescription: undefined as unknown as ReviewExtraction["prescription"],
+    uncertain_fields: undefined as unknown as string[],
+  };
+  assert.deepEqual(buildReviewChecklist(neither), []);
+});

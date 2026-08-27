@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import * as LabelPrimitive from "@radix-ui/react-label";
+import { Slottable } from "@radix-ui/react-slot";
 
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,15 @@ function Label({ className, required = false, children, ...props }: LabelProps) 
       )}
       {...props}
     >
-      {children}
+      {/* `Slottable` rather than a bare `{children}`, because callers pass
+          `asChild` — the review sheet does, so that the visible label and the
+          field share one `<label>` element. Radix's Slot runs `Children.only`,
+          and appending anything after `{children}` makes the child list an
+          array of two even when the second entry is `null`. That threw
+          "Primitive.label failed to slot onto its children" and, since it threw
+          during render, took the whole review sheet with it the moment a doctor
+          finished dictating. This marks which child to slot onto instead. */}
+      <Slottable>{children}</Slottable>
       {required ? (
         <>
           {/* A glyph, not a colour — the asterisk still marks the field for a

@@ -237,7 +237,9 @@ export function tokenPairs(scan: TokenScan): TokenPair[] {
     { label: "danger text on its chip", foreground: "--destructive", background: "--destructive-soft", minimum: 4.5 },
     { label: "warning text on its chip", foreground: "--warning", background: "--warning-soft", minimum: 4.5 },
     { label: "money on its chip", foreground: "--money", background: "--money-soft", minimum: 4.5 },
-    { label: "axis labels on page", foreground: "--axis", background: "--background", minimum: 4.5 },
+    // Axis ticks and series both live inside a `.surface-card` chart frame, so
+    // the card is the surface they are measured against, not the page.
+    { label: "axis labels in a chart", foreground: "--axis", background: "--card", minimum: 4.5 },
     { label: "field edge on the field", foreground: "--field-border", background: "--input", minimum: 3 },
     { label: "field edge on a card", foreground: "--field-border", background: "--card", minimum: 3 },
     { label: "focus ring on page", foreground: "--ring", background: "--background", minimum: 3 },
@@ -249,6 +251,192 @@ export function tokenPairs(scan: TokenScan): TokenPair[] {
   ];
 
   return [...painted, ...derived].filter((pair) => has(pair.foreground) && has(pair.background));
+}
+
+/**
+ * A filled shape and the surface it is painted on.
+ *
+ * `tokenPairs` above asks "can this ink be read here", which is the question
+ * WCAG asks. It is not the only way a theme breaks. A chip can carry perfectly
+ * legible text and still have no chip: measured in the dark theme today,
+ * `--primary-soft` (#071a2e) sits on `--card` (#1c1c1e) at 1.03:1, so the
+ * "First visit" badge in the register renders as bare blue text on a card while
+ * its label passes at 4.81:1. Nothing in the pair table sees that, because both
+ * halves of the pair are fine.
+ *
+ * So this measures the other axis: fill against surface. It is derived from the
+ * palette rather than listed, so a `--x-soft` token added tomorrow is covered.
+ */
+export interface SurfacePair {
+  label: string;
+  fill: string;
+  surface: string;
+}
+
+export function surfacePairs(scan: TokenScan): SurfacePair[] {
+  const has = (name: string) => name in scan.light || name in scan.dark;
+  const name = (token: string) => token.slice(2).replace(/-/g, " ");
+
+  // Every chip the palette declares, on each surface the app paints chips on.
+  const chips = scan.flipping
+    .filter((token) => token.endsWith("-soft"))
+    .flatMap((fill) =>
+      ["--card", "--background", "--popover"].map((surface) => ({
+        label: `${name(fill.replace(/-soft$/, ""))} chip on ${name(surface)}`,
+        fill,
+        surface,
+      })),
+    );
+
+  const structural: SurfacePair[] = [
+    { label: "card on page", fill: "--card", surface: "--background" },
+    { label: "popover on page", fill: "--popover", surface: "--background" },
+    { label: "well on page", fill: "--secondary", surface: "--background" },
+    { label: "well on a card", fill: "--secondary", surface: "--card" },
+    { label: "field fill on page", fill: "--input", surface: "--background" },
+    { label: "field fill on a card", fill: "--input", surface: "--card" },
+    { label: "hairline on page", fill: "--border", surface: "--background" },
+    { label: "hairline on a card", fill: "--border", surface: "--card" },
+    { label: "accent fill on page", fill: "--primary", surface: "--background" },
+    { label: "accent fill on a card", fill: "--primary", surface: "--card" },
+  ];
+
+  return [...structural, ...chips].filter((pair) => has(pair.fill) && has(pair.surface));
+}
+
+/**
+ * CIE Lab, D65, for the perceptual distance below.
+ *
+ * The contrast ratio is a luminance ratio and nothing else, so two colours that
+ * differ only in hue can sit at 1.03:1 and still be told apart on sight. Judging
+ * a fill "invisible" from the ratio alone would therefore be a lie about a large
+ * part of this palette, whose `-soft` chips are deliberately near-isoluminant
+ * tints. Lab is the cheapest way to ask the other half of the question.
+ */
+function toLab({ r, g, b }: Rgb): [number, number, number] {
+  const linear = (value: number) => {
+    const srgb = value / 255;
+    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  };
+  const [lr, lg, lb] = [linear(r), linear(g), linear(b)];
+  // sRGB D65 primaries, then normalised by the D65 white point.
+  const x = (0.4124564 * lr + 0.3575761 * lg + 0.1804375 * lb) / 0.95047;
+  const y = 0.2126729 * lr + 0.7151522 * lg + 0.072175 * lb;
+  const z = (0.0193339 * lr + 0.119192 * lg + 0.9503041 * lb) / 1.08883;
+  const f = (t: number) => (t > (6 / 29) ** 3 ? Math.cbrt(t) : t / (3 * (6 / 29) ** 2) + 4 / 29);
+  return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+}
+
+/**
+ * CIEDE2000, because CIE76 overstates the distance in exactly the blues this
+ * palette's accent chips live in. Roughly: 1 is the threshold of noticing under
+ * ideal conditions, and 2.3 is the figure usually quoted for "a viewer who is
+ * not looking for it will see a difference".
+ */
+function deltaE2000(one: Rgb, two: Rgb): number {
+  const rad = Math.PI / 180;
+  const [l1, a1, b1] = toLab(one);
+  const [l2, a2, b2] = toLab(two);
+
+  const c1 = Math.hypot(a1, b1);
+  const c2 = Math.hypot(a2, b2);
+  const cBar = (c1 + c2) / 2;
+  const g = 0.5 * (1 - Math.sqrt(cBar ** 7 / (cBar ** 7 + 25 ** 7)));
+  const ap1 = (1 + g) * a1;
+  const ap2 = (1 + g) * a2;
+  const cp1 = Math.hypot(ap1, b1);
+  const cp2 = Math.hypot(ap2, b2);
+  const angle = (a: number, b: number) => {
+    if (a === 0 && b === 0) return 0;
+    const degrees = Math.atan2(b, a) / rad;
+    return degrees < 0 ? degrees + 360 : degrees;
+  };
+  const hp1 = angle(ap1, b1);
+  const hp2 = angle(ap2, b2);
+
+  const dL = l2 - l1;
+  const dC = cp2 - cp1;
+  let dh = 0;
+  if (cp1 * cp2 !== 0) {
+    dh = hp2 - hp1;
+    if (dh > 180) dh -= 360;
+    else if (dh < -180) dh += 360;
+  }
+  const dH = 2 * Math.sqrt(cp1 * cp2) * Math.sin((dh / 2) * rad);
+
+  const lBar = (l1 + l2) / 2;
+  const cpBar = (cp1 + cp2) / 2;
+  // A grey has no hue to average, so the sum is left alone rather than halved.
+  const sum = hp1 + hp2;
+  const hBar =
+    cp1 * cp2 === 0
+      ? sum
+      : Math.abs(hp1 - hp2) <= 180
+        ? sum / 2
+        : sum < 360
+          ? (sum + 360) / 2
+          : (sum - 360) / 2;
+
+  const t =
+    1 -
+    0.17 * Math.cos((hBar - 30) * rad) +
+    0.24 * Math.cos(2 * hBar * rad) +
+    0.32 * Math.cos((3 * hBar + 6) * rad) -
+    0.2 * Math.cos((4 * hBar - 63) * rad);
+  const sL = 1 + (0.015 * (lBar - 50) ** 2) / Math.sqrt(20 + (lBar - 50) ** 2);
+  const sC = 1 + 0.045 * cpBar;
+  const sH = 1 + 0.015 * cpBar * t;
+  const rt =
+    -2 *
+    Math.sqrt(cpBar ** 7 / (cpBar ** 7 + 25 ** 7)) *
+    Math.sin(60 * Math.exp(-(((hBar - 275) / 25) ** 2)) * rad);
+
+  return Math.sqrt(
+    (dL / sL) ** 2 + (dC / sC) ** 2 + (dH / sH) ** 2 + rt * (dC / sC) * (dH / sH),
+  );
+}
+
+/**
+ * Four outcomes, because two would misreport this palette.
+ *
+ * `distinct` is the only pass: 3:1 is what SC 1.4.11 asks of a shape that is
+ * the only thing conveying a state or a boundary. `faint` is under that, which
+ * is fine for decoration and not fine for an affordance — which of the two a
+ * given fill is, is a question about the component, not about the token.
+ *
+ * The bottom two split what a contrast ratio cannot. Below 1.06:1 there is no
+ * luminance step to speak of, and then the hue decides: `tint-only` is a shape
+ * you can see but that disappears in greyscale, on a sun-washed phone, and for
+ * a doctor with reduced colour vision. `invisible` is not a judgement at all —
+ * the shape is not on screen.
+ */
+export type SurfaceVerdict = "invisible" | "tint-only" | "faint" | "distinct";
+
+export interface SurfaceMeasurement extends SurfacePair {
+  theme: "light" | "dark";
+  ratio: number | null;
+  /** CIEDE2000 between the fill and what is under it. */
+  deltaE: number | null;
+  verdict: SurfaceVerdict | null;
+}
+
+export function measureSurface(
+  pair: SurfacePair,
+  palette: Record<string, string>,
+  theme: "light" | "dark",
+  page: Rgb | null,
+): SurfaceMeasurement {
+  const fill = parseColor(palette[pair.fill] ?? "");
+  const surface = parseColor(palette[pair.surface] ?? "");
+  if (!fill || !surface) return { ...pair, theme, ratio: null, deltaE: null, verdict: null };
+
+  const under = surface.a < 1 && page ? flatten(surface, page) : surface;
+  const over = fill.a < 1 ? flatten(fill, under) : fill;
+  const ratio = contrastRatio(over, under);
+  const deltaE = deltaE2000(over, under);
+  const verdict: SurfaceVerdict =
+    ratio >= 3 ? "distinct" : ratio >= 1.06 ? "faint" : deltaE >= 2.3 ? "tint-only" : "invisible";
+  return { ...pair, theme, ratio, deltaE, verdict };
 }
 
 export interface PairMeasurement extends TokenPair {

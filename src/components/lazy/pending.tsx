@@ -51,20 +51,27 @@ function usePendingLongEnough(): boolean {
 }
 
 function PulseBlock({ className }: { className?: string }) {
-  // `animate-pulse` is neutralised wholesale by the reduced-motion block in
-  // globals.css, so the still version of this is the same shape in the same
-  // place — not a frozen frame of an animation.
+  // `animate-pulse` is caught by the blanket `animation-duration: 0.001ms` in
+  // the reduced-motion block in globals.css, and the pulse keyframes end at
+  // full opacity — so the still version is this same shape in this same place,
+  // not a frozen mid-fade.
   return <div aria-hidden className={cn("animate-pulse rounded-md bg-border", className)} />;
 }
 
 /**
- * Stands in for a chart card, mirroring `ChartFrame`'s box model element for
- * element so the swap costs no layout shift.
+ * Stands in for a chart card.
+ *
+ * Every box here is taken from `ChartFrame` and the chart it wraps rather than
+ * eyeballed: the same `surface-card` padding and radius, a 22px heading line
+ * box (15px type at the inherited 1.5), a 20px `leading-5` subtitle, a 16px
+ * legend row, the chart's own `h-48 sm:h-60` plot area, and a 16px summary
+ * line. Matching them is the whole point of the component — a card that
+ * changes height when the real one lands moves the register rows under a
+ * thumb.
  *
  * `legend` and `footer` are not decoration: `ChartFrame` draws a legend only
  * for two or more series, and each chart trails its own summary line or does
- * not. Getting either wrong is a card that changes height when the real one
- * lands.
+ * not. Volume has the summary and no legend; mix has the legend and no summary.
  */
 export function ChartPending({
   title,
@@ -87,17 +94,20 @@ export function ChartPending({
 
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <PulseBlock className="h-[18px] w-40 max-w-full" />
+          <PulseBlock className="h-[22px] w-40 max-w-full" />
           <PulseBlock className="mt-1 h-5 w-56 max-w-full opacity-60" />
         </div>
+        {/* The real frame's table toggle is a bordered `size-9` circle, so this
+            one is drawn rather than pulsed: a button-shaped hole reads as a
+            control that has not painted yet. */}
         <div aria-hidden className="size-9 shrink-0 rounded-full border border-border bg-secondary" />
       </header>
 
-      {legend && <PulseBlock className="mt-4 h-[18px] w-44 max-w-full opacity-60" />}
+      {legend && <PulseBlock className="mt-4 h-4 w-44 max-w-full opacity-60" />}
 
       <PulseBlock className="mt-5 h-48 w-full opacity-40 sm:h-60" />
 
-      {footer && <PulseBlock className="mt-1 ml-auto h-5 w-32 opacity-60" />}
+      {footer && <PulseBlock className="mt-1 ml-auto h-4 w-32 opacity-60" />}
     </section>
   );
 }

@@ -13,23 +13,34 @@ import { WorkspacePending } from "@/components/lazy/pending";
 import type { PatientDirectory as PatientDirectoryImpl } from "@/components/patients/patient-directory";
 
 /**
- * The tab bodies, split one chunk per tab.
+ * The tab bodies, one chunk per tab.
  *
- * The dashboard renders exactly one of these at a time — `{view === "register"
- * && <RegisterWorkspace …/>}` — but a static import puts all six in the chunk
- * that the document blocks on, so opening the app pays for the accounts ledger
- * and the settings form before it has drawn the overview.
+ * MEASURED, AND IT DOES NOT PAY. Wiring all six of these into the dashboard was
+ * built twice on 766751f and compared against the same tree with only the
+ * charts split. It moves 51 kB of uncompressed JavaScript off `/`, but the
+ * first load goes from 325 kB gzipped to 322 kB and from 275 kB brotli to
+ * 278 kB — worse over the wire on modern browsers — while turning 12 requests
+ * into 17. Do not wire these expecting a win; re-measure if you wire them at
+ * all.
  *
- * SSR is left on. A component that is not in the rendered tree is not
- * server-rendered and its chunk is not preloaded, so the split costs nothing on
- * the default tab; a doctor who deep-links to `?view=register` still gets that
- * workspace in the server HTML, and its chunk alongside the document, exactly
- * as before. Turning SSR off would trade the first-load win for a blank tab on
- * every deep link, which is the wrong side of the trade.
+ * The reason is worth keeping even though the conclusion is negative. SSR is
+ * left on here, because a component that is server-rendered still deep-links
+ * correctly — `?view=register` renders that workspace into the HTML instead of
+ * a placeholder. But a server-rendered dynamic import has its chunk preloaded
+ * with the document, so the bytes do not leave the first load; splitting mostly
+ * fragments them across more files, and a compressor given six small files
+ * beats a compressor given one large file by less than the per-file overhead
+ * costs. Turning SSR off would move real bytes, at the price of a blank tab on
+ * every deep link — the wrong side of that trade for a register a doctor links
+ * colleagues into.
+ *
+ * The charts are the opposite case and the reason `charts.tsx` exists: recharts
+ * is a single 334 kB dependency that renders nothing on the server anyway, so
+ * `ssr: false` there costs no pixels and removes 96 kB gzipped.
  *
  * Nothing on the dictation path is in here. The voice dock, the capture hook,
  * the recorder and the review sheet are all imported eagerly by the dashboard
- * and stay that way — see the note in `sheets.tsx`.
+ * and must stay that way — see the note in `sheets.tsx`.
  */
 
 /** Kept as named thunks so the preload path and the render path share one specifier. */
@@ -64,7 +75,7 @@ export const FollowUpWorkspace: ComponentType<ComponentProps<typeof FollowUpWork
 
 export const AccountsWorkspace: ComponentType<ComponentProps<typeof AccountsWorkspaceImpl>> =
   dynamic(() => loaders.accounts().then((mod) => mod.AccountsWorkspace), {
-    loading: () => <WorkspacePending label="accounts" /> ,
+    loading: () => <WorkspacePending label="accounts" />,
   });
 
 export const SettingsWorkspace: ComponentType<ComponentProps<typeof SettingsWorkspaceImpl>> =

@@ -8,10 +8,13 @@ import {
   flatten,
   formatRatio,
   measurePair,
+  measureSurface,
   parseColor,
   scanThemeTokens,
+  surfacePairs,
   tokenPairs,
   type ContrastGrade,
+  type SurfaceMeasurement,
   type TokenScan,
 } from "@/components/theme/theme-tokens";
 import { cn } from "@/lib/utils";
@@ -57,6 +60,46 @@ function GradeBadge({ grade, ratio }: { grade: ContrastGrade | null; ratio: numb
       )}
       <span className="tnum">{formatRatio(ratio)}</span>
       <span>{grade}</span>
+    </span>
+  );
+}
+
+/**
+ * The fill-against-surface column.
+ *
+ * Deliberately not styled like `GradeBadge`: a faint fill is often correct — a
+ * `--card` that barely lifts off the page is a design choice — so this reports
+ * rather than judges, and only `invisible` is coloured like a failure, because
+ * that one is not a matter of taste.
+ */
+function SurfaceBadge({ measurement }: { measurement: SurfaceMeasurement }) {
+  const { verdict, ratio, deltaE } = measurement;
+  if (verdict === null || ratio === null || deltaE === null) {
+    return <span className="text-muted-foreground text-xs">not a colour</span>;
+  }
+
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span
+        className={cn(
+          "inline-flex w-fit items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold",
+          verdict === "invisible"
+            ? "bg-destructive-soft text-destructive"
+            : verdict === "distinct"
+              ? "bg-money-soft text-money"
+              : "bg-warning-soft text-warning",
+        )}
+      >
+        {verdict === "distinct" ? (
+          <CheckIcon className="size-3" aria-hidden />
+        ) : (
+          <TriangleAlertIcon className="size-3" aria-hidden />
+        )}
+        <span>{verdict}</span>
+      </span>
+      <span className="text-muted-foreground tnum text-xs">
+        {formatRatio(ratio)} &middot; &Delta;E {deltaE.toFixed(1)}
+      </span>
     </span>
   );
 }
@@ -308,6 +351,7 @@ export function ThemePreview({ className }: { className?: string }) {
   }
 
   const pairs = tokenPairs(scan);
+  const surfaces = surfacePairs(scan);
   const darkPalette = { ...scan.light, ...scan.dark };
   const lightPage = parseColor(scan.light["--background"] ?? "");
   const darkPage = parseColor(darkPalette["--background"] ?? "");
@@ -320,7 +364,15 @@ export function ThemePreview({ className }: { className?: string }) {
         ))}
       </div>
 
-      <div className="surface-card overflow-x-auto">
+      {/* Focusable and named. Chrome already makes an overflowing box a tab stop
+          so a keyboard user can scroll it, but it arrives unnamed; a screen
+          reader landing on "group" with no label cannot say what was reached. */}
+      <div
+        className="surface-card overflow-x-auto"
+        role="region"
+        aria-label="Contrast of the pairs the interface paints, scrollable"
+        tabIndex={0}
+      >
         <table className="w-full text-left text-xs">
           <caption className="text-muted-foreground px-4 py-3 text-left text-xs">
             Measured contrast for the pairs the interface actually paints. Text pairs are held to
@@ -360,6 +412,60 @@ export function ThemePreview({ className }: { className?: string }) {
                   </td>
                   <td className="px-4 py-2">
                     <GradeBadge grade={dark.grade} ratio={dark.ratio} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div
+        className="surface-card overflow-x-auto"
+        role="region"
+        aria-label="Separation of each fill from the surface under it, scrollable"
+        tabIndex={0}
+      >
+        <table className="w-full text-left text-xs">
+          <caption className="text-muted-foreground px-4 py-3 text-left text-xs">
+            Measured separation between a fill and the surface it is painted on. A chip whose fill
+            matches its card is still legible and is no longer a chip, which the table above cannot
+            see. A contrast ratio is a luminance ratio, so it is paired with CIEDE2000: a
+            <span className="text-warning font-semibold"> tint-only</span> fill is visible in
+            colour and gone in greyscale, while <span className="text-destructive font-semibold">
+            invisible</span> is neither. 3:1 is what WCAG 1.4.11 asks of a shape carrying a state on
+            its own; decoration does not owe that.
+          </caption>
+          <thead className="text-muted-foreground border-border border-b">
+            <tr>
+              <th scope="col" className="px-4 py-2 font-semibold">
+                Fill on surface
+              </th>
+              <th scope="col" className="px-4 py-2 font-semibold">
+                Light
+              </th>
+              <th scope="col" className="px-4 py-2 font-semibold">
+                Dark
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-border divide-y">
+            {surfaces.map((pair) => {
+              const light = measureSurface(pair, scan.light, "light", lightPage);
+              const dark = measureSurface(pair, darkPalette, "dark", darkPage);
+              return (
+                <tr key={`${pair.label}-${pair.fill}-${pair.surface}`}>
+                  <th scope="row" className="px-4 py-2 font-normal">
+                    <span className="block font-semibold">{pair.label}</span>
+                    <span className="text-muted-foreground block">
+                      {pair.fill} on {pair.surface}
+                    </span>
+                  </th>
+                  <td className="px-4 py-2">
+                    <SurfaceBadge measurement={light} />
+                  </td>
+                  <td className="px-4 py-2">
+                    <SurfaceBadge measurement={dark} />
                   </td>
                 </tr>
               );
