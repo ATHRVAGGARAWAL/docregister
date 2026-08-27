@@ -54,3 +54,17 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /blob-report/
+
+# Throwaway probe scripts. Agents and humans both write one-off measurement
+# harnesses at the repo root; several have been committed by accident. Anything
+# matching these is scratch by construction — name it otherwise if it is real.
+/a11y-*.mts
+/a11y-*.js
+/theme-*.mts
+/theme-harness-*.tsx
+/zz-*
+/probe-*
+/measure-*
+/shot*.mjs
+/csscheck.mjs
+/findbad.mjs
