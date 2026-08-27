@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { BookOpenCheckIcon, CircleCheckIcon } from "@/components/icons";
 import { useOnboardingDismissal } from "@/components/onboarding/onboarding-dismissal";
@@ -30,6 +30,7 @@ export interface OnboardingResumeButtonProps {
 export function OnboardingResumeButton({ onRestored, className }: OnboardingResumeButtonProps) {
   const { dismissed, restore } = useOnboardingDismissal();
   const [justRestored, setJustRestored] = useState(false);
+  const confirmationRef = useRef<HTMLParagraphElement>(null);
 
   // Hiding it again — here or in another tab — makes the confirmation below a
   // false statement, so it goes when the fact it reports does.
@@ -38,6 +39,16 @@ export function OnboardingResumeButton({ onRestored, className }: OnboardingResu
     setLastSeen(dismissed);
     if (dismissed === true) setJustRestored(false);
   }
+
+  // Restoring replaces the button being pressed with the line below, so focus
+  // has to move there or it falls to <body> and a keyboard user starts again
+  // from the top of Settings. Announced by that move rather than by a live
+  // region — the same reason the checklist's undo strip has none, and a region
+  // mounted in the same commit as its text is read by very few screen readers
+  // anyway.
+  useEffect(() => {
+    if (justRestored) confirmationRef.current?.focus();
+  }, [justRestored]);
 
   const shell = cn(
     "surface-inset flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 rounded-xl px-3.5 py-3",
@@ -51,7 +62,11 @@ export function OnboardingResumeButton({ onRestored, className }: OnboardingResu
     if (!justRestored) return null;
 
     return (
-      <p role="status" className={cn(shell, "text-xs leading-5 text-muted-foreground")}>
+      <p
+        ref={confirmationRef}
+        tabIndex={-1}
+        className={cn(shell, "text-xs leading-5 text-muted-foreground")}
+      >
         <CircleCheckIcon className="mr-2 inline-block size-4 align-text-bottom text-money" aria-hidden />
         Setup checklist restored. It is back on your overview.
       </p>

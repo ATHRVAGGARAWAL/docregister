@@ -34,15 +34,39 @@ export interface OnboardingVisits {
   reload: () => void;
 }
 
+export interface OnboardingVisitsOptions {
+  /**
+   * Whether the answer is wanted at all.
+   *
+   * `/api/register` is rate limited on the `match` bucket, 240 an hour
+   * (migration 0004), and that is the same budget the doctor's own patient
+   * searches draw on. The overview is remounted on every view switch, so a
+   * checklist that has been put away — or one whose dismissal the browser has
+   * not been asked about yet — would spend that budget on counts nobody is
+   * going to see.
+   */
+  enabled?: boolean;
+  /**
+   * Change it whenever a visit is saved or confirmed, so the checklist cannot
+   * keep asking for a first visit that has just been recorded.
+   */
+  refreshKey?: number | string;
+}
+
 /**
- * @param refreshKey Change it whenever a visit is saved or confirmed, so the
- *   checklist cannot keep asking for a first visit that has just been recorded.
+ * While `enabled` is false nothing is requested and the report stays
+ * `checking`, which is the literal truth: the register has not been asked. A
+ * caller that renders while disabled would show a spinner forever, so don't.
  */
-export function useOnboardingVisits(refreshKey?: number | string): OnboardingVisits {
+export function useOnboardingVisits({
+  enabled = true,
+  refreshKey,
+}: OnboardingVisitsOptions = {}): OnboardingVisits {
   const [report, setReport] = useState<OnboardingVisitReport>({ state: "checking" });
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
 
     async function load() {
@@ -77,7 +101,7 @@ export function useOnboardingVisits(refreshKey?: number | string): OnboardingVis
     // before re-running the effect, so a second request cannot land after the
     // one that replaced it.
     return () => controller.abort();
-  }, [attempt, refreshKey]);
+  }, [attempt, enabled, refreshKey]);
 
   const reload = useCallback(() => {
     // Back to "checking" rather than holding the failure on screen: the steps

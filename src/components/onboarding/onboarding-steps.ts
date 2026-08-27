@@ -224,6 +224,73 @@ function unchecked(
   };
 }
 
+/**
+ * Confirmed visits past which this stops being a setup panel.
+ *
+ * Twenty is roughly a clinic day. The rate-limit policy in migration 0004 sizes
+ * the transcription budget on "a busy clinic runs 4-6 patients an hour", and a
+ * four-hour list at that rate is sixteen to twenty-four confirmed visits;
+ * twenty sits in the middle. Below it a doctor may still be trying the app out
+ * and the four steps are worth the space they take on the overview. Above it
+ * they have taken it through a day of real consultations, and their own
+ * register has already answered every question the panel asks.
+ *
+ * Counted in confirmed visits rather than account age for two reasons. Age is
+ * the weaker signal — an account opened in March and never used still needs the
+ * checklist, and twenty confirmed visits cannot happen unless dictation, review
+ * and commit all work. And the client is never told when the account was
+ * created: the profile the dashboard holds carries name, registration number,
+ * speciality, role and languages, nothing dated. Drafts are excluded on the
+ * same reasoning — an abandoned dictation is not evidence of anything.
+ */
+export const ESTABLISHED_VISITS = 20;
+
+/**
+ * Whether the register itself says this doctor is past setup.
+ *
+ * `unavailable` is deliberately not established: a failed count is not evidence
+ * of a full register, and guessing "established" would hide an outstanding step
+ * from the new doctor it was written for.
+ */
+export function isEstablished(visits: OnboardingVisitReport): boolean {
+  return visits.state === "counted" && visits.committed >= ESTABLISHED_VISITS;
+}
+
+export interface OnboardingNudge {
+  /** The whole of it. One line, replacing the panel. */
+  line: string;
+  /** Null when the outstanding step has nothing to press — see `registerStep`. */
+  action: OnboardingAction | null;
+}
+
+/**
+ * What is left, for a doctor who no longer needs to be walked through this.
+ *
+ * Returns null when nothing is outstanding, which is the common case and is
+ * meant to render as nothing at all: a doctor with a full register should not
+ * be shown a setup panel, and "Setup complete" is still a setup panel.
+ *
+ * Steps that are `checking` or `unknown` are not outstanding work — they are
+ * unanswered questions, and this line has no room to explain the difference.
+ * They are left to the panel, which does.
+ */
+export function summariseOutstanding(steps: readonly OnboardingStep[]): OnboardingNudge | null {
+  const todo = steps.filter((step) => step.status === "todo");
+  const first = todo[0];
+  if (!first) return null;
+
+  return {
+    // A step's own detail is already a sentence about what to do, so one
+    // outstanding step needs no rewording. Several do not fit in a line, so
+    // they are named rather than explained.
+    line:
+      todo.length === 1
+        ? first.detail
+        : `Still to do: ${todo.map((step) => step.title).join(", ")}.`,
+    action: todo.find((step) => step.action)?.action ?? null,
+  };
+}
+
 export interface OnboardingProgress {
   total: number;
   done: number;

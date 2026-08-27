@@ -277,8 +277,25 @@ const NO_DURATIONS: Record<DurationName, number> = {
   surface: 0,
 };
 
+/**
+ * `Object.freeze` stops at the top level, and one write past it reaches further
+ * here than it looks: the still system aliases a single `STILL` object across
+ * `rise`, `fade`, `pop` and `surface`, so `NO_MOTION.variants.rise.hidden` is
+ * also three other variants. Freezing all the way down makes that write throw
+ * where it happens instead of leaving four entrances that no longer hide
+ * anything. Safe to hand to `motion`, which spreads a variant target and a
+ * transition into its own object before it writes to either.
+ */
+function deepFreeze<T>(value: T): T {
+  if (value === null || typeof value !== "object") return value;
+  for (const nested of Object.values(value as Record<string, unknown>)) {
+    deepFreeze(nested);
+  }
+  return Object.freeze(value);
+}
+
 /** The system as designed, for a device that has not asked for less movement. */
-export const FULL_MOTION: MotionSystem = Object.freeze({
+export const FULL_MOTION: MotionSystem = deepFreeze({
   reduced: false,
   duration: DURATION,
   transition: FULL_TRANSITIONS,
@@ -290,7 +307,7 @@ export const FULL_MOTION: MotionSystem = Object.freeze({
  * The same system with the time taken out. Exported so a test or a story can ask
  * for it directly instead of emulating the media query.
  */
-export const NO_MOTION: MotionSystem = Object.freeze({
+export const NO_MOTION: MotionSystem = deepFreeze({
   reduced: true,
   duration: NO_DURATIONS,
   transition: NO_TRANSITIONS,

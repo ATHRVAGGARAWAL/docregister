@@ -79,8 +79,11 @@ export function usePatientSearch(query: string, enabled: boolean): PatientSearch
           setState((current) => ({
             ...current,
             loading: false,
-            // The previous names stay on screen beneath the message rather than
-            // vanishing: a failed search is not evidence that nobody matched.
+            // Spreading `current` carries `patients` and `resolvedQuery`
+            // through together, so names that still answer the query in the box
+            // survive a failed refetch — a blip is not evidence that nobody
+            // matched. Names left over from an earlier query do not survive it:
+            // the check below drops those on the way out.
             error: error instanceof Error && error.message
               ? error.message
               : "Could not search patients. Try again.",

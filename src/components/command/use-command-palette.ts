@@ -25,8 +25,12 @@ export function useCommandPalette({ enabled = true }: { enabled?: boolean } = {}
     if (!enabled) return;
 
     function onKeyDown(event: KeyboardEvent) {
-      // Someone nearer the keystroke already claimed it. Held keys repeat many
-      // times a second, and each repeat would toggle the palette again.
+      // Held keys repeat many times a second, and each repeat would toggle the
+      // palette again. The `defaultPrevented` half is near-vestigial and kept
+      // only as a courtesy: this listener runs in the capture phase at `window`
+      // (below), so nothing nearer the keystroke has run yet — the only thing
+      // that can have claimed the key is another window-capture listener
+      // registered ahead of it.
       if (event.defaultPrevented || event.repeat) return;
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
       // `code` as well as `key`: on a non-Latin layout the K key reports its own

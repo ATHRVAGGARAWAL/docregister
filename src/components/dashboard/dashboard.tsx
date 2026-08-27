@@ -703,6 +703,10 @@ export function Dashboard({
                       onOpenSettings={() => changeView("settings")}
                       onStartDictation={() => void capture.start()}
                       onOpenRegister={() => changeView("register")}
+                      // Without this the checklist reads `undefined` as "cannot
+                      // dictate" and hides its own "Start dictating" button
+                      // outright, rather than only while a recording is running.
+                      dictationPhase={capture.phase}
                       refreshKey={registerEntries.length}
                     />
                   </div>

@@ -47,14 +47,15 @@ export function useMotionPreference(): boolean {
 
   // The device preference wins, and cannot be switched off from inside the app.
   //
-  // `MotionConfigContext` defaults `reducedMotion` to `"never"` when no
-  // `MotionConfig` is mounted — and none is anywhere in this tree — so honouring
-  // that value made this function return `false` unconditionally and the whole
-  // reduced-motion collapse never ran. A default is indistinguishable from an
-  // explicit opt-out through context alone, which is reason enough not to let
-  // either of them overrule the person using the device: someone who set
-  // "reduce motion" because animation makes them ill is not asking a component
-  // library's opinion.
+  // `MotionConfigContext` defaults `reducedMotion` to `"never"`, so honouring
+  // that value returned `false` for every tree with no `MotionConfig` above it.
+  // The root layout mounts one, but `src/app/global-error.tsx` replaces that
+  // layout wholesale and mounts none — the reduced-motion collapse was off on
+  // the one screen a doctor reaches when everything else has already failed. A
+  // default is indistinguishable from an explicit opt-out through context alone,
+  // which is reason enough not to let either of them overrule the person using
+  // the device: someone who set "reduce motion" because animation makes them ill
+  // is not asking a component library's opinion.
   //
   // `"always"` is still honoured, because forcing motion off is safe in the
   // direction this cares about and is how a test pins the reduced path.

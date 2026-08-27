@@ -195,9 +195,12 @@ function CommandPaletteContent({
     [flat],
   );
 
-  // Kept as an id rather than an index so that patient results arriving from the
-  // server settle in underneath the highlight instead of moving it. The row
-  // under Enter must never change without the doctor doing something.
+  // Kept as an id rather than an index so that patient results arriving from
+  // the server settle in underneath the highlight instead of moving it: an
+  // index would leave Enter pointing at whatever slid into that position. An id
+  // can only hold while its row is still on screen under the same query, so
+  // both misses below fall back to the first row — a defined destination the
+  // doctor can see is highlighted, rather than a stale one they cannot.
   const activeIndex = useMemo(() => {
     if (flat.length === 0) return -1;
     if (highlight === null || highlight.query !== trimmed) return 0;
@@ -278,7 +281,12 @@ function CommandPaletteContent({
     // Typing is the only thing this dialog is for, so a character typed while
     // the close button happens to hold focus goes into the box rather than
     // nowhere. `length === 1` is what separates "a" from "Shift" and "Tab".
-    if (event.key.length !== 1) return;
+    //
+    // Space is the one character that is not free to take: a native button
+    // activates on keyup, so moving focus during this keydown sends that keyup
+    // to the input instead, and Clear or Close never fires — the doctor gets a
+    // space in the query in place of the button they were standing on.
+    if (event.key.length !== 1 || event.key === " ") return;
     inputRef.current?.focus();
   }
 

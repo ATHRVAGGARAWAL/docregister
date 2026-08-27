@@ -312,8 +312,12 @@ export function PatientTimeline({
         <div>
           <ClipboardListIcon className="mx-auto size-6 text-muted-foreground" aria-hidden />
           <p className="mt-3 text-sm font-medium">No visits on this chart yet</p>
+          {/* Scoped to what this component was handed, not to the register: the
+              chart it is mounted in is fed by an endpoint that returns committed
+              encounters only, so a patient with nothing but unconfirmed drafts
+              would be told the register holds nothing for them. */}
           <p className="mt-1 text-xs text-muted-foreground">
-            The patient record exists; nothing has been written against it in the register.
+            The patient record exists. Visits appear here once they are saved to the register.
           </p>
         </div>
       </div>
@@ -360,9 +364,16 @@ export function PatientTimeline({
                   className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pl-9 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase"
                 >
                   <span>{group.label}</span>
-                  {/* `justify-between` puts these at opposite ends with no text
-                      between them, so the heading's accessible name concatenated
-                      to "October 20252 visits" and was read as one number. */}
+                    {/* The comma is read, not seen. `flex` on the heading makes
+                        these spans flex items and a flex item is blockified —
+                        `justify-between` only distributes space and has nothing
+                        to do with it. Chromium separates blockified children
+                        when it builds the accessible name, so it reads "AUGUST
+                        2026 2 visits · ₹300" even without this. It stays because
+                        only Chromium was measured here and the clinic reads this
+                        on iOS: an engine that does NOT separate them names the
+                        heading "AUGUST 20262 visits", a month and a count heard
+                        as one number. Remove it once WebKit has been checked. */}
                   <span className="sr-only">, </span>
                   <span className="tnum tracking-normal normal-case">
                     {group.visits === 1 ? "1 visit" : `${group.visits} visits`}

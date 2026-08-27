@@ -60,6 +60,13 @@ interface RevealListProps extends React.ComponentProps<"ol"> {
    * Off by default, and that is the whole point of the entrance: it means "this
    * row is new". Playing it for a page of history says the opposite, and says it
    * to someone who opened the register to read the history.
+   *
+   * It also puts back the hazard `<RevealList>` exists to avoid. Measured
+   * through `react-dom/server`: on with it, a row server-renders as
+   * `style="opacity:0;transform:translateY(8px)"` and only hydration reveals it;
+   * off, it renders at `opacity:1`. Do not turn it on for server-rendered
+   * content — a register that arrives invisible when hydration fails is worse
+   * than one that arrives without an animation.
    */
   animateInitial?: boolean;
 }
@@ -81,7 +88,13 @@ export function RevealList({
   const List = ordered ? "ol" : "ul";
 
   return (
-    <List {...rest}>
+    // Tailwind's preflight sets `list-style: none` on every `ol` and `ul`, and
+    // Safari drops the list role from a list styled that way, taking the item
+    // count and the position-in-list with it. The role puts back what the reset
+    // took, and that sequence is the whole justification for this being a list.
+    // (`dashboard/stat-rail.tsx` also sets `role="list"`, but for a different
+    // reason — it is a `<div>`, which never had the role to lose.)
+    <List role="list" {...rest}>
       <AnimatePresence initial={animateInitial} mode="popLayout">
         {children}
       </AnimatePresence>

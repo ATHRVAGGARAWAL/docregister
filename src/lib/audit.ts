@@ -113,6 +113,27 @@ export interface AuditPage {
  */
 export const UNATTRIBUTED_ACTOR = "An automated job or removed account";
 
+/**
+ * A phrase table lookup that cannot answer with `Object.prototype`.
+ *
+ * The tables in this file are plain object literals, so `TABLE["constructor"]`
+ * resolves to the `Object` constructor rather than to `undefined` and a `??`
+ * fallback never fires. Their keys are not a fixed set — they come from
+ * `tg_table_name`, from a `text[]` of column names and from free-form jsonb —
+ * so every lookup goes through `Object.hasOwn` first. Without it,
+ * `auditEntityNoun` returns a function while claiming to return a string, and a
+ * row renders `function Object() { [native code] }` at a doctor.
+   *
+   * `PREDICATES` is guarded the same way even though its key is
+   * `${action}:${entity}` and so always contains a colon, which no member of
+   * `Object.prototype` does. One line is cheaper than asking the next reader to
+   * re-derive that, and the reasoning stops holding the moment someone changes
+   * how the key is built.
+ */
+function phraseFor(table: Record<string, string>, key: string): string | undefined {
+  return Object.hasOwn(table, key) ? table[key] : undefined;
+}
+
 /** Noun phrases, article included, for the entity strings the app actually writes. */
 const ENTITY_NOUNS: Record<string, string> = {
   encounters: "a visit",
@@ -138,7 +159,7 @@ function fallbackNoun(entity: string): string {
 }
 
 export function auditEntityNoun(entity: string): string {
-  return ENTITY_NOUNS[entity] ?? fallbackNoun(entity);
+  return phraseFor(ENTITY_NOUNS, entity) ?? fallbackNoun(entity);
 }
 
 /** Verbs that read wrong in the general case and right for one entity. */
@@ -205,7 +226,9 @@ export function describeAuditEntry(entry: AuditEntry): AuditSentence {
     ? entry.action === "insert"
       ? "joined the clinic"
       : defaultPredicate(entry.action, "their own account")
-    : (PREDICATES[key]?.(noun) ?? defaultPredicate(entry.action, noun));
+      : Object.hasOwn(PREDICATES, key)
+        ? PREDICATES[key](noun)
+        : defaultPredicate(entry.action, noun);
 
   return {
     actor: entry.actorName ?? UNATTRIBUTED_ACTOR,
@@ -287,7 +310,10 @@ const MAX_LISTED_FIELDS = 4;
 export function describeChangedFields(changed: readonly string[]): string | null {
   const labels = changed
     .filter((column) => !NOISE_FIELDS.has(column))
-    .map((column) => FIELD_LABELS[column] ?? column.replace(/_id$/, "").replace(/_/g, " "));
+    .map(
+      (column) =>
+        phraseFor(FIELD_LABELS, column) ?? column.replace(/_id$/, "").replace(/_/g, " "),
+    );
 
   const unique = [...new Set(labels)];
   if (unique.length === 0) return null;
@@ -311,16 +337,7 @@ export function describeAuditDetail(detail: unknown): string | null {
   const record = detail as Record<string, unknown>;
   const parts: string[] = [];
 
-  // `Object.hasOwn` before the lookup, because a plain object literal inherits
-  // from `Object.prototype`: `record.surface === "constructor"` otherwise
-  // resolves to the Object constructor, `if (surface)` is true for a function,
-  // and the audit row renders `function Object() { [native code] }` at a doctor.
-  // `record` comes from a jsonb column, so its keys are whatever was written
-  // there rather than a fixed set.
-  const surfaceKey = asShortText(record.surface) ?? "";
-  const surface = Object.hasOwn(SURFACE_PHRASES, surfaceKey)
-    ? SURFACE_PHRASES[surfaceKey]
-    : undefined;
+  const surface = phraseFor(SURFACE_PHRASES, asShortText(record.surface) ?? "");
   if (surface) parts.push(surface);
 
   const format = asShortText(record.format);
@@ -393,7 +410,8 @@ export function encodeAuditCursor(entry: AuditCursor): string {
  * a timestamptz rather than merely parsed as a date — `Date.parse` accepts
  * plenty of strings that also contain a comma.
  */
-const CURSOR_PATTERN = /^(\d{1,19})@(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2}))$/;
+const CURSOR_PATTERN =
+  /^(\d{1,19})@((\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-](?:0\d|1[0-5]):[0-5]\d))$/;
 
 export function parseAuditCursor(raw: string | null | undefined): AuditCursor | null {
   if (!raw) return null;
@@ -402,6 +420,31 @@ export function parseAuditCursor(raw: string | null | undefined): AuditCursor | 
 
   const id = Number(match[1]);
   if (!Number.isSafeInteger(id) || id <= 0) return null;
+
+  // The pattern settles the shape; the calendar needs arithmetic. `2026-02-30`
+  // is shaped like a timestamp and is not one, and Postgres answers it with
+  // 22008, which `/api/audit` reports as "Could not load the audit trail."
+  // (500) instead of the sentence written for a cursor that is no longer valid.
+  // `Date.parse` cannot make the call either: it rolls 30 February forward to
+  // 2 March rather than rejecting it, so the fields are compared against what
+  // `Date.UTC` made of them.
+  const year = Number(match[3]);
+  const month = Number(match[4]);
+  const day = Number(match[5]);
+  const hour = Number(match[6]);
+  const minute = Number(match[7]);
+  const second = Number(match[8]);
+  const utc = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  if (
+    utc.getUTCFullYear() !== year ||
+    utc.getUTCMonth() !== month - 1 ||
+    utc.getUTCDate() !== day ||
+    utc.getUTCHours() !== hour ||
+    utc.getUTCMinutes() !== minute ||
+    utc.getUTCSeconds() !== second
+  ) {
+    return null;
+  }
 
   return { id, at: match[2] };
 }

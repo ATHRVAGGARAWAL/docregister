@@ -12,10 +12,14 @@ export {
 } from "@/components/onboarding/onboarding-dismissal";
 export {
   deriveOnboardingSteps,
+  ESTABLISHED_VISITS,
+  isEstablished,
   summariseOnboarding,
+  summariseOutstanding,
   VISIT_LOOKBACK_DAYS,
   type OnboardingAction,
   type OnboardingIntent,
+  type OnboardingNudge,
   type OnboardingProfileSignal,
   type OnboardingProgress,
   type OnboardingSignals,
@@ -24,4 +28,8 @@ export {
   type OnboardingStepStatus,
   type OnboardingVisitReport,
 } from "@/components/onboarding/onboarding-steps";
-export { useOnboardingVisits, type OnboardingVisits } from "@/components/onboarding/use-onboarding-visits";
+export {
+  useOnboardingVisits,
+  type OnboardingVisits,
+  type OnboardingVisitsOptions,
+} from "@/components/onboarding/use-onboarding-visits";

@@ -166,12 +166,14 @@ export const GET = withDoctor(async ({ doctor, supabase, request }) => {
 }, { rateLimit: "match" });
 
 /**
- * `Number(null)` and `Number("")` are both 0, so an absent `limit` has to be
- * caught before the numeric checks. Clamped instead, a request that simply did
- * not mention a limit would come back holding a single row.
+ * Absent, blank, non-numeric and below one all mean the same thing — the caller
+ * named no usable page size — and all four answer 25 rather than being clamped
+ * to the nearest legal value, which for `limit=0` would be a page holding a
+ * single row. `Number(null)` and `Number("")` are both 0, so the `< 1` guard
+ * already covers absent and blank and no earlier return is needed. A size the
+ * caller did choose is honoured, capped at 100.
  */
 function parseLimit(raw: string | null): number {
-  if (raw === null || raw.trim() === "") return DEFAULT_LIMIT;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_LIMIT;
   return Math.min(Math.trunc(parsed), MAX_LIMIT);
