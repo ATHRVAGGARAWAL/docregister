@@ -94,10 +94,22 @@ export function usePatientSearch(query: string, enabled: boolean): PatientSearch
     };
   }, [searchable, trimmed]);
 
-  // Reported rather than stored: below the minimum there is nothing to say, and
-  // the names answering the last query must not sit under a box that has
-  // stopped asking for them.
-  return searchable ? state : IDLE;
+  // Names are surrendered the moment they stop answering the question on
+  // screen. `state.patients` survives a query change — the effect keeps them
+  // through the debounce so the list does not flicker, and the catch keeps them
+  // indefinitely on a failed request — so without this check the rows under a
+  // new query are the rows that matched the old one.
+  //
+  // That is not cosmetic staleness. Palette rows carry `keepUnmatched`, so a
+  // patient row survives any filter, and the highlight resets to index 0 when
+  // the query changes: type "sun", select all, type "rajesh", lose the network,
+  // and Sunita Devi is the only row on screen and the one under Enter. Opening
+  // the wrong chart is the failure this whole app is arranged to prevent, so a
+  // stale name is worth less than a flicker.
+  if (!searchable || state.resolvedQuery !== trimmed) {
+    return { ...IDLE, loading: searchable && state.loading, error: searchable ? state.error : null };
+  }
+  return state;
 }
 
 async function searchPatients(query: string, signal: AbortSignal): Promise<PatientMatch[]> {

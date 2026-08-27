@@ -226,8 +226,34 @@ export function isTypingTarget(target: EventTarget | null): boolean {
  */
 export function isInsideModal(target: EventTarget | null): boolean {
   const element = asElement(target);
-  return element ? inside(element, '[aria-modal="true"]') : false;
+  if (element && inside(element, OPEN_DIALOG_SELECTOR)) return true;
+
+  // Falling back to a document-wide check, because climbing from the target is
+  // not enough on its own: this listener is on `window`, and a press that lands
+  // while focus sits on `<body>` — after a dialog has opened but before focus
+  // has moved into it, or after a control inside it unmounts — reports a target
+  // outside the dialog while the dialog is unmistakably open.
+  //
+  // The question the callers actually ask is "is a modal open", not "did this
+  // keystroke originate inside one", and the answer has to be the same either
+  // way. `n` starting a dictation behind an unconfirmed review sheet is the case
+  // that matters: the sheet holds a visit the doctor has not filed yet.
+  if (typeof document === "undefined") return false;
+  return document.querySelector(OPEN_DIALOG_SELECTOR) !== null;
 }
+
+/**
+ * What an open Radix dialog actually looks like in the DOM.
+ *
+ * Not `[aria-modal="true"]`, which is what this used to test for and which
+ * `@radix-ui/react-dialog` never emits — it aria-hides everything outside the
+ * content instead, and its own source calls that "a better supported equivalent
+ * to setting aria-modal". Verified: zero occurrences of the attribute in
+ * `node_modules/@radix-ui/react-dialog/dist/index.mjs`. So the guard matched
+ * nothing, in either direction, for every dialog in this app.
+ */
+const OPEN_DIALOG_SELECTOR =
+  '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]';
 
 // ---------------------------------------------------------------------------
 // Resolution

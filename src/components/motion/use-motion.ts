@@ -45,9 +45,21 @@ export function useMotionPreference(): boolean {
   const prefersReduced = usePrefersReducedMotion();
   const { reducedMotion } = useContext(MotionConfigContext);
 
-  if (reducedMotion === "always") return true;
-  if (reducedMotion === "never") return false;
-  return prefersReduced;
+  // The device preference wins, and cannot be switched off from inside the app.
+  //
+  // `MotionConfigContext` defaults `reducedMotion` to `"never"` when no
+  // `MotionConfig` is mounted — and none is anywhere in this tree — so honouring
+  // that value made this function return `false` unconditionally and the whole
+  // reduced-motion collapse never ran. A default is indistinguishable from an
+  // explicit opt-out through context alone, which is reason enough not to let
+  // either of them overrule the person using the device: someone who set
+  // "reduce motion" because animation makes them ill is not asking a component
+  // library's opinion.
+  //
+  // `"always"` is still honoured, because forcing motion off is safe in the
+  // direction this cares about and is how a test pins the reduced path.
+  if (prefersReduced) return true;
+  return reducedMotion === "always";
 }
 
 /**

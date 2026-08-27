@@ -311,7 +311,16 @@ export function describeAuditDetail(detail: unknown): string | null {
   const record = detail as Record<string, unknown>;
   const parts: string[] = [];
 
-  const surface = SURFACE_PHRASES[asShortText(record.surface) ?? ""];
+  // `Object.hasOwn` before the lookup, because a plain object literal inherits
+  // from `Object.prototype`: `record.surface === "constructor"` otherwise
+  // resolves to the Object constructor, `if (surface)` is true for a function,
+  // and the audit row renders `function Object() { [native code] }` at a doctor.
+  // `record` comes from a jsonb column, so its keys are whatever was written
+  // there rather than a fixed set.
+  const surfaceKey = asShortText(record.surface) ?? "";
+  const surface = Object.hasOwn(SURFACE_PHRASES, surfaceKey)
+    ? SURFACE_PHRASES[surfaceKey]
+    : undefined;
   if (surface) parts.push(surface);
 
   const format = asShortText(record.format);

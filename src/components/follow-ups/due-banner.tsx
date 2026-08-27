@@ -161,7 +161,15 @@ export function DueBanner({
         {spokenSummary(state, overdue.length, dueToday.length)}
       </p>
 
-      {state === "error" ? (
+      {/* A refresh failure must not take the list down with it. `load()` sets
+          `state = "error"` without clearing `entries`, and the visibilitychange
+          recheck re-runs it whenever the doctor returns to the tab — so testing
+          `error` before `ready` replaced a still-valid list of overdue patients
+          with a one-line apology. The names are the point of this banner: a
+          failed recheck is a reason to say the list may be stale, not to take it
+          away. Only a failure with nothing already loaded gets the full-width
+          treatment. */}
+      {state === "error" && entries.length === 0 ? (
         <section
           className={cn(
             "surface-card flex flex-wrap items-center justify-between gap-3 rounded-2xl p-3.5",
@@ -179,7 +187,7 @@ export function DueBanner({
             Try again
           </Button>
         </section>
-      ) : state === "ready" && entries.length > 0 ? (
+      ) : entries.length > 0 ? (
         <section
           aria-labelledby={headingId}
           onKeyDown={handleKeyDown}
