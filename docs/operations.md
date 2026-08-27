@@ -291,3 +291,44 @@ and `mark_audio_deleted_admin(p_ids uuid[])`, both `security definer`, both
 `revoke all ... from public, anon, authenticated` so only the service role can
 reach them — and the route switches to two `rpc()` calls. That is a tidier
 boundary; it is not a behaviour change.
+
+## The nightly purge is scheduled in the database
+
+`pg_cron` job `audio-retention-nightly` runs `public.run_audio_retention()` at
+21:10 UTC — 02:40 IST, the quietest part of a clinic's day, and deliberately not
+on the hour where every scheduled job in the world lands.
+
+The schedule lives in Postgres rather than in the host's scheduler for two
+reasons. This deployment is on a plan whose cron is limited to once a day, and
+more importantly the retention promise belongs to the schema: if the app moves
+host, the purge moves with the data rather than being left behind in a config
+file nobody migrates.
+
+`run_audio_retention()` reads the shared secret from `app_private_settings` —
+the same table that holds `clinic_invite_hmac`, RLS-enabled with no policies, so
+it is unreachable through PostgREST — and POSTs it to the route with `pg_net`.
+`pg_net` is asynchronous, so the job never holds a worker open for the length of
+a purge.
+
+### Checking it
+
+```sql
+select * from audio_retention_health();
+```
+
+| outcome | means |
+|---|---|
+| `purged` | It ran. The body carries the counts. |
+| `app has no secret configured` | `AUDIO_RETENTION_SECRET` is missing from the app's environment. Set it in the host and redeploy. |
+| `secret mismatch` | The value in `app_private_settings` and the one in the app environment have drifted. They are two copies of one secret; rotating one means rotating both. |
+| `unreachable` | The app did not answer. `detail` carries the transport error. |
+
+### Rotating the secret
+
+```sql
+select set_retention_secret('<new value, 32+ chars>');
+```
+
+Then set the same value as `AUDIO_RETENTION_SECRET` in the host and redeploy.
+Between those two steps the job reports `secret mismatch`, which is the intended
+signal rather than a fault.
