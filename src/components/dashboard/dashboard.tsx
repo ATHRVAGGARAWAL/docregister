@@ -6,6 +6,13 @@ import { AnimatePresence, motion } from "motion/react";
 import { CalendarDaysIcon, CircleAlertIcon, ClipboardPenLineIcon } from "@/components/icons";
 
 import { AccountsWorkspace } from "@/components/accounts/accounts-workspace";
+import {
+  FinanceWorkspace,
+  OperationsWorkspace,
+  ReportsWorkspace,
+  ScheduleWorkspace,
+  TreatmentsWorkspace,
+} from "@/components/lazy/practice";
 import { AppNavigation, type AppView } from "@/components/dashboard/app-navigation";
 import { FollowUpWorkspace } from "@/components/follow-ups/follow-up-workspace";
 import { type DashboardUrlState, type RegisterStatus } from "@/lib/url-state";
@@ -51,6 +58,11 @@ const viewTitles: Record<AppView, string> = {
   recall: "Patient recall",
   "follow-ups": "Follow-ups",
   accounts: "Accounts",
+  schedule: "Schedule",
+  treatments: "Treatment plans",
+  operations: "Lab and inventory",
+  finance: "Finance",
+  reports: "Reports",
   settings: "Settings",
 };
 
@@ -795,6 +807,11 @@ export function Dashboard({
                   />
                 )}
                 {view === "accounts" && <AccountsWorkspace refreshKey={accountsRefreshKey} />}
+                {view === "schedule" && <ScheduleWorkspace />}
+                {view === "treatments" && <TreatmentsWorkspace />}
+                {view === "operations" && <OperationsWorkspace />}
+                {view === "finance" && <FinanceWorkspace />}
+                {view === "reports" && <ReportsWorkspace analytics={analytics} />}
                 {view === "settings" && (
                   <SettingsWorkspace
                     onDirtyChange={handleSettingsDirty}

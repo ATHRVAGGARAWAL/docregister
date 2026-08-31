@@ -7,6 +7,10 @@ import {
   ClipboardListIcon,
   ClipboardPenLineIcon,
   HistoryIcon,
+  CalendarDaysIcon,
+  ToothIcon,
+  WalletCardsIcon,
+  ActivityIcon,
   LandmarkIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -34,6 +38,11 @@ export type AppView =
   | "recall"
   | "follow-ups"
   | "accounts"
+  | "schedule"
+  | "treatments"
+  | "operations"
+  | "finance"
+  | "reports"
   | "settings";
 
 const primaryItems = [
@@ -47,12 +56,24 @@ const careItems = [
   { id: "follow-ups", label: "Follow-ups", icon: ClipboardClockIcon },
 ] as const;
 
+// The practice workspaces, folded in from what used to be a second app at
+// /(practice) with its own shell and sidebar. A dentist had to know which URL
+// they were on to know which half of the product they were using; there is one
+// now, and the register is it.
+const practiceItems = [
+  { id: "schedule", label: "Schedule", icon: CalendarDaysIcon },
+  { id: "treatments", label: "Treatments", icon: ToothIcon },
+  { id: "operations", label: "Lab & stock", icon: ClipboardListIcon },
+] as const;
+
 const adminItems = [
   { id: "accounts", label: "Accounts", icon: LandmarkIcon },
+  { id: "finance", label: "Finance", icon: WalletCardsIcon },
+  { id: "reports", label: "Reports", icon: ActivityIcon },
   { id: "settings", label: "Settings", icon: Settings2Icon },
 ] as const;
 
-const allItems = [...primaryItems, ...careItems, ...adminItems];
+const allItems = [...primaryItems, ...careItems, ...practiceItems, ...adminItems];
 
 export function AppNavigation({
   active,
@@ -85,7 +106,8 @@ export function AppNavigation({
         <nav className="clinical-sidebar-nav" aria-label="Primary navigation">
           <NavGroup label="Clinical" items={primaryItems} active={active} onChange={onChange} />
           <NavGroup label="Care" items={careItems} active={active} onChange={onChange} />
-          <NavGroup label="Practice" items={adminItems} active={active} onChange={onChange} />
+          <NavGroup label="Practice" items={practiceItems} active={active} onChange={onChange} />
+          <NavGroup label="Business" items={adminItems} active={active} onChange={onChange} />
         </nav>
 
         <div className="clinical-sidebar-footer">
@@ -139,7 +161,7 @@ export function AppNavigation({
             <SheetDescription>Clinical follow-up, accounts and practice settings.</SheetDescription>
           </SheetHeader>
           <nav className="grid gap-1 p-3" aria-label="More navigation">
-            {[...careItems, ...adminItems].map((item) => (
+            {[...careItems, ...practiceItems, ...adminItems].map((item) => (
               <SheetClose asChild key={item.id}>
                 <button
                   type="button"

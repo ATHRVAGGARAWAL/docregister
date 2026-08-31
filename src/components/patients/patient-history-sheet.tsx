@@ -31,6 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
 import { maskPhone } from "@/lib/format";
 import { PermanentArchViewer } from "@/components/dental/permanent-arch-viewer";
+import { PatientConsentsPanel } from "@/components/practice/patient-consents-panel";
 import {
   deriveToothStatus,
   type ToothFindingRecord,
@@ -265,6 +266,15 @@ export function PatientHistorySheet({
                   label="Derived from every confirmed visit"
                 />
               </section>
+
+              {/*
+                Consent moved here when the second app was folded into the
+                register. Deleting `patient-workspace.tsx` would otherwise have
+                taken the only mount point for this panel with it, and a
+                documented consent is not a feature to lose quietly — extraction,
+                root canal and implant all need one on file.
+              */}
+              <PatientConsentsPanel patientId={history.patient.id} />
 
               <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
                 <section className="space-y-3">

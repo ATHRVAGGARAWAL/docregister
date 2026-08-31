@@ -14,6 +14,10 @@ import {
   ClipboardListIcon,
   ClipboardPenLineIcon,
   HistoryIcon,
+  CalendarDaysIcon,
+  ToothIcon,
+  WalletCardsIcon,
+  ActivityIcon,
   LandmarkIcon,
   LayoutDashboardIcon,
   Mic,
@@ -41,6 +45,11 @@ export type CommandWorkspaceId =
   | "recall"
   | "follow-ups"
   | "accounts"
+  | "schedule"
+  | "treatments"
+  | "operations"
+  | "finance"
+  | "reports"
   | "settings";
 
 export interface CommandWorkspace {
@@ -65,6 +74,11 @@ export const COMMAND_WORKSPACES: readonly CommandWorkspace[] = [
   { id: "recall", label: "Recall", keywords: "ask question search history", icon: HistoryIcon },
   { id: "follow-ups", label: "Follow-ups", keywords: "callback review due reminders", icon: ClipboardClockIcon },
   { id: "accounts", label: "Accounts", keywords: "money fees payments income expenses ledger", icon: LandmarkIcon },
+  { id: "schedule", label: "Schedule", keywords: "appointments chairs operatory booking diary calendar", icon: CalendarDaysIcon },
+  { id: "treatments", label: "Treatments", keywords: "plans quotes phases sittings course of treatment", icon: ToothIcon },
+  { id: "operations", label: "Lab & stock", keywords: "lab cases crown denture inventory materials expiry reorder", icon: ClipboardListIcon },
+  { id: "finance", label: "Finance", keywords: "invoices estimates outstanding receivables billing", icon: WalletCardsIcon },
+  { id: "reports", label: "Reports", keywords: "analytics trends business clinical performance", icon: ActivityIcon },
   { id: "settings", label: "Settings", keywords: "profile preferences clinic account language", icon: Settings2Icon },
 ];
 
