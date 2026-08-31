@@ -68,6 +68,21 @@ $$;
 create or replace function auth.jwt() returns jsonb language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb);
 $$;
+-- pg_cron and pg_net are Supabase-managed and cannot be installed into a plain
+-- PostgreSQL. The migrations guard their `create extension` on availability, so
+-- the only thing still needed here is somewhere for `cron.schedule` to land and
+-- a `net._http_response` for the retention health view to select from.
+create schema if not exists cron;
+create or replace function cron.schedule(job_name text, schedule text, command text)
+returns bigint language sql as $$ select 1::bigint $$;
+create or replace function cron.unschedule(job_name text)
+returns boolean language sql as $$ select true $$;
+create schema if not exists net;
+create table if not exists net._http_response (
+  id bigserial primary key, status_code int, content text,
+  error_msg text, created timestamptz default now()
+);
+
 create schema if not exists storage;
 create table storage.buckets (
   id text primary key, name text, public boolean default false,

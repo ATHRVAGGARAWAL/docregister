@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
+import type { Database } from "@/lib/supabase/database.types";
 import { ApiError, readBody, requireString, withDoctor } from "@/lib/api/http";
 import { isFdiTooth, sortSurfaces } from "@/lib/dental/tooth";
-import { practiceTable } from "@/lib/supabase/practice";
 
 export const GET = withDoctor(async ({ doctor, supabase, request }) => {
   const patientId = new URL(request.url).searchParams.get("patientId");
@@ -13,7 +13,7 @@ export const GET = withDoctor(async ({ doctor, supabase, request }) => {
   // workspace into a 500. The plain key is the parent link; the composite one
   // exists to enforce tenancy. Same fix, same reason, as the patient-history
   // route's `doctors!encounters_doctor_id_fkey`.
-  let query = practiceTable(supabase, "treatment_plans")
+  let query = supabase.from("treatment_plans")
     .select(`
       id, patient_id, clinician_id, title, diagnosis, status, priority,
       accepted_at, completed_at, created_at, updated_at,
@@ -52,7 +52,7 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
   if (patientError) throw new ApiError("Could not create the treatment plan.", 500);
   if (!patient) throw new ApiError("Patient chart not found.", 404);
 
-  const { data: plan, error: planError } = await practiceTable(supabase, "treatment_plans")
+  const { data: plan, error: planError } = await supabase.from("treatment_plans")
     .insert({
       clinic_id: doctor.clinic_id,
       patient_id: patientId,
@@ -72,9 +72,9 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
 
   const items = rawItems.map((raw, index) => planItem(raw, index, plan.id, doctor.clinic_id));
   if (items.length > 0) {
-    const { error: itemError } = await practiceTable(supabase, "treatment_plan_items").insert(items);
+    const { error: itemError } = await supabase.from("treatment_plan_items").insert(items);
     if (itemError) {
-      await practiceTable(supabase, "treatment_plans").delete().eq("id", plan.id).eq("clinic_id", doctor.clinic_id);
+      await supabase.from("treatment_plans").delete().eq("id", plan.id).eq("clinic_id", doctor.clinic_id);
       console.error("[treatment-plans] item create failed", itemError);
       throw new ApiError("Could not create the treatment plan items.", 500);
     }
@@ -83,7 +83,10 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
   return NextResponse.json({ id: plan.id }, { status: 201 });
 });
 
-function planItem(value: unknown, index: number, planId: string, clinicId: string): Record<string, unknown> {
+/** The generated insert row, so a bad column name fails at build time. */
+type PlanItemInsert = Database["public"]["Tables"]["treatment_plan_items"]["Insert"];
+
+function planItem(value: unknown, index: number, planId: string, clinicId: string): PlanItemInsert {
   if (!value || typeof value !== "object") throw new ApiError("Every treatment item must be an object.");
   const item = value as Record<string, unknown>;
   const scope = choice(item.scope, ["tooth", "quadrant", "arch", "full_mouth", "other"]) ?? "tooth";
@@ -94,12 +97,14 @@ function planItem(value: unknown, index: number, planId: string, clinicId: strin
   return {
     clinic_id: clinicId,
     plan_id: planId,
-    catalogue_id: item.catalogueId || null,
+    catalogue_id: typeof item.catalogueId === "string" && item.catalogueId ? item.catalogueId : null,
     procedure_name: requireString(item.procedureName, "procedureName").slice(0, 160),
-    scope,
+    scope: scope as PlanItemInsert["scope"],
     tooth_fdi: scope === "tooth" ? tooth : null,
     quadrant: scope === "quadrant" ? Number(item.quadrant) : null,
-    arch: scope === "arch" ? item.arch : null,
+    // Narrowed to the enum the column actually is, so an arbitrary string
+    // from the request body cannot reach Postgres and 400 there instead.
+    arch: scope === "arch" ? (choice(item.arch, ["upper", "lower"]) as PlanItemInsert["arch"]) : null,
     surfaces: scope === "tooth" ? sortSurfaces(Array.isArray(item.surfaces) ? item.surfaces.map(String) : []) : [],
     phase: Math.max(1, Math.min(20, Number(item.phase ?? 1))),
     planned_sittings: item.plannedSittings == null ? null : Number(item.plannedSittings),

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { ApiError, readBody, requireString, withDoctor } from "@/lib/api/http";
+import type { getSupabaseServerClient } from "@/lib/supabase/server";
 import { callWorkflow } from "@/lib/supabase/workflows";
-import { practiceTable } from "@/lib/supabase/practice";
 
 interface ConsentBody {
   consentType?: unknown;
@@ -14,7 +14,7 @@ interface ConsentBody {
 export const GET = withDoctor<{ id: string }>(async ({ doctor, supabase, params }) => {
   await requirePatient(supabase, doctor.clinic_id, params.id, "Could not load consent records.");
 
-  const { data, error } = await practiceTable(supabase, "consent_records")
+  const { data, error } = await supabase.from("consent_records")
     .select("id, consent_type, template_version, content_snapshot, language_code, status, signed_name, signed_at, witness_name, revoked_at, created_at, updated_at")
     .eq("clinic_id", doctor.clinic_id)
     .eq("patient_id", params.id)
@@ -49,7 +49,7 @@ export const POST = withDoctor<{ id: string }>(async ({ doctor, supabase, reques
   const templateVersion = optionalText(body.templateVersion, "templateVersion", 80);
   const languageCode = optionalLanguage(body.languageCode) ?? "en-IN";
 
-  const { data, error } = await practiceTable(supabase, "consent_records")
+  const { data, error } = await supabase.from("consent_records")
     .insert({
       clinic_id: doctor.clinic_id,
       patient_id: params.id,
@@ -71,13 +71,16 @@ export const POST = withDoctor<{ id: string }>(async ({ doctor, supabase, reques
   return NextResponse.json({ consent: data }, { status: 201 });
 });
 
+/** The typed server client, as every other route already receives it. */
+type SupabaseServerClient = Awaited<ReturnType<typeof getSupabaseServerClient>>;
+
 async function requirePatient(
-  supabase: Parameters<typeof practiceTable>[0],
+  supabase: SupabaseServerClient,
   clinicId: string,
   patientId: string,
   failureMessage: string,
 ): Promise<void> {
-  const { data, error } = await practiceTable(supabase, "patients")
+  const { data, error } = await supabase.from("patients")
     .select("id")
     .eq("id", patientId)
     .eq("clinic_id", clinicId)

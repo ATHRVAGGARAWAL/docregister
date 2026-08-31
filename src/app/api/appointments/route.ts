@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { ApiError, readBody, requireString, withDoctor } from "@/lib/api/http";
 import { appointmentWriteFailure } from "@/lib/practice/appointments";
-import { practiceTable } from "@/lib/supabase/practice";
 
 interface AppointmentBody {
   patientId?: unknown;
@@ -25,7 +24,7 @@ export const GET = withDoctor(async ({ doctor, supabase, request }) => {
   }
 
   const [appointmentResult, operatoryResult, clinicianResult] = await Promise.all([
-    practiceTable(supabase, "appointments")
+    supabase.from("appointments")
       .select(`
         id, patient_id, clinician_id, operatory_id, starts_at, ends_at, status,
         appointment_type, reason, notes, reminder_at,
@@ -39,12 +38,12 @@ export const GET = withDoctor(async ({ doctor, supabase, request }) => {
       .gte("starts_at", from.toISOString())
       .lt("starts_at", to.toISOString())
       .order("starts_at", { ascending: true }),
-    practiceTable(supabase, "operatories")
+    supabase.from("operatories")
       .select("id, name, code, colour, sort_order, is_active")
       .eq("clinic_id", doctor.clinic_id)
       .eq("is_active", true)
       .order("sort_order", { ascending: true }),
-    practiceTable(supabase, "doctors")
+    supabase.from("doctors")
       .select("id, full_name, speciality, practice_role")
       .eq("clinic_id", doctor.clinic_id)
       .eq("membership_status", "active")
@@ -92,7 +91,7 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
     reminder_at: optionalDate(body.reminderAt)?.toISOString() ?? null,
   };
 
-  const { data, error } = await practiceTable(supabase, "appointments")
+  const { data, error } = await supabase.from("appointments")
     .insert(row)
     .select("id")
     .single();

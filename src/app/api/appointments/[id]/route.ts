@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import type { Database } from "@/lib/supabase/database.types";
 import { ApiError, readBody, withDoctor } from "@/lib/api/http";
 import {
   appointmentWriteFailure,
@@ -7,11 +8,12 @@ import {
   isAppointmentStatus,
 } from "@/lib/practice/appointments";
 import type { AppointmentStatus } from "@/lib/practice/types";
-import { practiceTable } from "@/lib/supabase/practice";
 
 export const PATCH = withDoctor<{ id: string }>(async ({ doctor, supabase, request, params }) => {
   const body = await readBody<Record<string, unknown>>(request);
-  const patch: Record<string, unknown> = {};
+  // The generated row type, so a typo in a key is a compile error rather than
+// a PostgREST 400 at runtime. `database.types.ts` covers these tables now.
+  const patch: Database["public"]["Tables"]["appointments"]["Update"] = {};
   let requestedStatus: AppointmentStatus | null = null;
 
   if (body.status !== undefined) {
@@ -39,13 +41,20 @@ export const PATCH = withDoctor<{ id: string }>(async ({ doctor, supabase, reque
 
   for (const [input, column, max] of [["reason", "reason", 500], ["notes", "notes", 2000], ["appointmentType", "appointment_type", 80]] as const) {
     if (body[input] !== undefined) {
-      if (body[input] === null || body[input] === "") patch[column] = null;
+      // `appointment_type` is NOT NULL with a default, so an empty value means
+      // "leave it alone" rather than "store null" — which is what the old
+      // untyped patch would have sent, for PostgREST to reject at runtime.
+      if (body[input] === null || body[input] === "") {
+        if (column === "appointment_type") continue;
+        patch[column] = null;
+      }
       else if (typeof body[input] === "string" && body[input].trim().length <= max) patch[column] = body[input].trim();
       else throw new ApiError(`\`${input}\` is invalid.`);
     }
   }
   for (const [input, column] of [["patientId", "patient_id"], ["clinicianId", "clinician_id"], ["operatoryId", "operatory_id"]] as const) {
     if (body[input] !== undefined) {
+      // All three are genuinely nullable — an appointment can lose its chair.
       if (body[input] === null || body[input] === "") patch[column] = null;
       else if (typeof body[input] === "string" && isUuid(body[input])) patch[column] = body[input];
       else throw new ApiError(`\`${input}\` is invalid.`);
@@ -54,7 +63,7 @@ export const PATCH = withDoctor<{ id: string }>(async ({ doctor, supabase, reque
 
   if (Object.keys(patch).length === 0) throw new ApiError("No appointment changes were supplied.");
 
-  const currentResult = await practiceTable(supabase, "appointments")
+  const currentResult = await supabase.from("appointments")
     .select("id, status, starts_at, ends_at")
     .eq("id", params.id)
     .eq("clinic_id", doctor.clinic_id)
@@ -97,7 +106,7 @@ export const PATCH = withDoctor<{ id: string }>(async ({ doctor, supabase, reque
     throw new ApiError("The appointment end must be after its start and within 12 hours.");
   }
 
-  let update = practiceTable(supabase, "appointments")
+  let update = supabase.from("appointments")
     .update(patch)
     .eq("id", params.id)
     .eq("clinic_id", doctor.clinic_id);
@@ -120,7 +129,7 @@ export const PATCH = withDoctor<{ id: string }>(async ({ doctor, supabase, reque
 });
 
 export const DELETE = withDoctor<{ id: string }>(async ({ doctor, supabase, params }) => {
-  const currentResult = await practiceTable(supabase, "appointments")
+  const currentResult = await supabase.from("appointments")
     .select("id, status")
     .eq("id", params.id)
     .eq("clinic_id", doctor.clinic_id)
@@ -144,7 +153,7 @@ export const DELETE = withDoctor<{ id: string }>(async ({ doctor, supabase, para
     throw new ApiError("This closed appointment cannot be cancelled.", 409);
   }
 
-  const { data, error } = await practiceTable(supabase, "appointments")
+  const { data, error } = await supabase.from("appointments")
     .update({ status: "cancelled" })
     .eq("id", params.id)
     .eq("clinic_id", doctor.clinic_id)

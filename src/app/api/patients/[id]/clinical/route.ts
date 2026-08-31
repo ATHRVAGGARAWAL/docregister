@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { ApiError, readBody, requireString, withDoctor } from "@/lib/api/http";
 import { isFdiTooth, sortSurfaces } from "@/lib/dental/tooth";
-import { practiceTable } from "@/lib/supabase/practice";
 import { callWorkflow } from "@/lib/supabase/workflows";
 
 export const GET = withDoctor<{ id: string }>(async ({ doctor, supabase, params }) => {
@@ -16,11 +15,11 @@ export const GET = withDoctor<{ id: string }>(async ({ doctor, supabase, params 
   if (!patient) throw new ApiError("Patient chart not found.", 404);
 
   const [alerts, history, findings, perio, imaging] = await Promise.all([
-    practiceTable(supabase, "patient_alerts").select("id, kind, label, severity, note, is_active, created_at").eq("patient_id", params.id).eq("is_active", true).order("severity", { ascending: false }),
-    practiceTable(supabase, "patient_medical_history").select("id, category, name, status, detail, onset_date, resolved_date, created_at").eq("patient_id", params.id).order("created_at", { ascending: false }),
-    practiceTable(supabase, "tooth_findings").select("id, tooth_fdi, surfaces, finding, state, severity, note, observed_at, resolved_at").eq("patient_id", params.id).order("observed_at", { ascending: false }),
-    practiceTable(supabase, "periodontal_measurements").select("id, tooth_fdi, site, pocket_depth_mm, recession_mm, bleeding, suppuration, mobility, furcation, measured_at").eq("patient_id", params.id).order("measured_at", { ascending: false }).limit(192),
-    practiceTable(supabase, "imaging_links").select("id, label, modality, url, taken_at, note, created_at").eq("patient_id", params.id).order("taken_at", { ascending: false, nullsFirst: false }),
+    supabase.from("patient_alerts").select("id, kind, label, severity, note, is_active, created_at").eq("patient_id", params.id).eq("is_active", true).order("severity", { ascending: false }),
+    supabase.from("patient_medical_history").select("id, category, name, status, detail, onset_date, resolved_date, created_at").eq("patient_id", params.id).order("created_at", { ascending: false }),
+    supabase.from("tooth_findings").select("id, tooth_fdi, surfaces, finding, state, severity, note, observed_at, resolved_at").eq("patient_id", params.id).order("observed_at", { ascending: false }),
+    supabase.from("periodontal_measurements").select("id, tooth_fdi, site, pocket_depth_mm, recession_mm, bleeding, suppuration, mobility, furcation, measured_at").eq("patient_id", params.id).order("measured_at", { ascending: false }).limit(192),
+    supabase.from("imaging_links").select("id, label, modality, url, taken_at, note, created_at").eq("patient_id", params.id).order("taken_at", { ascending: false, nullsFirst: false }),
   ]);
 
   const failed = [alerts, history, findings, perio, imaging].find((result) => result.error);
@@ -110,9 +109,29 @@ export const POST = withDoctor<{ id: string }>(async ({ doctor, supabase, reques
     throw new ApiError("Choose a supported clinical entry type.");
   }
 
-  const { data, error } = await practiceTable(supabase, table).insert(row).select("id").single();
+  // `table` and `row` are chosen together in the branches above, so they always
+  // agree — but TypeScript cannot see that through a runtime table name, and
+  // narrowing it properly would mean duplicating this insert once per branch.
+  // The cast is confined to the client here; the result is still checked.
+  const client = supabase as unknown as {
+    from: (relation: string) => {
+      insert: (values: unknown) => {
+        select: (columns: string) => {
+          single: () => Promise<{ data: { id: string } | null; error: { message: string } | null }>;
+        };
+      };
+    };
+  };
+  const { data, error } = await client.from(table).insert(row).select("id").single();
   if (error) {
     console.error("[clinical-chart] create failed", error);
+    throw new ApiError("Could not save that clinical entry.", 500);
+  }
+  // A successful insert that returned no row. Rare, but the previous code read
+  // `data.id` off it and threw a TypeError inside the handler — a 500 with a
+  // stack trace instead of a 500 with a reason. Surfaced by the generated types.
+  if (!data) {
+    console.error("[clinical-chart] insert returned no row", { table });
     throw new ApiError("Could not save that clinical entry.", 500);
   }
   return NextResponse.json({ id: data.id }, { status: 201 });

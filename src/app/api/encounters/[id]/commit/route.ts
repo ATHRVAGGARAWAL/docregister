@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { ApiError, readBody, withDoctor } from "@/lib/api/http";
 import { isFdiTooth, sortSurfaces } from "@/lib/dental/tooth";
 import type { ReviewToothFinding } from "@/lib/encounters/review";
-import { practiceTable } from "@/lib/supabase/practice";
 import { callWorkflow } from "@/lib/supabase/workflows";
 
 /**
@@ -175,7 +174,7 @@ export const POST = withDoctor<Params>(async ({ doctor, supabase, request, param
   }
 
   if (toothFindings.length > 0) {
-    const table = practiceTable(supabase, "tooth_findings");
+    const table = supabase.from("tooth_findings");
     const { data: existing, error: existingError } = await table
       .select("id")
       .eq("encounter_id", result.encounter_id)
