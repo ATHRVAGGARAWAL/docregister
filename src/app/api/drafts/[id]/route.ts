@@ -1,6 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- migration 0012 adds columns/RPCs before generated types are refreshed. */
 import { NextResponse } from "next/server";
 
+import {
+  normaliseProcedures,
+  normaliseToothFindings,
+  type ReviewToothFinding,
+} from "@/lib/encounters/review";
+import { normaliseFrequency, normaliseRoute, normaliseDuration } from "@/lib/llm/dosage";
 import { ApiError, PGRST_NO_ROWS, readBody, withDoctor } from "@/lib/api/http";
 import { normalisePatientPhone, type PatientSex } from "@/lib/encounters/review";
 import { callWorkflow } from "@/lib/supabase/workflows";
@@ -60,6 +66,12 @@ export const GET = withDoctor<Params>(async ({ doctor, supabase, params }) => {
       diagnosis: row.diagnosis ?? stringValue(extracted.diagnosis),
       treatment: row.treatment ?? stringValue(extracted.treatment),
       consultation_fee_inr: numberValue(extracted.consultation_fee_inr),
+      procedures: normaliseProcedures(
+        Array.isArray(extracted.procedures) ? extracted.procedures : [],
+      ),
+      tooth_findings: normaliseToothFindings(
+        Array.isArray(extracted.tooth_findings) ? extracted.tooth_findings : [],
+      ),
       prescription: items.map((item: any) => ({
         drug_name: item.drug_name,
         strength: item.strength ?? null,
@@ -96,6 +108,8 @@ interface DraftPatch {
   treatment?: unknown;
   consultation_fee_inr?: unknown;
   prescription?: unknown;
+  procedures?: unknown;
+  tooth_findings?: unknown;
 }
 
 export const PATCH = withDoctor<Params>(async ({ doctor, supabase, request, params }) => {
@@ -122,18 +136,113 @@ export const PATCH = withDoctor<Params>(async ({ doctor, supabase, request, para
     ? optionalConsultationFee(body.consultation_fee_inr)
     : null;
 
-  const { data: updated, error } = await callWorkflow<Record<string, unknown>>(
+  // Normalised here, not passed through. This route used to hand
+  // `body.prescription` to the RPC raw while the extract and retry routes ran
+  // the dosage table over it, so every autosave from the review sheet rewrote
+  // `frequency_code` and `frequency_label` to null — the codes were only ever
+  // correct until the dentist next typed a character.
+  // A row the dentist has added but not yet named is not a line item — it is an
+  // empty box they are about to type into. Both internal writers reject a blank
+  // name with a check_violation, so sending one turns the very next autosave
+  // into a save failure: click "Add medicine", pause, and the sheet tells you it
+  // could not save. That behaviour predates procedures; it is filtered here,
+  // server-side, so every client is covered rather than just this one.
+  const named = (item: unknown, field: string) =>
+    typeof (item as Record<string, unknown>)?.[field] === "string" &&
+    ((item as Record<string, string>)[field]).trim().length > 0;
+
+  const prescription = Array.isArray(body.prescription)
+    ? (body.prescription as Record<string, unknown>[]).filter((item) => named(item, "drug_name")).map((item) => {
+        const spoken = typeof item.frequency_spoken === "string" ? item.frequency_spoken : null;
+        const frequency = normaliseFrequency(spoken);
+        return {
+          ...item,
+          frequency_spoken: spoken,
+          frequency_code: frequency.code,
+          frequency_label: frequency.label,
+          needs_review: frequency.needsReview,
+          route: normaliseRoute(
+            typeof item.instructions === "string" ? item.instructions :
+            typeof item.form === "string" ? item.form : null,
+          ),
+          duration: normaliseDuration(typeof item.duration === "string" ? item.duration : null),
+        };
+      })
+    : null;
+
+  // Undefined means "this patch says nothing about procedures" and leaves the
+  // rows alone; an empty array means the dentist removed them all.
+  const procedures = Array.isArray(body.procedures)
+    ? normaliseProcedures(
+        (body.procedures as Record<string, unknown>[]).filter((item) =>
+          named(item, "procedure_name"),
+        ) as never[],
+      ).map((item) => {
+        const unresolved = (item.scope ?? "tooth") === "tooth" && item.tooth_fdi == null;
+        return {
+          procedure_name: item.procedure_name,
+          catalogue_id: item.catalogue_id ?? null,
+          scope: unresolved ? "other" : (item.scope ?? "tooth"),
+          tooth_fdi: item.tooth_fdi ?? null,
+          surfaces: unresolved ? [] : (item.surfaces ?? []),
+          sitting_number: item.sitting_number ?? null,
+          total_sittings: item.total_sittings ?? null,
+          notes: item.note,
+          needs_review: unresolved,
+        };
+      })
+    : null;
+
+  const toothFindings = Array.isArray(body.tooth_findings)
+    ? normaliseToothFindings(body.tooth_findings as ReviewToothFinding[])
+    : null;
+
+  let { data: updated, error } = await callWorkflow<Record<string, unknown>>(
     supabase,
-    hasConsultationFee ? "update_draft_with_consultation_fee_workflow" : "update_draft_workflow",
+    "update_dental_draft_workflow",
     {
       p_encounter_id: params.id,
       p_patch: patch,
-      p_prescription: Array.isArray(body.prescription) ? body.prescription : null,
+      p_prescription: prescription,
       p_expected_version: expected,
+      p_procedures: procedures,
+      // Explicit, because "the caller is setting the fee" is a different fact
+      // from "the fee is null" and the RPC cannot recover it from the value —
+      // see 0027, where conflating them silently erased the amount.
+      p_set_consultation_fee: hasConsultationFee,
       ...(hasConsultationFee ? { p_consultation_fee_inr: consultationFeeInr } : {}),
+      p_tooth_findings: toothFindings,
     },
   );
+
+  // Migration 0037 adds draft persistence for findings. Older deployments can
+  // still review and commit them in the current session; retry the established
+  // dental draft workflow instead of taking the whole visit down while the
+  // migration is being rolled out.
+  if (error?.code === "PGRST202") {
+    const fallback = await callWorkflow<Record<string, unknown>>(
+      supabase,
+      "update_dental_draft_workflow",
+      {
+        p_encounter_id: params.id,
+        p_patch: patch,
+        p_prescription: prescription,
+        p_expected_version: expected,
+        p_procedures: procedures,
+        p_set_consultation_fee: hasConsultationFee,
+        ...(hasConsultationFee ? { p_consultation_fee_inr: consultationFeeInr } : {}),
+      },
+    );
+    updated = fallback.data;
+    error = fallback.error;
+  }
   if (error) {
+    // 23514 is check_violation, which both line-item writers raise for a payload
+    // they refuse. That is the caller's problem and a 500 misattributes it —
+    // it also hides the reason from anyone reading the logs.
+    if (error.code === "23514") {
+      throw new ApiError("A procedure or medicine on this draft is incomplete.", 400);
+    }
     if (error.code === "P0001" || error.code === "40001" || error.code === "409") {
       const latest = await loadDraft(db, doctor.id, params.id);
       return NextResponse.json(

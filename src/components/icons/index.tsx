@@ -291,6 +291,20 @@ export const PillIcon = createIcon("PillIcon", [
   line(7.2, 7.2, 13.8, 13.8, "seam"),
 ]);
 
+/**
+ * A molar in outline: a broad crown on two roots.
+ *
+ * Drawn on the same 24x24 grid as the rest of the set rather than borrowed, so
+ * it inherits the stroke weight and the join style every other glyph uses — a
+ * tooth is now a first-class noun in this product and needed a first-class
+ * glyph.
+ */
+export const ToothIcon = createIcon("ToothIcon", [
+  path(
+    "M12 3.2c-2 0-2.8.9-4.6.9-1.9 0-3.4 1.5-3.4 3.8 0 2.6.9 3.6 1.6 6.2.5 1.9.6 3.6 1 5.1.3 1.2 1 1.6 1.7 1.6 1 0 1.4-.9 1.6-2.2.3-1.7.5-3.4 2.1-3.4s1.8 1.7 2.1 3.4c.2 1.3.6 2.2 1.6 2.2.7 0 1.4-.4 1.7-1.6.4-1.5.5-3.2 1-5.1.7-2.6 1.6-3.6 1.6-6.2 0-2.3-1.5-3.8-3.4-3.8-1.8 0-2.6-.9-4.6-.9Z",
+  ),
+]);
+
 export const PlusIcon = createIcon("PlusIcon", [
   line(12, 4, 12, 20, "vertical"),
   line(4, 12, 20, 12, "horizontal"),

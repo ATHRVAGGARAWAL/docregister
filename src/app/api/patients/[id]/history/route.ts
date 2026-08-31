@@ -78,8 +78,26 @@ export const GET = withDoctor<{ id: string }>(async ({ doctor, supabase, params 
     throw new ApiError("Could not load this patient’s medical history.", 500);
   }
 
+  // The mouth as it stands, derived from every committed procedure. Fetched
+  // alongside the encounters rather than folded into them: the chart is a view
+  // over the patient's whole history, not over one visit, and the RPC already
+  // does the join and the ordering that derivation needs.
+  //
+  // A failure here loses the chart, not the chart *of the patient* — the
+  // history below is what a doctor came for, and taking the whole page down
+  // because a derived diagram could not be built would be the wrong trade.
+  // Through `callWorkflow` because the RPC is newer than the generated types —
+  // the same reason every other post-0021 function is called this way.
+  const { data: toothRows, error: toothError } = await callWorkflow<
+    PatientHistoryPayload["toothProcedures"]
+  >(supabase, "patient_tooth_procedures", { p_patient_id: patientId });
+  if (toothError) {
+    console.error("[patient-history] tooth procedures unavailable", toothError);
+  }
+
   const payload: PatientHistoryPayload = {
     patient: patient as PatientRow,
+    toothProcedures: toothRows ?? [],
     encounters: ((encounters ?? []) as unknown as EncounterRow[]).map((encounter) => ({
       id: encounter.id,
       occurred_at: encounter.occurred_at,

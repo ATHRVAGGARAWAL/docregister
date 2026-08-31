@@ -95,6 +95,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
   const [fullName, setFullName] = useState("");
   const [clinicName, setClinicName] = useState("");
   const [email, setEmail] = useState("");
+  const [testAccessCode, setTestAccessCode] = useState("");
   const [status, setStatus] = useState<Status>(callbackError ? "error" : "idle");
   /** Epoch ms when the provider will accept another link request. */
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
@@ -145,10 +146,42 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
     const normalizedEmail = email.trim();
     const normalizedName = fullName.trim();
     const normalizedClinic = clinicName.trim();
-    if (!normalizedEmail || (mode === "signup" && (!normalizedName || !normalizedClinic))) return;
+    const usingTestAccess = testAccessCode.length > 0;
+    if (
+      !normalizedEmail ||
+      (!usingTestAccess && mode === "signup" && (!normalizedName || !normalizedClinic))
+    ) return;
 
     setStatus("sending");
     setMessage("");
+
+    if (usingTestAccess) {
+      try {
+        const response = await fetch("/api/auth/test-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: normalizedEmail, accessCode: testAccessCode }),
+        });
+        const result = (await response.json().catch(() => ({}))) as { error?: string };
+        if (!response.ok) {
+          setStatus("error");
+          setMessage(result.error ?? "Could not open the test workspace.");
+          return;
+        }
+
+        const destination = new URL(nextPath, window.location.origin);
+        window.location.assign(
+          destination.origin === window.location.origin
+            ? `${destination.pathname}${destination.search}${destination.hash}`
+            : "/",
+        );
+        return;
+      } catch {
+        setStatus("error");
+        setMessage(NETWORK_ERROR);
+        return;
+      }
+    }
 
     const supabase = getSupabaseBrowserClient();
     try {
@@ -344,7 +377,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                             id="full-name"
                             name="full-name"
                             type="text"
-                            required
+                            required={!testAccessCode}
                             autoComplete="name"
                             value={fullName}
                             onChange={(event) => {
@@ -364,7 +397,7 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                             id="clinic-name"
                             name="clinic-name"
                             type="text"
-                            required
+                            required={!testAccessCode}
                             autoComplete="organization"
                             aria-describedby="clinic-hint"
                             value={clinicName}
@@ -407,7 +440,29 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                         />
                         <p id="email-hint" className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
                           <MailCheckIcon className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-                          We’ll email a one-time link. No password to remember.
+                          {testAccessCode
+                            ? "Testing access opens an existing allowlisted workspace directly."
+                            : "We’ll email a one-time link. No password to remember."}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="test-access-code">Testing access code</Label>
+                        <Input
+                          id="test-access-code"
+                          name="test-access-code"
+                          type="password"
+                          autoComplete="off"
+                          value={testAccessCode}
+                          onChange={(event) => {
+                            setTestAccessCode(event.target.value);
+                            clearError();
+                          }}
+                          placeholder="Leave blank to receive an email link"
+                          className="h-12"
+                        />
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          Allowlisted test accounts can open the workspace without sending email.
                         </p>
                       </div>
                     </div>
@@ -423,12 +478,15 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                     <Button
                       type="submit"
                       size="lg"
-                      disabled={sending || secondsLeft > 0}
+                      disabled={sending || (!testAccessCode && secondsLeft > 0)}
                       className="mt-6 h-12 w-full sm:mt-7"
                     >
                       {sending ? (
-                        <><LoaderCircleIcon className="animate-spin" aria-hidden /> Sending secure link</>
-                      ) : secondsLeft > 0 ? (
+                        <>
+                          <LoaderCircleIcon className="animate-spin" aria-hidden />
+                          {testAccessCode ? "Opening workspace" : "Sending secure link"}
+                        </>
+                      ) : !testAccessCode && secondsLeft > 0 ? (
                         // The wait is on the button rather than only in the error,
                         // because the button is the thing being pressed. A live
                         // number also says the app is still working, where a
@@ -436,20 +494,16 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
                         // as broken.
                         <>Try again in {secondsLeft}s</>
                       ) : (
-                        <>{signingUp ? "Create account" : "Continue with email"}<ArrowRightIcon aria-hidden /></>
+                        <>
+                          {testAccessCode
+                            ? "Open test workspace"
+                            : signingUp
+                              ? "Create account"
+                              : "Continue with email"}
+                          <ArrowRightIcon aria-hidden />
+                        </>
                       )}
                     </Button>
-
-                    <button
-                      type="button"
-                      onClick={() => changeMode(signingUp ? "signin" : "signup")}
-                      className="mt-4 flex min-h-11 w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg px-3 text-[0.8125rem] font-medium text-muted-foreground outline-none hover:bg-background focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <span>{signingUp ? "Already have a clinic workspace?" : "New to docregister?"}</span>
-                      <span className="font-semibold text-primary">
-                        {signingUp ? "Sign in" : "Create an account"}
-                      </span>
-                    </button>
                   </form>
                 </CardContent>
               </>

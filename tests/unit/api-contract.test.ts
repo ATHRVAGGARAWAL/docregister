@@ -532,6 +532,10 @@ const PUBLIC_ROUTES = new Map([
   ["src/app/api/health/route.ts", "liveness probe for Vercel and uptime checks"],
   ["src/app/api/[...unmatched]/route.ts", "a JSON 404; route names are not privileged"],
   ["src/app/api/maintenance/audio-retention/route.ts", "machine endpoint on a shared secret"],
+  [
+    "src/app/api/auth/test-login/route.ts",
+    "allowlisted test identity protected by a separate high-entropy access code",
+  ],
 ]);
 
 test("the /api surface was found", () => {

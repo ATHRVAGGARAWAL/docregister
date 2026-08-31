@@ -47,12 +47,15 @@ export function SettingsWorkspace({
   onProfileChange,
   onSignOut,
   onDirtyChange,
+  showIntro = true,
 }: {
   profile: DoctorProfile;
   onProfileChange: (profile: DoctorProfile) => void;
   onSignOut: () => void;
   /** Raised while the form holds edits that have not been saved. */
   onDirtyChange?: (dirty: boolean) => void;
+  /** The routed practice shell supplies its own page heading. */
+  showIntro?: boolean;
 }) {
   const [fullName, setFullName] = useState(profile.fullName);
   const [speciality, setSpeciality] = useState(profile.speciality ?? "");
@@ -152,20 +155,22 @@ export function SettingsWorkspace({
 
   return (
     <div className="space-y-7">
-      <section>
-        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-          <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary-soft">
-            <StethoscopeIcon className="size-3.5" aria-hidden />
-          </span>
-          Practice identity
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
-          Account &amp; settings
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Your clinical identity, dictation languages, and private workspace preferences.
-        </p>
-      </section>
+      {showIntro && (
+        <section>
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary-soft">
+              <StethoscopeIcon className="size-3.5" aria-hidden />
+            </span>
+            Practice identity
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
+            Account &amp; settings
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Your clinical identity, dictation languages, and private workspace preferences.
+          </p>
+        </section>
+      )}
 
       <div className="grid items-start gap-4 lg:grid-cols-[19rem_minmax(0,1fr)]">
         <aside className="surface-elevated relative overflow-hidden rounded-[1.65rem] p-6 lg:sticky lg:top-5">
@@ -344,6 +349,7 @@ export function SettingsWorkspace({
           </div>
         </CardContent>
       </Card>
+
         </div>
       </div>
     </div>

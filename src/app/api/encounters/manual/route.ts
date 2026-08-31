@@ -3,11 +3,14 @@ import { NextResponse } from "next/server";
 import { ApiError, readBody, withDoctor } from "@/lib/api/http";
 import {
   normalisePatientPhone,
+  normaliseToothFindings,
   patientPhoneError,
   type ManualVisitInput,
   type PatientSex,
   type ReviewMedication,
+  type ReviewToothFinding,
 } from "@/lib/encounters/review";
+import { isFdiTooth, sortSurfaces } from "@/lib/dental/tooth";
 import { normaliseDuration, normaliseFrequency, normaliseRoute } from "@/lib/llm/dosage";
 import { callWorkflow } from "@/lib/supabase/workflows";
 
@@ -15,6 +18,7 @@ export const runtime = "nodejs";
 
 const SEX_VALUES = new Set<PatientSex>(["female", "male", "intersex", "not_recorded"]);
 const MAX_MEDICATIONS = 30;
+const MAX_TOOTH_FINDINGS = 64;
 
 /**
  * POST /api/encounters/manual
@@ -35,6 +39,7 @@ export const POST = withDoctor(async ({ supabase, request }) => {
   const diagnosis = optionalText(body.diagnosis, 2_000);
   const treatment = optionalText(body.treatment, 2_000);
   const prescription = parsePrescription(body.prescription);
+  const toothFindings = parseToothFindings(body.tooth_findings);
   const encounterId = crypto.randomUUID();
 
   const storedPrescription = prescription.map((medicine) => {
@@ -58,12 +63,14 @@ export const POST = withDoctor(async ({ supabase, request }) => {
     treatment,
     phone,
     sex,
+    tooth_findings: toothFindings,
   };
 
-  const { error } = await callWorkflow(supabase, "create_manual_draft", {
+  const { error } = await callWorkflow(supabase, "create_manual_dental_draft", {
     p_encounter_id: encounterId,
     p_values: values,
     p_prescription: storedPrescription,
+    p_procedures: [],
   });
 
   if (error) {
@@ -90,6 +97,8 @@ export const POST = withDoctor(async ({ supabase, request }) => {
       diagnosis,
       treatment,
       consultation_fee_inr: null,
+      procedures: [],
+      tooth_findings: toothFindings,
       prescription,
       uncertain_fields: [],
       notes_for_doctor: null,
@@ -102,6 +111,67 @@ export const POST = withDoctor(async ({ supabase, request }) => {
     patientIdentity: { phone, sex },
   });
 });
+
+function parseToothFindings(value: unknown): ReviewToothFinding[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new ApiError("Tooth findings must be a list.");
+  if (value.length > MAX_TOOTH_FINDINGS) {
+    throw new ApiError(`A visit can contain at most ${MAX_TOOTH_FINDINGS} tooth findings.`);
+  }
+
+  const rows = value.map((entry, index) => {
+    if (!entry || typeof entry !== "object") {
+      throw new ApiError(`Finding ${index + 1} is invalid.`);
+    }
+    const item = entry as Record<string, unknown>;
+    if (typeof item.finding !== "string" || !FINDING_VALUES.has(item.finding)) {
+      throw new ApiError(`Finding ${index + 1} needs a valid condition.`);
+    }
+    const state = typeof item.state === "string" ? item.state : "existing";
+    if (!FINDING_STATES.has(state)) {
+      throw new ApiError(`Finding ${index + 1} has an invalid status.`);
+    }
+    const severity = item.severity == null || item.severity === "" ? null : String(item.severity);
+    if (severity !== null && !FINDING_SEVERITIES.has(severity)) {
+      throw new ApiError(`Finding ${index + 1} has an invalid severity.`);
+    }
+    return {
+      finding: item.finding,
+      tooth_spoken: typeof item.tooth_spoken === "string" ? item.tooth_spoken : null,
+      surfaces_spoken: typeof item.surfaces_spoken === "string" ? item.surfaces_spoken : null,
+      tooth_fdi: typeof item.tooth_fdi === "number" ? item.tooth_fdi : null,
+      surfaces: Array.isArray(item.surfaces) ? item.surfaces.map(String) : [],
+      state,
+      severity,
+      note: typeof item.note === "string" ? item.note : null,
+      resolved: true,
+    } as ReviewToothFinding;
+  });
+
+  return normaliseToothFindings(rows).map((finding, index) => {
+    if (finding.tooth_fdi == null || !isFdiTooth(finding.tooth_fdi)) {
+      throw new ApiError(`Finding ${index + 1} needs a valid FDI tooth.`);
+    }
+    return {
+      finding: finding.finding,
+      tooth_spoken: finding.tooth_spoken ?? String(finding.tooth_fdi),
+      surfaces_spoken: finding.surfaces_spoken ?? null,
+      tooth_fdi: finding.tooth_fdi,
+      surfaces: sortSurfaces(finding.surfaces ?? []),
+      state: finding.state,
+      severity: finding.severity ?? null,
+      note: optionalText(finding.note, 1500),
+      resolved: true,
+    };
+  });
+}
+
+const FINDING_VALUES = new Set([
+  "sound", "caries", "fracture", "wear", "mobility", "periapical", "impacted",
+  "missing", "restoration", "crown", "implant", "root_canal", "sealant", "other",
+]);
+const FINDING_STATES = new Set(["existing", "planned", "completed", "resolved"]);
+const FINDING_SEVERITIES = new Set(["mild", "moderate", "severe"]);
 
 function parsePrescription(value: unknown): ReviewMedication[] {
   if (value === undefined || value === null) return [];

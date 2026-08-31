@@ -14,8 +14,10 @@ import {
 } from "@/components/icons";
 
 import { PatientHistorySheet } from "@/components/patients/patient-history-sheet";
+import { ToothFindingEditor } from "@/components/dental/tooth-finding-editor";
 import { PostCommitActions } from "@/components/outputs/post-commit-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,21 +30,36 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import type { PatientMatch, ReviewDraft, ReviewMedication, PatientSex } from "@/lib/encounters/review";
 import {
   buildReviewChecklist,
+  normaliseProcedures,
+  normaliseToothFindings,
+  PATIENT_SEX_OPTIONS,
+  type PatientMatch,
+  type PatientSex,
+  type ReviewDraft,
+  type ReviewMedication,
+  type ReviewProcedure,
+  type ReviewToothFinding,
   normalisePatientPhone,
   patientPhoneError,
   reviewFieldId,
 } from "@/lib/encounters/review";
-import { PATIENT_SEX_OPTIONS } from "@/lib/encounters/review";
 import { propagateCommitOutcome } from "@/lib/encounters/commit";
 import { createDraftSaveQueue } from "@/lib/encounters/draft-save-queue";
+import { extractFdiTeeth } from "@/lib/dental/tooth";
 import { formatVisitDay, maskPhone } from "@/lib/format";
-import type { CommitOutcome } from "@/lib/types";
+import {
+  deriveToothStatus,
+  type ToothFindingRecord,
+  type ToothProcedureRecord,
+  type ToothStatus,
+} from "@/lib/dental/tooth-status";
+import type { CommitOutcome, PatientHistoryPayload } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { InteractionWarnings } from "@/components/clinical/interaction-warning";
 import { MedicationEditor } from "@/components/voice/medication-editor";
+import { ProcedureEditor } from "@/components/voice/procedure-editor";
 
 interface DraftUpdatePayload {
   patient_name_spoken: string;
@@ -51,6 +68,8 @@ interface DraftUpdatePayload {
   treatment: string | null;
   consultation_fee_inr: number | null;
   prescription: ReviewMedication[];
+  procedures: ReviewProcedure[];
+  tooth_findings: ReviewToothFinding[];
 }
 
 class DraftSaveError extends Error {
@@ -163,9 +182,28 @@ export function ReviewSheet({
     new Set(buildReviewChecklist(draft.extraction).map((item) => item.key)),
   );
   const [reviewedKeys, setReviewedKeys] = useState<Set<string>>(new Set());
+  // Resolved once, on open. The rule table turns the model's verbatim
+  // "36" / "chhattis" / "lower left first molar" into an FDI number before the
+  // dentist ever sees the row, so the chart opens already pointing at a tooth.
+  const [procedures, setProcedures] = useState(() =>
+    normaliseProcedures(draft.extraction.procedures ?? []),
+  );
+  const [toothFindings, setToothFindings] = useState(() =>
+    normaliseToothFindings(draft.extraction.tooth_findings ?? []),
+  );
+  const [patientToothStatus, setPatientToothStatus] = useState<Map<number, ToothStatus>>(
+    new Map(),
+  );
+  const [chartLoading, setChartLoading] = useState(false);
   const checklist = useMemo(
-    () => buildReviewChecklist({ ...draft.extraction, uncertain_fields: [...uncertain] }),
-    [draft.extraction, uncertain],
+    () =>
+      buildReviewChecklist({
+        ...draft.extraction,
+        procedures,
+        tooth_findings: toothFindings,
+        uncertain_fields: [...uncertain],
+      }),
+    [draft.extraction, procedures, toothFindings, uncertain],
   );
   const [reviewIndex, setReviewIndex] = useState(0);
   const [retrying, setRetrying] = useState(false);
@@ -187,6 +225,8 @@ export function ReviewSheet({
     treatment !== (draft.extraction.treatment ?? "") ||
     consultationFee !== (draft.extraction.consultation_fee_inr?.toString() ?? "") ||
     drugs !== draft.extraction.prescription ||
+    procedures !== draft.extraction.procedures ||
+    toothFindings !== draft.extraction.tooth_findings ||
     phone !== (draft.patientIdentity?.phone ?? "") ||
     sex !== (draft.patientIdentity?.sex ?? "") ||
     patient !== null;
@@ -229,6 +269,46 @@ export function ReviewSheet({
     }, 350);
     return () => clearTimeout(timer);
   }, [name, phone]);
+
+  useEffect(() => {
+    if (!patient?.id) {
+      const timer = window.setTimeout(() => setPatientToothStatus(new Map()), 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const controller = new AbortController();
+    const load = async () => {
+      setChartLoading(true);
+      try {
+        const [historyResponse, clinicalResponse] = await Promise.all([
+          fetch(`/api/patients/${encodeURIComponent(patient.id)}/history`, {
+            signal: controller.signal,
+          }),
+          fetch(`/api/patients/${encodeURIComponent(patient.id)}/clinical`, {
+            signal: controller.signal,
+          }),
+        ]);
+        const history = historyResponse.ok
+          ? await historyResponse.json() as PatientHistoryPayload
+          : null;
+        const clinical = clinicalResponse.ok
+          ? await clinicalResponse.json() as { findings?: ToothFindingRecord[] }
+          : null;
+        if (!controller.signal.aborted) {
+          setPatientToothStatus(deriveToothStatus(
+            (history?.toothProcedures ?? []) as ToothProcedureRecord[],
+            clinical?.findings ?? [],
+          ));
+        }
+      } catch {
+        if (!controller.signal.aborted) setPatientToothStatus(new Map());
+      } finally {
+        if (!controller.signal.aborted) setChartLoading(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [patient?.id]);
 
   function markReviewed(key: string) {
     if (!uncertain.has(key)) return;
@@ -283,6 +363,8 @@ export function ReviewSheet({
         setTreatment(body.extraction.treatment ?? "");
         setConsultationFee(body.extraction.consultation_fee_inr?.toString() ?? "");
         setDrugs(body.extraction.prescription ?? []);
+        setProcedures(normaliseProcedures(body.extraction.procedures ?? []));
+        setToothFindings(normaliseToothFindings(body.extraction.tooth_findings ?? []));
         const nextUncertain = new Set(
           buildReviewChecklist(body.extraction).map((item) => item.key),
         );
@@ -305,8 +387,13 @@ export function ReviewSheet({
       treatment: treatment.trim() || null,
       consultation_fee_inr: parseOptionalMoney(consultationFee),
       prescription: drugs,
+      procedures,
+      tooth_findings: toothFindings,
     }),
-    [age, consultationFee, diagnosis, drugs, name, treatment],
+    // `procedures` belongs in this list. Omitting it does not fail loudly — the
+    // memo simply never recomputes, and every procedure edit stops autosaving
+    // while every other field keeps working.
+    [age, consultationFee, diagnosis, drugs, name, procedures, toothFindings, treatment],
   );
 
   // Voice capture already creates the draft server-side. Once a doctor starts
@@ -415,6 +502,7 @@ export function ReviewSheet({
               },
           idempotencyKey,
           consultationFeeInr: parseOptionalMoney(consultationFee),
+          toothFindings,
         }),
       });
       const commitBody = await commit.json().catch(() => null);
@@ -483,6 +571,11 @@ export function ReviewSheet({
               {commitOutcome.accountEntryError && (
                 <p className="mt-1 font-medium text-destructive">
                   The visit was saved, but its amount could not be added to Accounts.
+                </p>
+              )}
+              {commitOutcome.toothFindingError && (
+                <p className="mt-1 font-medium text-warning">
+                  The visit was saved, but structured tooth findings need to be added from the patient chart.
                 </p>
               )}
             </div>
@@ -663,17 +756,17 @@ export function ReviewSheet({
                   />
                 </Field>
                 <Field label="Sex">
-                  <select
+                  <Select
                     id="review-new-patient-sex"
                     value={sex}
                     onChange={(event) => setSex(event.target.value as PatientSex | "")}
-                    className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/20"
+                    className="h-11"
                   >
                     <option value="">Not stated</option>
                     {PATIENT_SEX_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
-                  </select>
+                  </Select>
                 </Field>
               </div>
             )}
@@ -697,6 +790,36 @@ export function ReviewSheet({
           <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
             <div className="flex items-center gap-2">
               <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">02</span>
+              <div>
+                <h3 className="text-sm font-semibold tracking-[-0.015em]">Dental chart &amp; findings</h3>
+                <p className="text-xs text-muted-foreground">
+                  {chartLoading
+                    ? "Loading the selected patient’s existing tooth history…"
+                    : patient
+                      ? "Existing history is shown underneath today’s highlighted teeth."
+                      : "Choose an existing patient to add their previous tooth history."}
+                </p>
+              </div>
+            </div>
+            <ToothFindingEditor
+              value={toothFindings}
+              onChange={setToothFindings}
+              status={patientToothStatus}
+              relatedTeeth={procedures
+                .map((procedure) => procedure.tooth_fdi)
+                .filter((tooth): tooth is number => typeof tooth === "number")
+                .concat(extractFdiTeeth(diagnosis), extractFdiTeeth(treatment))}
+              flaggedKeys={uncertain}
+              reviewedKeys={reviewedKeys}
+              onFieldChange={markReviewed}
+              title="What is wrong, and where?"
+              description="Teeth identified from dictation are highlighted. Tap any tooth to add or correct a finding."
+            />
+          </section>
+
+          <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
+            <div className="flex items-center gap-2">
+              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">03</span>
               <h3 className="text-sm font-semibold tracking-[-0.015em]">Clinical assessment</h3>
             </div>
 
@@ -735,7 +858,24 @@ export function ReviewSheet({
           {/* ---- Accounts -------------------------------------------------- */}
           <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
             <div className="flex items-center gap-2">
-              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">03</span>
+              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">04</span>
+              <div>
+                <h3 className="text-sm font-semibold tracking-[-0.015em]">Procedures</h3>
+                <p className="text-xs text-muted-foreground">What was done, and to which tooth.</p>
+              </div>
+            </div>
+            <ProcedureEditor
+              value={procedures}
+              onChange={setProcedures}
+              flaggedKeys={uncertain}
+              reviewedKeys={reviewedKeys}
+              onFieldChange={markReviewed}
+            />
+          </section>
+
+          <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
+            <div className="flex items-center gap-2">
+              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">05</span>
               <div>
                 <h3 className="text-sm font-semibold tracking-[-0.015em]">Consultation amount</h3>
                 <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
@@ -767,7 +907,7 @@ export function ReviewSheet({
           {/* ---- Prescription ------------------------------------------------ */}
           <section className="surface-inset rounded-xl p-3 sm:p-4">
             <div className="mb-4 flex items-center gap-2">
-              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">04</span>
+              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">06</span>
               <h3 className="text-sm font-semibold tracking-[-0.015em]">Prescription</h3>
             </div>
             <MedicationEditor
@@ -821,7 +961,7 @@ export function ReviewSheet({
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
             <span className={cn("size-1.5 rounded-full", pendingReviewCount > 0 ? "bg-warning" : autosaveState === "error" || autosaveState === "conflict" ? "bg-destructive" : "bg-primary")} aria-hidden />
             {pendingReviewCount > 0
-              ? `${pendingReviewCount} flagged detail${pendingReviewCount === 1 ? "" : "s"} still need review`
+              ? `${pendingReviewCount} flagged detail${pendingReviewCount === 1 ? " still needs" : "s still need"} review`
               : autosaveState === "saving"
                 ? "Saving draft…"
                 : autosaveState === "saved"

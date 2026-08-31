@@ -58,6 +58,27 @@ export const MOCK_EXTRACTION: Extraction = {
   diagnosis: "Acute pharyngitis with low-grade fever",
   treatment: "Warm saline gargles, oral fluids, review in three days if fever persists",
   consultation_fee_inr: 500,
+  // One resolvable tooth, so the procedure path is exercised without adding a
+  // checklist item — this fixture's whole point is that Confirm stays enabled.
+  procedures: [
+    {
+      procedure_name: "Scaling and polishing",
+      tooth_spoken: null,
+      surfaces_spoken: null,
+      sitting_spoken: null,
+      note: null,
+    },
+  ],
+  tooth_findings: [
+    {
+      finding: "periapical",
+      tooth_spoken: "36",
+      surfaces_spoken: null,
+      state: "existing",
+      severity: null,
+      note: "Irreversible pulpitis",
+    },
+  ],
   prescription: [
     {
       drug_name: "Azithromycin",

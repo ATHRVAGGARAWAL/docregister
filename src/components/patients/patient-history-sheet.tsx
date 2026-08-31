@@ -30,6 +30,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
 import { maskPhone } from "@/lib/format";
+import { PermanentArchViewer } from "@/components/dental/permanent-arch-viewer";
+import {
+  deriveToothStatus,
+  type ToothFindingRecord,
+  type ToothProcedureRecord,
+} from "@/lib/dental/tooth-status";
 import type { PatientHistoryPayload } from "@/lib/types";
 
 export function PatientHistorySheet({
@@ -48,6 +54,7 @@ export function PatientHistorySheet({
   const [request, setRequest] = useState<{
     patientId: string;
     history: PatientHistoryPayload | null;
+    findings: ToothFindingRecord[];
     error: string | null;
   } | null>(null);
   const [editForm, setEditForm] = useState<PatientDetailsForm | null>(null);
@@ -60,18 +67,32 @@ export function PatientHistorySheet({
 
     const controller = new AbortController();
 
-    fetch(`/api/patients/${encodeURIComponent(patientId)}/history`, {
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        const payload = await readBody(response, "Could not open this patient chart.");
-        setRequest({ patientId, history: payload as PatientHistoryPayload, error: null });
+    Promise.all([
+      fetch(`/api/patients/${encodeURIComponent(patientId)}/history`, {
+        signal: controller.signal,
+      }),
+      fetch(`/api/patients/${encodeURIComponent(patientId)}/clinical`, {
+        signal: controller.signal,
+      }),
+    ])
+      .then(async ([historyResponse, clinicalResponse]) => {
+        const payload = await readBody(historyResponse, "Could not open this patient chart.");
+        const clinical = clinicalResponse.ok
+          ? await clinicalResponse.json() as { findings?: ToothFindingRecord[] }
+          : null;
+        setRequest({
+          patientId,
+          history: payload as PatientHistoryPayload,
+          findings: clinical?.findings ?? [],
+          error: null,
+        });
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
         setRequest({
           patientId,
           history: null,
+          findings: [],
           error: cause instanceof Error ? cause.message : "Could not open this patient chart.",
         });
       });
@@ -83,6 +104,17 @@ export function PatientHistorySheet({
   const history = currentRequest?.history ?? null;
   const error = currentRequest?.error ?? null;
   const loading = open && Boolean(patientId) && currentRequest === null;
+
+  // Folded here rather than in the route: the precedence rules — an implant
+  // restoring a tooth an extraction removed, surfaces accumulating across
+  // visits — are order-dependent logic that lives in one tested place.
+  const toothStatus = useMemo(
+    () => deriveToothStatus(
+      (history?.toothProcedures ?? []) as ToothProcedureRecord[],
+      currentRequest?.findings ?? [],
+    ),
+    [currentRequest?.findings, history?.toothProcedures],
+  );
 
   const totals = useMemo(() => {
     const encounters = history?.encounters ?? [];
@@ -211,6 +243,26 @@ export function PatientHistorySheet({
                   icon={StethoscopeIcon}
                   label="Distinct diagnoses"
                   value={String(totals.diagnoses)}
+                />
+              </section>
+
+              <section className="space-y-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                    Dental chart
+                  </p>
+                  <h2 className="mt-1 text-lg font-semibold tracking-[-0.025em]">
+                    Current state of the mouth
+                  </h2>
+                  {toothStatus.size === 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      No structured tooth history has been recorded yet. Unmarked teeth are unknown, not confirmed sound.
+                    </p>
+                  )}
+                </div>
+                <PermanentArchViewer
+                  status={toothStatus}
+                  label="Derived from every confirmed visit"
                 />
               </section>
 

@@ -32,6 +32,14 @@ export interface RegisterEntry {
   visit_number: number | null;
   status: "draft" | "committed" | "discarded";
   drugs: string[];
+  /**
+   * What was done, per tooth, as short display strings — "36 RCT", "26 MO".
+   *
+   * For a dental visit this is the line a dentist scans the register for, which
+   * is why it sits beside `drugs` rather than inside it. Empty for a visit with
+   * no per-tooth work, such as a consultation or a scaling.
+   */
+  procedures: string[];
 }
 
 /** The durable result returned after the human-reviewed commit transaction. */
@@ -45,6 +53,8 @@ export interface CommitOutcome {
   accountEntryId: string | null;
   /** The visit saved, but its optional Accounts entry could not be created. */
   accountEntryError: boolean;
+  /** The visit saved, but structured tooth findings could not be attached. */
+  toothFindingError?: boolean;
 }
 
 export interface PatientHistoryPrescription {
@@ -69,6 +79,23 @@ export interface PatientHistoryEncounter {
 }
 
 export interface PatientHistoryPayload {
+  /**
+   * Every committed per-tooth procedure, oldest first, carrying the effect the
+   * clinic's catalogue declares. Folded into a per-tooth state by
+   * `deriveToothStatus` — the precedence rules live there, where they can be
+   * tested against named clinical sequences rather than asserted in SQL.
+   */
+  toothProcedures: {
+    encounter_id: string;
+    occurred_at: string;
+    tooth_fdi: number;
+    surfaces: string[] | null;
+    procedure_name: string;
+    tooth_effect: string;
+    status: string;
+    sitting_number: number | null;
+    total_sittings: number | null;
+  }[];
   patient: {
     id: string;
     full_name: string;

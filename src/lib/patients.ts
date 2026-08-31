@@ -1,5 +1,7 @@
 import "server-only";
 
+import { shiftDays, startOfDayInIndia, todayInIndia } from "@/lib/analytics";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -40,9 +42,23 @@ interface ListPatientsRow {
   total_count: number | string;
 }
 
+/**
+ * The floor for a "seen in the last N days" filter, as an IST day boundary.
+ *
+ * Days, not hours: "today" has to mean the clinic's calendar day, so a visit at
+ * 09:00 is still in range at 18:00. `startOfDayInIndia` is the same helper the
+ * register and the accounts ledger already use, so the three surfaces cannot
+ * disagree about where a day starts.
+ */
+function sinceFor(days: number | undefined): string | null {
+  if (!days || !Number.isFinite(days) || days < 1) return null;
+  const clamped = Math.min(Math.floor(days), 3650);
+  return startOfDayInIndia(shiftDays(todayInIndia(), -(clamped - 1)));
+}
+
 export async function loadPatients(
   supabase: SupabaseClient,
-  options: { search?: string; limit?: number; offset?: number } = {},
+  options: { search?: string; limit?: number; offset?: number; days?: number } = {},
 ): Promise<PatientDirectoryResult> {
   const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
 
@@ -52,6 +68,10 @@ export async function loadPatients(
     p_search: options.search?.trim() || null,
     p_limit: limit,
     p_offset: Math.max(options.offset ?? 0, 0),
+    // Filtered in Postgres, not here. The list is paginated server-side, so a
+    // filter applied after the fetch would narrow this page and then report
+    // `total_count` for the unfiltered query — "showing 3 of 214".
+    p_since: sinceFor(options.days),
   });
 
   if (error) {

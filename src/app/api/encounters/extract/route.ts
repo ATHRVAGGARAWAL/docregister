@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { Json } from "@/lib/supabase/database.types";
 import { ApiError, readBody, withDoctor } from "@/lib/api/http";
 import { normaliseDuration, normaliseFrequency, normaliseRoute } from "@/lib/llm/dosage";
+import { normaliseProcedures } from "@/lib/encounters/review";
 import { extractEncounter } from "@/lib/llm/extract";
 import { classifyUtterance } from "@/lib/llm/intent";
 import { callWorkflow } from "@/lib/supabase/workflows";
@@ -214,10 +215,32 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
     };
   });
 
-  // Encounter fields and prescription rows are replaced in one transaction.
+
+  // Procedures are resolved by the same deterministic pass everywhere — see
+  // `normaliseProcedures`. The model gives verbatim speech; the rule table in
+  // `src/lib/dental/tooth.ts` turns it into an FDI number, and a tooth it
+  // cannot read stays null and reaches the dentist as a review item rather than
+  // being guessed at.
+  const procedureRows = normaliseProcedures(extraction.procedures ?? []).map((item) => ({
+    procedure_name: item.procedure_name,
+    catalogue_id: item.catalogue_id ?? null,
+    scope: item.scope ?? "tooth",
+    tooth_fdi: item.tooth_fdi ?? null,
+    surfaces: item.surfaces ?? [],
+    sitting_number: item.sitting_number ?? null,
+    total_sittings: item.total_sittings ?? null,
+    notes: item.note,
+    // A row whose tooth did not resolve cannot satisfy the scope-consistency
+    // constraint, so it is stored as `other` and flagged. The dentist's
+    // correction in review is what turns it into a tooth procedure.
+    needs_review: item.scope === "tooth" && item.tooth_fdi === null,
+  })).map((row) => (row.needs_review ? { ...row, scope: "other", surfaces: [] } : row));
+
+  // Encounter fields, prescription rows and procedure rows are replaced in one
+  // transaction.
   // The function derives tenant/doctor identity from auth.uid() and refuses to
   // overwrite another doctor's row, even inside the same clinic.
-  const { error: saveError } = await callWorkflow<unknown>(supabase, "save_clinical_draft", {
+  const { error: saveError } = await callWorkflow<unknown>(supabase, "save_dental_draft", {
     p_encounter_id: encounterId,
     p_transcript_id: transcriptId,
     p_patient_name_spoken: extraction.patient_name,
@@ -231,6 +254,7 @@ export const POST = withDoctor(async ({ doctor, supabase, request }) => {
     p_extraction_model: outcome.model,
     p_extraction_confidence: null,
     p_prescription: items,
+    p_procedures: procedureRows,
   });
 
   if (saveError) {

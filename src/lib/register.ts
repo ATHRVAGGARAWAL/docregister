@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { shiftDays, startOfDayInIndia, todayInIndia } from "@/lib/analytics";
+import { procedureChip } from "@/lib/dental/procedure";
 import type { RegisterEntry } from "@/lib/types";
 
 /**
@@ -38,7 +39,8 @@ export async function loadRegister(
       `id, occurred_at, patient_id, patient_name_spoken, age_years, diagnosis,
        treatment, is_new_patient, visit_number, status,
        patients!encounters_patient_id_fkey ( full_name ),
-       prescription_items!prescription_items_encounter_id_fkey ( drug_name, strength, frequency_label, position )`,
+       prescription_items!prescription_items_encounter_id_fkey ( drug_name, strength, frequency_label, position ),
+       encounter_procedures!encounter_procedures_encounter_id_fkey ( procedure_name, tooth_fdi, surfaces, sitting_number, total_sittings, position )`,
     )
     .eq("doctor_id", doctorId)
     .gte("occurred_at", startOfDayInIndia(from))
@@ -68,6 +70,9 @@ export async function loadRegister(
     // an embedded relation as an object, an array, or nothing depending on how
     // it infers the FK, and `[...undefined]` is a TypeError — which the old
     // `as unknown as` cast promised would never happen.
+    procedures: [...(row.encounter_procedures ?? [])]
+      .sort((a, b) => a.position - b.position)
+      .map((item) => procedureChip(item)),
     drugs: [...(row.prescription_items ?? [])]
       .sort((a, b) => a.position - b.position)
       .map((item) =>
@@ -102,6 +107,7 @@ interface RegisterSearchRow {
   visit_number: number | null;
   status: RegisterEntry["status"];
   drugs: string[] | null;
+  procedures: string[] | null;
   total_count: number | string;
   committed_count?: number | string;
   draft_count?: number | string;
@@ -176,6 +182,7 @@ export async function searchRegister(
       visit_number: row.visit_number,
       status: row.status,
       drugs: row.drugs ?? [],
+      procedures: row.procedures ?? [],
     })),
     // An empty page can still have matches before its offset. Fall back to the
     // independently queried total for the selected status instead of claiming

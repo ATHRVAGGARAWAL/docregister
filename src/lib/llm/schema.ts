@@ -46,6 +46,83 @@ export const PrescriptionItemSchema = z.object({
     .describe("Extra instruction such as 'after food', 'khaali pet', 'at bedtime'."),
 });
 
+/**
+ * One dental procedure, as the dentist described it.
+ *
+ * Every locational field is `*_spoken` and a **string**, for the same reason
+ * `frequency_spoken` is: mapping "36" or "chhattis" or "lower left first molar"
+ * onto FDI 36 is a rule table, and `src/lib/dental/tooth.ts` owns it. Asking
+ * the model for a number invites a confident wrong one on the single field
+ * where wrong means the wrong tooth was treated.
+ */
+export const ProcedureItemSchema = z.object({
+  procedure_name: z
+    .string()
+    .describe(
+      "The procedure as spoken, in English. E.g. 'root canal', 'composite filling', 'extraction', 'scaling', 'crown', 'pulpectomy'. Keep it short.",
+    ),
+  tooth_spoken: z
+    .string()
+    .nullable()
+    .describe(
+      "The tooth exactly as spoken, verbatim, in whatever language: '36', 'chhattis', '\u0968\u096c', 'lower left first molar'. Do NOT convert to a number — a rule table does that. Null for a procedure that is not on one tooth, such as scaling or an OPG.",
+    ),
+  surfaces_spoken: z
+    .string()
+    .nullable()
+    .describe(
+      "Crown surfaces if stated, as spoken: 'mesial occlusal', 'MOD', 'distal'. Null if not stated.",
+    ),
+  sitting_spoken: z
+    .string()
+    .nullable()
+    .describe(
+      "Which visit of a multi-visit treatment, as spoken: 'first sitting', 'second of three', 'doosri sitting'. Null if not stated.",
+    ),
+  note: z
+    .string()
+    .nullable()
+    .describe("Anything else said about this procedure. Null if nothing."),
+});
+
+/** A clinical observation tied to one tooth, separate from work performed. */
+export const ToothFindingItemSchema = z.object({
+  finding: z
+    .enum([
+      "sound",
+      "caries",
+      "fracture",
+      "wear",
+      "mobility",
+      "periapical",
+      "impacted",
+      "missing",
+      "restoration",
+      "crown",
+      "implant",
+      "root_canal",
+      "sealant",
+      "other",
+    ])
+    .describe("What is clinically observed on this tooth. Do not infer a finding that was not stated."),
+  tooth_spoken: z
+    .string()
+    .nullable()
+    .describe("The tooth exactly as spoken, verbatim. Do not convert it to an FDI number."),
+  surfaces_spoken: z
+    .string()
+    .nullable()
+    .describe("Affected crown surfaces exactly as spoken, or null when not stated."),
+  state: z
+    .enum(["existing", "planned", "completed", "resolved"])
+    .describe("Existing for a current finding; completed/resolved only when the dentist explicitly says so."),
+  severity: z
+    .enum(["mild", "moderate", "severe"])
+    .nullable()
+    .describe("Severity only when explicitly stated."),
+  note: z.string().nullable().describe("Short supporting clinical detail, or null."),
+});
+
 export const ExtractionSchema = z.object({
   patient_name: z
     .string()
@@ -78,6 +155,16 @@ export const ExtractionSchema = z.object({
     .describe(
       "Consultation fee or visit amount in Indian rupees, converted from spoken numerals. Capture only a fee for this visit; do not treat medicine prices as the consultation fee. Null if no consultation amount was stated.",
     ),
+  procedures: z
+    .array(ProcedureItemSchema)
+    .describe(
+      "One entry per dental procedure done or planned at this visit. Empty array if none. For a dental visit this is usually the substance of the note.",
+    ),
+  tooth_findings: z
+    .array(ToothFindingItemSchema)
+    .describe(
+      "One entry per tooth-specific observation such as caries, fracture, mobility, periapical finding, impacted or missing tooth. Empty array if no tooth finding was stated.",
+    ),
   prescription: z
     .array(PrescriptionItemSchema)
     .describe("One entry per drug. Empty array if nothing was prescribed."),
@@ -100,6 +187,8 @@ export const ExtractionSchema = z.object({
 
 export type Extraction = z.infer<typeof ExtractionSchema>;
 export type PrescriptionItem = z.infer<typeof PrescriptionItemSchema>;
+export type ProcedureItem = z.infer<typeof ProcedureItemSchema>;
+export type ToothFindingItem = z.infer<typeof ToothFindingItemSchema>;
 
 /** Issues found after parsing, surfaced in the review UI. */
 export interface ValidationIssue {

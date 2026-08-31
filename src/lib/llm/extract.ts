@@ -18,19 +18,36 @@ import { ExtractionSchema, validateExtraction, type Extraction, type ValidationI
  * Gemini matches long prefixes implicitly. The clinical guidance below clears
  * the threshold comfortably either way.
  */
-const EXTRACTION_SYSTEM = `You extract structured clinical data from a doctor's spoken consultation note.
+const EXTRACTION_SYSTEM = `You extract structured clinical data from a dentist's spoken consultation note.
 
-The audio was recorded in an Indian clinic and transcribed by a speech-to-text engine. Expect the transcript to be code-mixed: the doctor moves between English, Hindi and Punjabi mid-sentence, often within a single clause. Devanagari, Gurmukhi and Latin script may all appear in the same transcript. This is normal and expected — do not treat it as corruption.
+The audio was recorded in an Indian dental clinic and transcribed by a speech-to-text engine. Expect the transcript to be code-mixed: the doctor moves between English, Hindi and Punjabi mid-sentence, often within a single clause. Devanagari, Gurmukhi and Latin script may all appear in the same transcript. This is normal and expected — do not treat it as corruption.
 
 ## What you produce
 
-A structured record with: patient name, age, diagnosis, treatment plan, the individual prescription lines, and any consultation fee stated for this visit. The fee is reviewed with the visit, then written to the separate Accounts ledger when the visit is confirmed.
+A structured record with: patient name, age, diagnosis, treatment plan, **tooth-specific clinical findings**, **the dental procedures performed or planned**, the individual prescription lines, and any consultation fee stated for this visit. The fee is reviewed with the visit, then written to the separate Accounts ledger when the visit is confirmed.
+
+For a dental visit the procedures are the substance of the note and the prescription is usually the footnote.
 
 ## Rules that matter most
 
+**A bare number near a complaint or a procedure is a TOOTH, not an age.** This is the single most important rule here and the easiest to get wrong. Dentists identify teeth by two-digit FDI numbers — 11 to 48 for adults, 51 to 85 for children — and they say them constantly: "36 mein dard hai", "46 mein cavity", "38 nikaalna hai", "root canal in 24".
+
+- Put the number in \`tooth_findings[].tooth_spoken\` when the doctor is describing what is wrong, and in \`procedures[].tooth_spoken\` when describing treatment. If both are stated, create both entries. Keep it **verbatim**, exactly as spoken.
+- Set \`age_years\` **only** when an age is explicitly marked as one: "42 saal", "42 years old", "age 42", "35 ki hai", "do saal ka baccha".
+- If no age word is present, \`age_years\` is **null**. A missing age costs the dentist one tap. A tooth number recorded as an age puts a wrong date of birth on a medical record and is not caught, because 36 is a perfectly plausible age.
+- A sentence can contain both: "Ramesh, 42 saal, 46 mein cavity" is age 42 and tooth 46. The age word is what distinguishes them.
+
+**Do not convert tooth numbers, ever.** Record \`tooth_spoken\` exactly as said — "36", "chhattis", "\u0968\u096c", "lower left first molar" — in whatever language and script. A deterministic rule table maps it to FDI notation downstream. This is the same reason you do not normalise dosage frequency: guessing produces confident errors on something that needs no model at all, and here a wrong guess is the wrong tooth treated.
+
 **Never invent a value.** If the doctor did not say the patient's age, the age is null. An empty field the doctor fills in during review costs three seconds; a plausible fabricated value that reaches a patient record may never be caught. This applies with particular force to drug names and strengths.
 
-**Preserve drug names exactly as spoken.** Indian practice runs heavily on brand names — Dolo, Crocin, Pan-D, Shelcal, Augmentin, Zerodol, Monocef. If the doctor said a brand, record the brand. Do not helpfully substitute the generic molecule, and do not correct a brand to a similar-sounding one. If a drug name is garbled beyond recognition, put your best reading in \`drug_name\` and add the field to \`uncertain_fields\`.
+**Preserve drug names exactly as spoken.** Indian practice runs heavily on brand names. Dentistry prescribes from a narrow set: amoxicillin-clavulanate (Augmentin, Clavam, Moxikind-CV), metronidazole (Metrogyl, Flagyl), amoxicillin (Mox), ibuprofen and combinations (Brufen, Combiflam), aceclofenac (Zerodol, Hifenac), paracetamol (Dolo, Crocin), chlorhexidine mouthwash (Hexidine, Clohex), Hexigel, and local anaesthetics (Lignox, Xylocaine). If the dentist said a brand, record the brand. Do not substitute the generic molecule, and do not correct a brand to a similar-sounding one. If a drug name is garbled beyond recognition, put your best reading in \`drug_name\` and add the field to \`uncertain_fields\`.
+
+**Procedure vocabulary.** Recognise these however they are said, including in Hindi or Punjabi: root canal / RCT / "root canal treatment", pulpectomy, scaling / cleaning / "safai" / "saaf karna", filling / restoration / "bharna", composite, GIC, extraction / "nikaalna" / "ukhaadna", crown / cap, bridge, denture, implant, braces / aligners, X-ray / IOPA / OPG, night guard. Put a short English name in \`procedure_name\`.
+
+**Findings are not procedures.** "Cavity in 36", "fractured 11", "mobility grade two on 31", "periapical lesion 46", "impacted 38", and "missing 26" belong in \`tooth_findings\`. Record the tooth verbatim, the named surfaces, severity only if stated, and a short supporting note. Do not invent a treatment for a finding. A filling, extraction, crown or root canal belongs in \`procedures\` only when the dentist says it was done or planned.
+
+**Sittings.** Dental work often spans visits. "First sitting", "doosri sitting", "second of three" goes verbatim into \`sitting_spoken\`. Do not infer a sitting number that was not said.
 
 **Do not normalise dosage frequency.** Record \`frequency_spoken\` exactly as the doctor said it, in whatever language and form: "once daily", "do baar", "subah shaam", "BD", "1-0-1", "SOS", "ਦੋ ਵਾਰ". A deterministic rule table downstream maps these to canonical codes. Guessing here produces confident errors on something that does not need a model at all.
 
@@ -42,7 +59,7 @@ A structured record with: patient name, age, diagnosis, treatment plan, the indi
 
 **Capture the consultation fee, not medicine prices.** Phrases such as "fees paanch sau", "consultation 500", "charged seven hundred", or "visit amount ₹650" set \`consultation_fee_inr\`. Convert spoken numerals to rupees. If a medicine's retail price is mentioned, leave the consultation fee null. If it is unclear whether an amount is a fee, capture the best reading and add \`consultation_fee_inr\` to \`uncertain_fields\`.
 
-**Age can be stated in months for infants.** "chhah mahine ka baccha" is 6 months → record 0 and note it in \`notes_for_doctor\`.
+**Age can be stated in months for infants.** "chhah mahine ka baccha" is 6 months → record 0 and note it in \`notes_for_doctor\`. This still requires an explicit age word — see the tooth rule above.
 
 **Diagnosis and treatment go into English**, concisely, even when spoken in Hindi or Punjabi — these fields are read back in a register and searched later. Translate the clinical concept faithfully rather than transliterating. "Bukhar teen din se" is a symptom (fever, 3 days), not a diagnosis; if the doctor stated only symptoms and no impression, put the symptoms in \`treatment\` context and leave \`diagnosis\` null rather than inventing one.
 
@@ -52,7 +69,7 @@ A structured record with: patient name, age, diagnosis, treatment plan, the indi
 
 ## What you are not doing
 
-You are not diagnosing, second-guessing, or improving the doctor's clinical decisions. You are not adding drugs the doctor did not mention, adjusting a dose that looks unusual, or noting contraindications. You transcribe intent into structure. Clinical judgement stays with the clinician, who will review every field before it is saved.`;
+You are not diagnosing, second-guessing, or improving the dentist's clinical decisions. You are not adding drugs or procedures they did not mention, adjusting a dose that looks unusual, inferring which tooth they must have meant, or noting contraindications. You transcribe intent into structure. Clinical judgement stays with the clinician, who will review every field before it is saved.`;
 
 export interface ExtractionContext {
   /** Doctor's most-prescribed drugs — biases spelling of garbled drug names. */
@@ -139,6 +156,8 @@ function mockExtraction(transcript: string): ExtractionOutcome {
         diagnosis: "Migraine",
         treatment: "Naproxen for 7 days; advised to track triggers and review if unresolved.",
         consultation_fee_inr: null,
+        procedures: [],
+        tooth_findings: [],
         prescription: [
           {
             drug_name: "Naproxen",
@@ -159,6 +178,8 @@ function mockExtraction(transcript: string): ExtractionOutcome {
           diagnosis: "Type 2 diabetes mellitus, poorly controlled; hypertension",
           treatment: "Continue Metformin, add Telmisartan. Review in two weeks.",
           consultation_fee_inr: null,
+          procedures: [],
+          tooth_findings: [],
           prescription: [
             {
               drug_name: "Metformin",
@@ -181,23 +202,47 @@ function mockExtraction(transcript: string): ExtractionOutcome {
           notes_for_doctor: "Duration was not stated for either drug.",
         }
       : {
+          // The default branch is a dental visit, so the offline pipeline
+          // exercises the procedure path rather than only the prescription one.
+          // `tooth_spoken` is left verbatim here on purpose: the mock must
+          // produce the same shape the model does, or the deterministic tooth
+          // parsing downstream is never covered by a mock-mode run.
           patient_name: "Rajesh Kumar",
           age_years: 42,
-          diagnosis: "Acute pharyngitis",
-          treatment: "Azithromycin course with Paracetamol as needed for fever.",
+          diagnosis: "Irreversible pulpitis, lower left first molar",
+          treatment: "Root canal started on 36, first of three sittings. Antibiotic cover and analgesia.",
           consultation_fee_inr: /fees?\s+(?:paanch\s+sau|500)/i.test(transcript) ? 500 : null,
+          procedures: [
+            {
+              procedure_name: "Root canal",
+              tooth_spoken: "36",
+              surfaces_spoken: null,
+              sitting_spoken: "first sitting",
+              note: null,
+            },
+          ],
+          tooth_findings: [
+            {
+              finding: "periapical",
+              tooth_spoken: "36",
+              surfaces_spoken: null,
+              state: "existing",
+              severity: null,
+              note: "Irreversible pulpitis",
+            },
+          ],
           prescription: [
             {
-              drug_name: "Azithromycin",
-              strength: "500 mg",
+              drug_name: "Augmentin",
+              strength: "625 mg",
               form: "tab",
-              frequency_spoken: "once daily",
+              frequency_spoken: "BD",
               duration: "5 days",
-              instructions: null,
+              instructions: "after food",
             },
             {
-              drug_name: "Paracetamol",
-              strength: "650 mg",
+              drug_name: "Zerodol-SP",
+              strength: null,
               form: "tab",
               frequency_spoken: "SOS",
               duration: null,

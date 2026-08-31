@@ -140,8 +140,10 @@ function decorate(
 }
 
 export const config = {
-  // Skip static assets and the audio worklet — running an auth round trip for
-  // every icon is pure latency.
+  // Skip static assets, local 3D models and the audio worklet — running an auth
+  // round trip for every icon or GLB request is pure latency. Dental models are
+  // public, attribution-preserving derivatives; patient chart state never lives
+  // in these files.
   //
   // `.webmanifest` is here for a stronger reason than latency: a browser fetches
   // the manifest to decide whether the app is installable, and it does that
@@ -149,6 +151,6 @@ export const config = {
   // silently never becomes available — no error, just an "Add to home screen"
   // that is permanently absent.
   matcher: [
-    "/((?!_next/static|_next/image|worklets|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?|webmanifest)$).*)",
+    "/((?!_next/static|_next/image|worklets|models|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?|webmanifest)$).*)",
   ],
 };

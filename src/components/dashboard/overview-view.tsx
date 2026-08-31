@@ -1,228 +1,217 @@
 "use client";
 
-import {
-  ArrowRightIcon,
-  CalendarDaysIcon,
-  HistoryIcon,
-  Mic2Icon,
-  Square,
-  SparklesIcon,
-} from "@/components/icons";
-
-import { MixChart } from "@/components/charts/mix-chart";
-import { VolumeChart } from "@/components/charts/volume-chart";
-import { RegisterTimeline } from "@/components/dashboard/register-timeline";
-import { StatRail } from "@/components/dashboard/stat-rail";
-import { VisitHero } from "@/components/dashboard/visit-hero";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import type { CapturePhase, PatientMatch } from "@/hooks/use-voice-capture";
-import { cn } from "@/lib/utils";
+import { formatClock } from "@/lib/format";
 import type { AnalyticsPayload, RegisterEntry } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-/** How many of today's visits the overview previews before deferring to the register. */
-const RECENT_LIMIT = 5;
-
-const RANGES = [
-  { label: "7D", days: 7 },
-  { label: "30D", days: 30 },
-  { label: "90D", days: 90 },
-] as const;
+const RECENT_LIMIT = 6;
 
 export function OverviewView({
   doctorName,
   analytics,
   entries,
-  range,
-  loadingRange,
-  rangeError,
-  onRangeChange,
   dictationPhase,
   onStartDictation,
   onStopDictation,
+  onManualEntry,
+  onReviewNext,
   onOpenRegister,
   onOpenRecall,
+  onOpenPatients,
   onOpenPatient,
 }: {
   doctorName: string;
   analytics: AnalyticsPayload;
   entries: RegisterEntry[];
-  range: number;
-  loadingRange: boolean;
-  rangeError: string | null;
-  onRangeChange: (days: number) => void;
   dictationPhase: CapturePhase;
   onStartDictation: () => void;
   onStopDictation: () => void;
+  onManualEntry: () => void;
+  onReviewNext: () => void;
   onOpenRegister: () => void;
   onOpenRecall: () => void;
+  onOpenPatients: () => void;
   onOpenPatient: (patient: PatientMatch) => void;
 }) {
   const recording = dictationPhase === "arming" || dictationPhase === "listening";
   const processing = dictationPhase === "transcribing" || dictationPhase === "extracting";
+  const draftCount = entries.filter((entry) => entry.status === "draft").length;
+  const committedCount = entries.filter((entry) => entry.status === "committed").length;
 
   return (
-    <div className="space-y-6 sm:space-y-11">
-      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end sm:gap-6">
+    <div className="clinical-home">
+      <header className="clinical-home-header">
         <div>
-          <p className="flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-            <CalendarDaysIcon className="size-3.5 text-primary" strokeWidth={1.8} aria-hidden />
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
             {todayLabel()}
           </p>
-          <h1 className="mt-2.5 max-w-3xl text-[1.75rem] font-semibold leading-[1.08] tracking-[-0.045em] text-balance text-foreground sm:mt-3 sm:text-4xl lg:text-[2.75rem] lg:leading-[1.05]">
+          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">
             {greeting()}, {doctorName}
           </h1>
-          <p className="mt-2 text-sm leading-5 text-muted-foreground sm:leading-6">
-            Your practice, distilled into one calm clinical view.
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+            Capture the consultation now. Check the clinical details before anything enters the patient record.
           </p>
         </div>
-        <Button
-          size="lg"
-          variant={recording ? "destructive" : "default"}
-          onClick={recording ? onStopDictation : onStartDictation}
-          disabled={processing}
-          aria-pressed={recording}
-          className="group h-11 rounded-full px-5 sm:h-12 sm:w-auto"
-        >
-          <span className="relative grid size-7 place-items-center rounded-full border border-primary-foreground">
-            {recording ? (
-              <Square className="size-3.5 fill-current" aria-hidden />
-            ) : (
-              <Mic2Icon className="size-4 transition-transform duration-300 group-hover:scale-110" aria-hidden />
-            )}
-          </span>
-          {processing ? "Processing visit…" : recording ? "Stop & review" : "Dictate a visit"}
-        </Button>
-      </section>
-
-      <VisitHero
-        series={analytics.series}
-        todayVisits={analytics.today?.patient_count ?? 0}
-        delta={analytics.deltas.patients}
-      />
-
-      <StatRail analytics={analytics} />
-
-      <section aria-labelledby="clinic-trends-title">
-        <div className="mb-4 flex flex-col justify-between gap-3 sm:mb-5 sm:flex-row sm:items-end sm:gap-4">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">
-              Practice intelligence
-            </p>
-            <h2
-              id="clinic-trends-title"
-              className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground"
-            >
-              Clinic trends
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Patient volume and visit composition over time
-            </p>
+        <div className="hidden items-center gap-6 text-sm lg:flex" aria-label="Today at a glance">
+          <div className="flex items-baseline gap-2">
+            <strong className="tnum text-2xl font-semibold">{analytics.today?.patient_count ?? committedCount}</strong>
+            <span className="text-muted-foreground">notes today</span>
           </div>
-          <div
-            className="surface-inset inline-flex w-fit rounded-full p-1"
-            role="group"
-            aria-label="Analytics range"
+          <div className="flex items-baseline gap-2">
+            <strong className={cn("tnum text-2xl font-semibold", draftCount > 0 && "text-warning")}>{draftCount}</strong>
+            <span className="text-muted-foreground">need review</span>
+          </div>
+        </div>
+      </header>
+
+      <section className={cn("encounter-start", recording && "is-recording")} aria-labelledby="new-note-title">
+        <div className="encounter-start-copy">
+          <span className="encounter-step">New clinical note</span>
+          <h2 id="new-note-title">What happened in the chair?</h2>
+          <p>
+            Say the patient, diagnosis, tooth and procedure naturally. You will review every extracted detail before saving.
+          </p>
+          <ol className="encounter-path" aria-label="Clinical note workflow">
+            <li><span>1</span> Speak</li>
+            <li><span>2</span> Review</li>
+            <li><span>3</span> Confirm</li>
+          </ol>
+        </div>
+
+        <div className="encounter-start-actions">
+          <button
+            type="button"
+            onClick={recording ? onStopDictation : onStartDictation}
+            disabled={processing}
+            aria-pressed={recording}
+            className={cn("clinical-record-button", recording && "is-live")}
           >
-            {RANGES.map((option) => (
-              <button
-                key={option.days}
-                type="button"
-                onClick={() => onRangeChange(option.days)}
-                aria-pressed={range === option.days}
-                className={cn(
-                  "h-8 min-w-12 touch-manipulation rounded-full px-3 text-xs font-semibold tracking-[0.08em] transition-colors duration-200 [@media(pointer:coarse)]:min-h-11",
-                  range === option.days
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {rangeError && (
-          <Alert variant="destructive" role="alert" className="mb-4 rounded-2xl">
-            <AlertTitle>Could not load analytics</AlertTitle>
-            <AlertDescription>
-              {rangeError} The charts below are from the last range that loaded.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid gap-4 xl:grid-cols-2">
-          <VolumeChart data={analytics.series} loading={loadingRange} />
-          <MixChart data={analytics.series.slice(-14)} loading={loadingRange} />
+            <span className="clinical-record-button-icon">
+              {recording ? (
+                <span className="size-4 rounded-[0.2rem] bg-current" aria-hidden />
+              ) : (
+                <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                  <rect x="8" y="3" width="8" height="12" rx="4" />
+                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7" />
+                </svg>
+              )}
+            </span>
+            <span className="text-left">
+              <strong>{processing ? "Preparing review…" : recording ? "Stop & review" : "Dictate a visit"}</strong>
+              <small>{recording ? "Your note is being captured" : "Hindi, Punjabi or English"}</small>
+            </span>
+          </button>
+          <button type="button" onClick={onManualEntry} className="clinical-manual-button">
+            Type the note instead
+          </button>
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(19rem,0.55fr)]">
-        <section aria-labelledby="recent-visits-title">
-          <div className="mb-4 flex items-end justify-between gap-3">
+      <div className="clinical-work-grid">
+        <section className="clinical-list" aria-labelledby="today-notes-title">
+          <div className="clinical-section-heading">
             <div>
-              <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">
-                Today&rsquo;s register
-              </p>
-              <h2
-                id="recent-visits-title"
-                className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground"
-              >
-                Recent visits
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {entries.length > RECENT_LIMIT
-                  ? `Latest ${RECENT_LIMIT} of ${entries.length} visits today`
-                  : `${entries.length} visit${entries.length === 1 ? "" : "s"} today`}
-              </p>
+              <h2 id="today-notes-title">Today&rsquo;s clinical notes</h2>
+              <p>{entries.length === 0 ? "No encounters recorded yet" : `${entries.length} encounter${entries.length === 1 ? "" : "s"}`}</p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onOpenRegister}
-              className="rounded-full px-3 text-xs"
-            >
-              View register <ArrowRightIcon aria-hidden />
-            </Button>
+            <button type="button" className="clinical-link-button" onClick={onOpenRegister}>
+              Full register <span aria-hidden>→</span>
+            </button>
           </div>
-          <RegisterTimeline
-            entries={entries.slice(0, RECENT_LIMIT)}
-            compact
-            onOpenPatient={onOpenPatient}
-          />
+
+          {entries.length === 0 ? (
+            <div className="clinical-empty">
+              <span className="text-2xl" aria-hidden>∿</span>
+              <div>
+                <p>No notes for today</p>
+                <span>Your first confirmed encounter will appear here.</span>
+              </div>
+            </div>
+          ) : (
+            <ol className="clinical-visit-list">
+              {entries.slice(0, RECENT_LIMIT).map((entry) => (
+                <li key={entry.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!entry.patient_id) return;
+                      onOpenPatient({
+                        id: entry.patient_id,
+                        full_name: entry.patient_name,
+                        phone: null,
+                        age_years: entry.age_years,
+                        last_visit: entry.occurred_at,
+                        visit_count: entry.visit_number,
+                      });
+                    }}
+                    disabled={!entry.patient_id}
+                    className="clinical-visit-row"
+                  >
+                    <time dateTime={entry.occurred_at}>{formatClock(entry.occurred_at)}</time>
+                    <span className={cn("clinical-visit-state", entry.status === "draft" && "is-draft")} aria-hidden>
+                      {entry.status === "draft" ? "!" : "✓"}
+                    </span>
+                    <span className="min-w-0 flex-1 text-left">
+                      <strong>{entry.patient_name}</strong>
+                      <small>
+                        {entry.procedures[0] || entry.diagnosis || entry.treatment || (entry.status === "draft" ? "Draft awaiting review" : "Clinical note")}
+                      </small>
+                    </span>
+                    <span className={cn("clinical-status", entry.status === "draft" && "is-draft")}>
+                      {entry.status === "draft" ? "Review" : "Saved"}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
         </section>
 
-        <aside
-          aria-labelledby="clinical-recall-title"
-          className="surface-elevated group relative isolate h-fit min-h-0 overflow-hidden rounded-[1.5rem] p-5 sm:min-h-72 sm:p-7"
-        >
-          <div className="flex items-center justify-between">
-            <span className="grid size-11 place-items-center rounded-[1.1rem] border border-primary/20 bg-primary-soft text-primary">
-              <HistoryIcon className="size-5" strokeWidth={1.7} aria-hidden />
-            </span>
-            <SparklesIcon className="size-4 text-primary" strokeWidth={1.5} aria-hidden />
+        <aside className="clinical-actions" aria-labelledby="next-actions-title">
+          <div className="clinical-section-heading">
+            <div>
+              <h2 id="next-actions-title">Next action</h2>
+              <p>Move directly to the patient task.</p>
+            </div>
           </div>
-          <p className="mt-5 text-xs font-semibold tracking-[0.16em] text-primary uppercase sm:mt-8">
-            Clinical recall
-          </p>
-          <h2
-            id="clinical-recall-title"
-            className="mt-2 max-w-xs text-xl font-semibold leading-7 tracking-[-0.035em] text-foreground"
-          >
-            Need the last prescription?
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Ask naturally. Every answer stays linked to the verified visits it came from.
-          </p>
-          <Button
-            variant="outline"
-            className="mt-5 w-full rounded-full border-border bg-secondary shadow-none hover:bg-primary-soft hover:text-primary sm:mt-7"
-            onClick={onOpenRecall}
-          >
-            Search patient history
-            <ArrowRightIcon className="transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden />
-          </Button>
+
+          <div className="clinical-action-list">
+            {draftCount > 0 && (
+              <button type="button" className="clinical-action-row" onClick={onReviewNext}>
+                <span className="clinical-action-icon is-attention" aria-hidden>!</span>
+                <span className="min-w-0 flex-1 text-left">
+                  <strong>{`Review ${draftCount} unfinished note${draftCount === 1 ? "" : "s"}`}</strong>
+                  <small>Confirm the clinical record before the next patient.</small>
+                </span>
+                <span className="text-muted-foreground" aria-hidden>→</span>
+              </button>
+            )}
+            <button type="button" className="clinical-action-row" onClick={onOpenPatients}>
+              <span className="clinical-action-icon" aria-hidden>P</span>
+              <span className="min-w-0 flex-1 text-left">
+                <strong>Open a patient chart</strong>
+                <small>History, prescriptions and the dental arch.</small>
+              </span>
+              <span className="text-muted-foreground" aria-hidden>→</span>
+            </button>
+            <button type="button" className="clinical-action-row" onClick={onOpenRecall}>
+              <span className="clinical-action-icon" aria-hidden>?</span>
+              <span className="min-w-0 flex-1 text-left">
+                <strong>Ask the register</strong>
+                <small>Find a previous diagnosis, treatment or prescription.</small>
+              </span>
+              <span className="text-muted-foreground" aria-hidden>→</span>
+            </button>
+            <button type="button" className="clinical-action-row" onClick={onOpenRegister}>
+              <span className="clinical-action-icon" aria-hidden>R</span>
+              <span className="min-w-0 flex-1 text-left">
+                <strong>Browse all encounters</strong>
+                <small>Open confirmed notes and recover drafts.</small>
+              </span>
+              <span className="text-muted-foreground" aria-hidden>→</span>
+            </button>
+          </div>
         </aside>
       </div>
     </div>

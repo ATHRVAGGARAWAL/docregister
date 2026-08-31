@@ -367,3 +367,15 @@ suite run can lock somebody out of their own register. The suite uses
 `e2e-bot@docregister.test`, which owns its own clinic (`E2E Test Clinic
 (automated)`) seeded with obviously fictional patients, so tests never read a
 real patient record either.
+
+### Controlled production test access
+
+`TEST_AUTH_BYPASS_EMAILS` and `TEST_AUTH_ACCESS_CODE` enable the test-access
+field on `/login`. The shortcut only mints a normal RLS-governed session for an
+existing allowlisted user; it never creates an account, clinic, patient, visit,
+or demo record. The access code must be at least 24 characters and both values
+are server-only secrets.
+
+Remove either variable and redeploy to disable the endpoint. Keep seeded E2E
+data confined to `e2e-bot@docregister.test`; never add a real or manually tested
+doctor address to the seed workflow.

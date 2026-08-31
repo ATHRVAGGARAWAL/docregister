@@ -438,6 +438,10 @@ function toVisitHit(row: VisitRow): VisitSearchHit {
       visit_number: row.visit_number,
       status: row.status,
       drugs: row.drugs ?? [],
+      // Global search runs its own SQL and does not join procedures. An empty
+      // list here is honest — the command palette shows a visit's identity and
+      // diagnosis, and the register is where the per-tooth work is read.
+      procedures: [],
     },
   };
 }

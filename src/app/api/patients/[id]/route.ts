@@ -23,6 +23,34 @@ interface PatientResult {
   first_seen_at: string;
 }
 
+export const GET = withDoctor<{ id: string }>(async ({ doctor, supabase, params }) => {
+  const { data, error } = await supabase
+    .from("patients")
+    .select("id, full_name, phone, age_years, sex, abha_id, notes, first_seen_at")
+    .eq("id", params.id)
+    .eq("clinic_id", doctor.clinic_id)
+    .maybeSingle<PatientResult>();
+
+  if (error) {
+    console.error("[patient] lookup failed", error);
+    throw new ApiError("Could not open this patient chart.", 500);
+  }
+  if (!data) throw new ApiError("Patient chart not found.", 404);
+
+  const { error: auditError } = await callWorkflow<null>(supabase, "log_sensitive_access", {
+    p_action: "read",
+    p_entity: "patient",
+    p_entity_id: params.id,
+    p_detail: { surface: "patient_summary" },
+  });
+  if (auditError) {
+    console.error("[patient] audit failed", auditError);
+    throw new ApiError("Could not open this patient chart.", 500);
+  }
+
+  return NextResponse.json(data);
+}, { rateLimit: "match" });
+
 export const PATCH = withDoctor<{ id: string }>(async ({ supabase, request, params }) => {
   const body = await readBody<PatientUpdateBody>(request);
   const fullName = requireString(body.fullName, "fullName");

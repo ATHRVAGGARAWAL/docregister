@@ -27,6 +27,20 @@ const SEARCH_DEBOUNCE_MS = 300;
  * This avoids turning a wide desktop register into a dense spreadsheet that
  * cannot preserve the same one-handed reading order on a phone.
  */
+/**
+ * Last-visit windows.
+ *
+ * "Today" is the one a clinic reaches for at the end of a day. There is no 90
+ * option deliberately: a month is the recall rhythm a dentist thinks in, and
+ * past that the honest answer is the whole directory, which is what "All" is.
+ */
+const RECENCY = [
+  { label: "Today", days: 1 },
+  { label: "7D", days: 7 },
+  { label: "30D", days: 30 },
+  { label: "All", days: 0 },
+] as const;
+
 export function PatientDirectory({
   patients,
   totalCount,
@@ -35,6 +49,8 @@ export function PatientDirectory({
   error,
   query,
   onSearch,
+  days,
+  onDaysChange,
   onOpenPatient,
 }: {
   patients: PatientMatch[];
@@ -47,6 +63,9 @@ export function PatientDirectory({
   /** The search the rows currently on screen are the answer to. */
   query: string;
   onSearch: (query: string) => void;
+  /** Recency window in days; 0 is the whole directory. */
+  days: number;
+  onDaysChange: (days: number) => void;
   onOpenPatient: (patient: PatientMatch) => void;
 }) {
   // The box is typed into far faster than the network answers, so what is in it
@@ -83,6 +102,33 @@ export function PatientDirectory({
             Every chart, organised for a fast glance between consultations.
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {/*
+            Filtered in Postgres, not here — see `loadPatients`. A window
+            applied to the fetched page would narrow fifty rows and still report
+            the count for the whole directory.
+          */}
+          <div className="surface-inset flex w-fit items-center gap-1 rounded-full p-1" role="group" aria-label="Filter by last visit">
+            {RECENCY.map((option) => {
+              const active = days === option.days;
+              return (
+                <button
+                  key={option.label}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onDaysChange(option.days)}
+                  className={cn(
+                    "pressable rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
         <p className="surface-inset flex w-fit items-center gap-2 rounded-full px-3.5 py-2 text-left text-xs font-medium text-muted-foreground sm:text-right">
           {loading && !blank && (
             <LoaderCircleIcon className="size-3.5 animate-spin" aria-hidden />
@@ -101,6 +147,7 @@ export function PatientDirectory({
                 : `${formatCount(totalCount)} patient${totalCount === 1 ? "" : "s"}`}
           </span>
         </p>
+        </div>
       </section>
 
       <section className="surface-elevated relative overflow-hidden rounded-[1.5rem] p-3 sm:p-4">

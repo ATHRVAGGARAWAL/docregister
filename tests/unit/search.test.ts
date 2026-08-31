@@ -51,7 +51,8 @@ function visitHit(id: string, occurredAt: string): SearchHit {
       is_new_patient: false,
       visit_number: 2,
       status: "committed",
-      drugs: ["Paracetamol 500mg"],
+      procedures: [],
+    drugs: ["Paracetamol 500mg"],
     },
   };
 }

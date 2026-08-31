@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ApiError, readBody, withDoctor } from "@/lib/api/http";
 import { extractEncounter } from "@/lib/llm/extract";
 import { normaliseDuration, normaliseFrequency, normaliseRoute } from "@/lib/llm/dosage";
+import { normaliseProcedures } from "@/lib/encounters/review";
 import { transcribeWithFailover, type SttProviderName } from "@/lib/stt";
 import { callWorkflow } from "@/lib/supabase/workflows";
 
@@ -232,7 +233,28 @@ async function rebuildDraft({
       instructions: item.instructions,
     };
   });
-  const { error: saveError } = await callWorkflow(supabase, "save_clinical_draft", {
+
+  // Procedures are resolved by the same deterministic pass everywhere — see
+  // `normaliseProcedures`. The model gives verbatim speech; the rule table in
+  // `src/lib/dental/tooth.ts` turns it into an FDI number, and a tooth it
+  // cannot read stays null and reaches the dentist as a review item rather than
+  // being guessed at.
+  const procedureRows = normaliseProcedures(extraction.procedures ?? []).map((item) => ({
+    procedure_name: item.procedure_name,
+    catalogue_id: item.catalogue_id ?? null,
+    scope: item.scope ?? "tooth",
+    tooth_fdi: item.tooth_fdi ?? null,
+    surfaces: item.surfaces ?? [],
+    sitting_number: item.sitting_number ?? null,
+    total_sittings: item.total_sittings ?? null,
+    notes: item.note,
+    // A row whose tooth did not resolve cannot satisfy the scope-consistency
+    // constraint, so it is stored as `other` and flagged. The dentist's
+    // correction in review is what turns it into a tooth procedure.
+    needs_review: item.scope === "tooth" && item.tooth_fdi === null,
+  })).map((row) => (row.needs_review ? { ...row, scope: "other", surfaces: [] } : row));
+
+  const { error: saveError } = await callWorkflow(supabase, "save_dental_draft", {
     p_encounter_id: encounterId,
     p_transcript_id: transcriptId,
     p_patient_name_spoken: extraction.patient_name,
@@ -246,6 +268,7 @@ async function rebuildDraft({
     p_extraction_model: outcome.model,
     p_extraction_confidence: null,
     p_prescription: items,
+    p_procedures: procedureRows,
   });
   if (saveError) {
     console.error("[draft-retry] draft write failed", saveError);

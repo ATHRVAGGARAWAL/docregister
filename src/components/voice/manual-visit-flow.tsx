@@ -4,6 +4,8 @@ import { useState } from "react";
 import { ArrowRight, FilePenLine, Loader2 } from "@/components/icons";
 
 import { Button } from "@/components/ui/button";
+import { ToothFindingEditor } from "@/components/dental/tooth-finding-editor";
+import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,7 +26,9 @@ import {
   type PatientSex,
   type ReviewDraft,
   type ReviewMedication,
+  type ReviewToothFinding,
 } from "@/lib/encounters/review";
+import { extractFdiTeeth } from "@/lib/dental/tooth";
 import type { CommitOutcome } from "@/lib/types";
 
 const FIRST_MEDICATION: ReviewMedication = {
@@ -65,6 +69,7 @@ export function ManualVisitFlow({
   const [age, setAge] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
   const [treatment, setTreatment] = useState("");
+  const [toothFindings, setToothFindings] = useState<ReviewToothFinding[]>([]);
   const [medications, setMedications] = useState<ReviewMedication[]>([
     { ...FIRST_MEDICATION },
   ]);
@@ -79,6 +84,7 @@ export function ManualVisitFlow({
     setAge("");
     setDiagnosis("");
     setTreatment("");
+    setToothFindings([]);
     setMedications([{ ...FIRST_MEDICATION }]);
     setDraft(null);
     setSaving(false);
@@ -142,6 +148,7 @@ export function ManualVisitFlow({
           diagnosis: diagnosis.trim() || null,
           treatment: treatment.trim() || null,
           prescription,
+          tooth_findings: toothFindings,
         }),
       });
 
@@ -193,7 +200,7 @@ export function ManualVisitFlow({
         if (!next) close();
       }}
     >
-      <SheetContent className="surface-elevated overflow-hidden sm:max-w-2xl">
+      <SheetContent className="surface-elevated overflow-hidden sm:max-w-4xl">
         <SheetHeader className="border-b border-border px-5 pb-4 pt-5 sm:px-6">
           <div className="flex items-start gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary-soft text-primary">
@@ -252,11 +259,11 @@ export function ManualVisitFlow({
                   />
                 </FormField>
                 <FormField label="Sex" htmlFor="manual-patient-sex">
-                  <select
+                  <Select
                     id="manual-patient-sex"
                     value={sex}
                     onChange={(event) => setSex(event.target.value as PatientSex | "")}
-                    className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/20"
+                    className="h-11"
                   >
                     <option value="">Not stated</option>
                     {PATIENT_SEX_OPTIONS.map((option) => (
@@ -264,7 +271,7 @@ export function ManualVisitFlow({
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </FormField>
               </div>
             </section>
@@ -272,6 +279,26 @@ export function ManualVisitFlow({
             <section className="surface-inset rounded-xl p-4">
               <div className="mb-4 flex items-center gap-3">
                 <span className="tnum grid size-7 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">02</span>
+                <div>
+                  <h3 className="text-sm font-semibold tracking-[-0.015em]">Odontogram</h3>
+                  <p className="text-xs text-muted-foreground">Start with a clean mouth and chart only what you observe.</p>
+                </div>
+              </div>
+              <ToothFindingEditor
+                value={toothFindings}
+                onChange={setToothFindings}
+                relatedTeeth={[
+                  ...extractFdiTeeth(diagnosis),
+                  ...extractFdiTeeth(treatment),
+                ]}
+                title="What is wrong, and where?"
+                description="Tap a tooth to add a finding. Selected teeth remain highlighted through review."
+              />
+            </section>
+
+            <section className="surface-inset rounded-xl p-4">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="tnum grid size-7 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">03</span>
                 <div>
                   <h3 className="text-sm font-semibold tracking-[-0.015em]">Clinical note</h3>
                   <p className="text-xs text-muted-foreground">Summarise the assessment and care plan.</p>
@@ -302,7 +329,7 @@ export function ManualVisitFlow({
 
             <section className="surface-inset rounded-xl p-4">
               <div className="mb-4 flex items-center gap-3">
-                <span className="tnum grid size-7 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">03</span>
+                <span className="tnum grid size-7 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">04</span>
                 <div>
                   <h3 className="text-sm font-semibold tracking-[-0.015em]">Prescription</h3>
                   <p className="text-xs text-muted-foreground">Add only the medicines discussed in this visit.</p>

@@ -11,8 +11,6 @@ import { FollowUpWorkspace } from "@/components/follow-ups/follow-up-workspace";
 import { type DashboardUrlState, type RegisterStatus } from "@/lib/url-state";
 import { OverviewView } from "@/components/dashboard/overview-view";
 import { CommandPalette, useCommandPalette } from "@/components/command";
-import { DueBanner } from "@/components/follow-ups/due-banner";
-import { OnboardingChecklist } from "@/components/onboarding";
 import { ShortcutProvider } from "@/components/shortcuts";
 import { RecallWorkspace } from "@/components/dashboard/recall-workspace";
 import { patientFromRecall, type RecallResult } from "@/components/dashboard/recall-panel";
@@ -47,7 +45,7 @@ import {
 } from "@/components/ui/sheet";
 
 const viewTitles: Record<AppView, string> = {
-  overview: "Overview",
+  overview: "Today",
   register: "Patient register",
   patients: "Patient directory",
   recall: "Patient recall",
@@ -77,8 +75,6 @@ export function Dashboard({
   const [view, setView] = useState<AppView>(initialUrlState.view);
   const [profile, setProfile] = useState(initialProfile);
   const [analytics, setAnalytics] = useState(initialAnalytics);
-  const [range, setRange] = useState(30);
-  const [loadingRange, setLoadingRange] = useState(false);
   const [accessToken, setAccessToken] = useState<string | undefined>();
   const [manualVisitOpen, setManualVisitOpen] = useState(false);
   const [followUpContext, setFollowUpContext] = useState<CommitOutcome | null>(null);
@@ -144,7 +140,6 @@ export function Dashboard({
     draftCount: initialEntries.filter((entry) => entry.status === "draft").length,
     discardedCount: 0,
   });
-  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [chartPatient, setChartPatient] = useState<PatientMatch | null>(null);
   const [visitDetailId, setVisitDetailId] = useState<string | null>(null);
   const [recoveredDraft, setRecoveredDraft] = useState<CaptureDraft | null>(null);
@@ -157,6 +152,8 @@ export function Dashboard({
   const [patients, setPatients] = useState<PatientMatch[]>([]);
   const [patientsTotal, setPatientsTotal] = useState(0);
   const [patientsQuery, setPatientsQuery] = useState("");
+  // 0 is the whole directory, which is what the filter's "All" sends.
+  const [patientsDays, setPatientsDays] = useState(0);
   const [patientsLoading, setPatientsLoading] = useState(false);
   // Distinct from `patientsLoading`, which is false before the first request is
   // even issued. Without this the directory announces `aria-busy="false"` over
@@ -231,22 +228,15 @@ export function Dashboard({
     window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}`);
   }, [registerDays, registerOffset, registerQuery, registerStatus, view]);
 
-  const loadRange = useCallback(async (days: number) => {
+  const refreshAnalytics = useCallback(async () => {
     const ticket = ++rangeTicket.current;
-    setRange(days);
-    setLoadingRange(true);
-    setAnalyticsError(null);
     try {
-      const payload = await getJson(`/api/analytics/daily?days=${days}`);
+      const payload = await getJson("/api/analytics/daily?days=30");
       if (ticket !== rangeTicket.current) return;
       setAnalytics(payload as AnalyticsPayload);
     } catch (error) {
       if (ticket !== rangeTicket.current) return;
-      // Previously this had no failure branch at all: the spinner stopped, the
-      // old numbers stayed on screen, and nothing said they were stale.
-      setAnalyticsError(messageFor(error, "Could not load analytics."));
-    } finally {
-      if (ticket === rangeTicket.current) setLoadingRange(false);
+      console.error("[dashboard] could not refresh today's note count", error);
     }
   }, []);
 
@@ -309,14 +299,16 @@ export function Dashboard({
     }
   }, [openDraft, registerDays, registerEntries]);
 
-  const loadPatientDirectory = useCallback(async (query: string) => {
+  const loadPatientDirectory = useCallback(async (query: string, days = 0) => {
     const ticket = ++patientsTicket.current;
     setPatientsQuery(query);
+    setPatientsDays(days);
     setPatientsLoading(true);
     setPatientsError(null);
     try {
       const params = new URLSearchParams();
       if (query.trim()) params.set("q", query.trim());
+      if (days > 0) params.set("days", String(days));
       const search = params.toString();
       const payload = (await getJson(`/api/patients${search ? `?${search}` : ""}`)) as {
         patients?: PatientMatch[];
@@ -375,9 +367,17 @@ export function Dashboard({
    */
   const searchPatients = useCallback(
     (query: string) => {
-      void loadPatientDirectory(query);
+      void loadPatientDirectory(query, patientsDays);
     },
-    [loadPatientDirectory],
+    [loadPatientDirectory, patientsDays],
+  );
+
+  /** Changing the window re-runs the same search against the new range. */
+  const filterPatientsByDays = useCallback(
+    (days: number) => {
+      void loadPatientDirectory(patientsQuery, days);
+    },
+    [loadPatientDirectory, patientsQuery],
   );
 
   const ask = useCallback(async (text: string, patientId?: string) => {
@@ -493,7 +493,7 @@ export function Dashboard({
     // away the search the doctor left in the box.
     if (next === "patients" && !patientsLoaded.current) {
       patientsLoaded.current = true;
-      void loadPatientDirectory(patientsQuery);
+      void loadPatientDirectory(patientsQuery, patientsDays);
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -502,19 +502,21 @@ export function Dashboard({
     setDiscardedDraftId(null);
     setAccountsRefreshKey((current) => current + 1);
     router.refresh();
-    void loadRange(range);
+    void refreshAnalytics();
     void loadRegister(registerDays, registerStatus, registerQuery, registerOffset);
     // A commit moves a patient's visit count and last-seen date, so a directory
     // already on screen would be wrong. Only when it has been opened, though:
     // refreshing a workspace nobody has looked at spends a lookup token from
     // the shared hourly bucket for nothing.
-    if (patientsLoaded.current) void loadPatientDirectory(patientsQuery);
+    // The window is carried through, or a commit would silently reset a
+    // "Today" filter back to the whole directory under the doctor's cursor.
+    if (patientsLoaded.current) void loadPatientDirectory(patientsQuery, patientsDays);
   }, [
     loadPatientDirectory,
-    loadRange,
+    refreshAnalytics,
     loadRegister,
     patientsQuery,
-    range,
+    patientsDays,
     registerOffset,
     registerDays,
     registerQuery,
@@ -627,9 +629,9 @@ export function Dashboard({
           onSignOut={() => void signOut()}
         />
 
-        <div className="lg:pl-64">
-          <header className="sticky top-0 z-20 hidden border-b border-border bg-background lg:block">
-            <div className="mx-auto flex h-14 max-w-[94rem] items-center justify-between gap-4 px-8">
+        <div className="lg:pl-60">
+          <header className="sticky top-0 z-20 hidden border-b border-border/80 bg-background/95 lg:block">
+            <div className="mx-auto flex h-14 max-w-[90rem] items-center justify-between gap-4 px-8">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold tracking-[-0.025em]">
@@ -656,7 +658,7 @@ export function Dashboard({
             </div>
           </header>
 
-          <main className="mx-auto w-full max-w-[94rem] px-4 pb-[calc(var(--dock-height,7rem)+1.5rem)] pt-20 sm:px-6 lg:px-8 lg:pt-6">
+          <main className={`mx-auto w-full max-w-[90rem] px-4 pt-32 sm:px-6 lg:px-8 lg:pt-7 ${view === "overview" && capture.phase === "idle" ? "pb-8" : "pb-[calc(var(--dock-height,7rem)+1.5rem)]"}`}>
             {(discardedDraftId || draftError) && (
               <Alert
                 variant={draftError ? "destructive" : "default"}
@@ -683,48 +685,18 @@ export function Dashboard({
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               >
                 {view === "overview" && (
-                  <div className="space-y-4">
-                    {/* Above the overview, because both are about what to do
-                        next rather than what already happened, and a patient
-                        overdue for a follow-up is the most time-sensitive thing
-                        on this screen. Both render nothing when they have
-                        nothing to say — an established doctor with no one due
-                        sees neither. */}
-                    <DueBanner
-                      onOpenChart={setChartPatient}
-                      refreshKey={registerEntries.length}
-                    />
-                    <OnboardingChecklist
-                      profile={{
-                        fullName: profile.fullName,
-                        registrationNo: profile.registrationNo,
-                        dictationLangs: profile.dictationLangs,
-                      }}
-                      onOpenSettings={() => changeView("settings")}
-                      onStartDictation={() => void capture.start()}
-                      onOpenRegister={() => changeView("register")}
-                      // Without this the checklist reads `undefined` as "cannot
-                      // dictate" and hides its own "Start dictating" button
-                      // outright, rather than only while a recording is running.
-                      dictationPhase={capture.phase}
-                      refreshKey={registerEntries.length}
-                    />
-                  </div>
-                )}
-                {view === "overview" && (
                   <OverviewView
                     doctorName={shortName(profile.fullName)}
                     analytics={analytics}
-                    entries={initialEntries}
-                    range={range}
-                    loadingRange={loadingRange}
-                    rangeError={analyticsError}
-                    onRangeChange={(days) => void loadRange(days)}
+                    entries={registerEntries}
                     dictationPhase={capture.phase}
                     onStartDictation={() => void capture.start()}
                     onStopDictation={() => void capture.stop()}
+                    onManualEntry={() => setManualVisitOpen(true)}
+                    onReviewNext={() => void reviewNext()}
                     onOpenRegister={() => changeView("register")}
                     onOpenRecall={() => changeView("recall")}
+                    onOpenPatients={() => changeView("patients")}
                     onOpenPatient={setChartPatient}
                   />
                 )}
@@ -775,6 +747,8 @@ export function Dashboard({
                     error={patientsError}
                     query={patientsQuery}
                     onSearch={searchPatients}
+                    days={patientsDays}
+                    onDaysChange={filterPatientsByDays}
                     onOpenPatient={setChartPatient}
                   />
                 )}
@@ -852,30 +826,32 @@ export function Dashboard({
           }}
         />
 
-        <VoiceDock
-          phase={capture.phase}
-          level={capture.level}
-          elapsedMs={capture.elapsedMs}
-          remainingMs={capture.remainingMs}
-          approachingLimit={capture.approachingLimit}
-          spectrumRef={capture.spectrumRef}
-          interimText={capture.interimText}
-          finalText={capture.finalText}
-          error={capture.error}
-          liveTextUnavailable={capture.liveTextUnavailable}
-          onStart={() => void capture.start()}
-          onStop={() => void capture.stop()}
-          onCancel={capture.cancel}
-          canRetryTranscription={capture.canRetryTranscription}
-          onRetryTranscription={capture.retryTranscription}
-          onAsk={(text) => {
-            // The dock's own box is typed too, so the same rule applies as in the
-            // recall workspace above.
-            setSpokenQuestion(null);
-            void ask(text);
-          }}
-          onManualEntry={() => setManualVisitOpen(true)}
-        />
+        {(view !== "overview" || capture.phase !== "idle") && (
+          <VoiceDock
+            phase={capture.phase}
+            level={capture.level}
+            elapsedMs={capture.elapsedMs}
+            remainingMs={capture.remainingMs}
+            approachingLimit={capture.approachingLimit}
+            spectrumRef={capture.spectrumRef}
+            interimText={capture.interimText}
+            finalText={capture.finalText}
+            error={capture.error}
+            liveTextUnavailable={capture.liveTextUnavailable}
+            onStart={() => void capture.start()}
+            onStop={() => void capture.stop()}
+            onCancel={capture.cancel}
+            canRetryTranscription={capture.canRetryTranscription}
+            onRetryTranscription={capture.retryTranscription}
+            onAsk={(text) => {
+              // The dock's own box is typed too, so the same rule applies as in the
+              // recall workspace above.
+              setSpokenQuestion(null);
+              void ask(text);
+            }}
+            onManualEntry={() => setManualVisitOpen(true)}
+          />
+        )}
 
         {(capture.phase === "review" && capture.draft || recoveredDraft) && (
           <ReviewSheet

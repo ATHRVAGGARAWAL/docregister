@@ -16,6 +16,8 @@ function extraction(overrides: Partial<ReviewExtraction> = {}): ReviewExtraction
     diagnosis: "Fever",
     treatment: null,
     consultation_fee_inr: 500,
+    procedures: [],
+    tooth_findings: [],
     prescription: [
       {
         drug_name: "Dolo",

@@ -17,6 +17,14 @@ const staticHeaders = Object.entries(securityHeaders({ dev })).map(([key, value]
   value,
 }));
 
+const immutableDentalModelHeaders = [
+  ...staticHeaders,
+  {
+    key: "Cache-Control",
+    value: "public, max-age=31536000, immutable",
+  },
+];
+
 const nextConfig: NextConfig = {
   // `X-Powered-By: Next.js` tells a scanner which framework and, combined with
   // the chunk layout, roughly which version. Nothing here needs to advertise.
@@ -50,6 +58,15 @@ const nextConfig: NextConfig = {
       // here rather than being the only unprotected responses on the origin.
       { source: "/manifest.webmanifest", headers: staticHeaders },
       { source: "/icons/:path*", headers: staticHeaders },
+      // Files in `public/` default to `max-age=0`. Dental binaries live under
+      // an explicit version directory so a new derivative gets a new URL and
+      // the old one can safely remain cached for a year. Keep attribution.json
+      // outside that versioned subtree so notice corrections revalidate.
+      { source: "/models/dental/:path*", headers: staticHeaders },
+      {
+        source: "/models/dental/:version(v\\d+)/:path*",
+        headers: immutableDentalModelHeaders,
+      },
     ];
   },
 };

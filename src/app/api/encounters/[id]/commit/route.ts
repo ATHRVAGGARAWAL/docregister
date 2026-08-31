@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { ApiError, readBody, withDoctor } from "@/lib/api/http";
+import { isFdiTooth, sortSurfaces } from "@/lib/dental/tooth";
+import type { ReviewToothFinding } from "@/lib/encounters/review";
+import { practiceTable } from "@/lib/supabase/practice";
 import { callWorkflow } from "@/lib/supabase/workflows";
 
 /**
@@ -31,6 +34,7 @@ interface CommitBody {
   idempotencyKey?: string;
   /** Reviewed consultation amount. Written to Accounts, never the clinical row. */
   consultationFeeInr?: unknown;
+  toothFindings?: unknown;
 }
 
 interface CommitResult {
@@ -50,6 +54,7 @@ export const POST = withDoctor<Params>(async ({ doctor, supabase, request, param
   const body = await readBody<CommitBody>(request);
   const idempotencyKey = body.idempotencyKey?.trim() || null;
   const amountPaise = optionalAmountPaise(body.consultationFeeInr);
+  const toothFindings = parseToothFindings(body.toothFindings);
 
   if ((body.patientId == null) === (body.newPatient == null)) {
     throw new ApiError("Choose an existing patient or add a new one before saving.");
@@ -123,6 +128,7 @@ export const POST = withDoctor<Params>(async ({ doctor, supabase, request, param
 
   let accountEntryId: string | null = null;
   let accountEntryError = false;
+  let toothFindingError = false;
 
   if (amountPaise !== null) {
     // Migration 0018 owns the visit-income source and clears the temporary fee
@@ -168,6 +174,41 @@ export const POST = withDoctor<Params>(async ({ doctor, supabase, request, param
     }
   }
 
+  if (toothFindings.length > 0) {
+    const table = practiceTable(supabase, "tooth_findings");
+    const { data: existing, error: existingError } = await table
+      .select("id")
+      .eq("encounter_id", result.encounter_id)
+      .limit(1);
+
+    if (existingError) {
+      toothFindingError = true;
+      console.error("[commit] tooth finding lookup failed", existingError);
+    } else if (!existing?.length) {
+      const observedAt = new Date().toISOString();
+      const { error: findingError } = await table.insert(
+        toothFindings.map((finding) => ({
+          clinic_id: doctor.clinic_id,
+          patient_id: result.patient_id,
+          encounter_id: result.encounter_id,
+          tooth_fdi: finding.tooth_fdi,
+          surfaces: finding.surfaces,
+          finding: finding.finding,
+          state: finding.state,
+          severity: finding.severity,
+          note: finding.note,
+          observed_at: observedAt,
+          resolved_at: finding.state === "resolved" ? observedAt : null,
+          recorded_by: doctor.id,
+        })),
+      );
+      if (findingError) {
+        toothFindingError = true;
+        console.error("[commit] tooth findings save failed", findingError);
+      }
+    }
+  }
+
   return NextResponse.json({
     encounterId: result.encounter_id,
     patientId: result.patient_id,
@@ -176,8 +217,58 @@ export const POST = withDoctor<Params>(async ({ doctor, supabase, request, param
     alreadyCommitted: result.already_committed,
     accountEntryId,
     accountEntryError,
+    toothFindingError,
   });
 }, { rateLimit: "commit" });
+
+const FINDINGS = new Set([
+  "sound", "caries", "fracture", "wear", "mobility", "periapical", "impacted",
+  "missing", "restoration", "crown", "implant", "root_canal", "sealant", "other",
+]);
+const FINDING_STATES = new Set(["existing", "planned", "completed", "resolved"]);
+const FINDING_SEVERITIES = new Set(["mild", "moderate", "severe"]);
+
+function parseToothFindings(value: unknown): Array<{
+  tooth_fdi: number;
+  surfaces: string[];
+  finding: ReviewToothFinding["finding"];
+  state: ReviewToothFinding["state"];
+  severity: ReviewToothFinding["severity"];
+  note: string | null;
+}> {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > 64) {
+    throw new ApiError("Tooth findings are invalid.");
+  }
+
+  return value.map((entry, index) => {
+    if (!entry || typeof entry !== "object") {
+      throw new ApiError(`Finding ${index + 1} is invalid.`);
+    }
+    const item = entry as Record<string, unknown>;
+    const tooth = Number(item.tooth_fdi);
+    if (!isFdiTooth(tooth)) throw new ApiError(`Finding ${index + 1} needs a valid tooth.`);
+    if (typeof item.finding !== "string" || !FINDINGS.has(item.finding)) {
+      throw new ApiError(`Finding ${index + 1} needs a valid condition.`);
+    }
+    const state = typeof item.state === "string" ? item.state : "existing";
+    if (!FINDING_STATES.has(state)) throw new ApiError(`Finding ${index + 1} has an invalid status.`);
+    const severity = item.severity == null || item.severity === "" ? null : String(item.severity);
+    if (severity !== null && !FINDING_SEVERITIES.has(severity)) {
+      throw new ApiError(`Finding ${index + 1} has an invalid severity.`);
+    }
+    const note = typeof item.note === "string" ? item.note.trim() : "";
+    if (note.length > 1500) throw new ApiError(`Finding ${index + 1} note is too long.`);
+    return {
+      tooth_fdi: tooth,
+      surfaces: sortSurfaces(Array.isArray(item.surfaces) ? item.surfaces.map(String) : []),
+      finding: item.finding as ReviewToothFinding["finding"],
+      state: state as ReviewToothFinding["state"],
+      severity: severity as ReviewToothFinding["severity"],
+      note: note || null,
+    };
+  });
+}
 
 function optionalAmountPaise(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;

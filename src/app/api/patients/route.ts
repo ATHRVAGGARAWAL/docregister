@@ -4,7 +4,7 @@ import { ApiError, withDoctor } from "@/lib/api/http";
 import { loadPatients } from "@/lib/patients";
 
 /**
- * GET /api/patients?q=&limit=&offset=
+ * GET /api/patients?q=&limit=&offset=&days=
  * -> { patients: [{ id, full_name, phone, age_years, last_visit, visit_count }], totalCount }
  *
  * The directory behind the patients workspace. `q` is optional: with nothing in
@@ -36,7 +36,16 @@ export const GET = withDoctor(async ({ supabase, request }) => {
     throw new ApiError("That search is too long.");
   }
 
-  const result = await loadPatients(supabase, { search: query, limit, offset });
+  // Clamped like every other range in the app. 0 or absent means the whole
+  // directory, which is what the filter's "All" option sends.
+  const days = Math.min(Math.max(Number(url.searchParams.get("days")) || 0, 0), 3650);
+
+  const result = await loadPatients(supabase, {
+    search: query,
+    limit,
+    offset,
+    days: days || undefined,
+  });
 
   return NextResponse.json(result);
 }, { rateLimit: "match" });

@@ -169,7 +169,7 @@ export function VoiceDock({
   return (
     <div
       ref={dockRef}
-      className="voice-dock-frame pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:pb-[max(.75rem,env(safe-area-inset-bottom))] lg:left-64"
+      className="voice-dock-frame pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:pb-[max(.75rem,env(safe-area-inset-bottom))] lg:left-60"
     >
       <p className="sr-only" role="status" aria-live="polite">
         {activity}

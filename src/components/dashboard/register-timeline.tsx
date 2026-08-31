@@ -10,6 +10,7 @@ import {
   PillIcon,
   StethoscopeIcon,
   UserRoundIcon,
+  ToothIcon,
 } from "@/components/icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ComponentType } from "react";
@@ -154,6 +155,11 @@ function VisitCard({
   const StatusIcon = STATUS_ICON[entry.status];
   const drugLimit = compact ? 3 : 6;
   const undisplayedDrugs = entry.drugs.length - drugLimit;
+  // Procedures get the larger allowance of the two. On a dental visit the
+  // register row is mostly answering "which teeth", and truncating that to show
+  // a third antibiotic would be the wrong trade.
+  const procedureLimit = drugLimit + 1;
+  const undisplayedProcedures = entry.procedures.length - procedureLimit;
 
   return (
     <article
@@ -283,8 +289,32 @@ function VisitCard({
             )}
           </div>
 
-          {entry.drugs.length > 0 && (
+          {/*
+            Procedures above the prescription, and styled to lead rather than
+            follow it. For a dental visit this is what happened; the drugs are
+            the footnote. Same chip geometry so the two rows read as one block.
+          */}
+          {entry.procedures.length > 0 && (
             <ul className="mt-3 flex flex-wrap gap-1.5">
+              {entry.procedures.slice(0, procedureLimit).map((procedure) => (
+                <li
+                  key={procedure}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary-soft px-2.5 py-1.5 text-xs font-medium text-primary"
+                >
+                  <ToothIcon className="size-3 text-primary/75" aria-hidden />
+                  {procedure}
+                </li>
+              ))}
+              {undisplayedProcedures > 0 && (
+                <li className="px-1 py-1.5 text-xs text-muted-foreground">
+                  +{undisplayedProcedures} more
+                </li>
+              )}
+            </ul>
+          )}
+
+          {entry.drugs.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-1.5">
               {entry.drugs.slice(0, drugLimit).map((drug) => (
                 <li
                   key={drug}

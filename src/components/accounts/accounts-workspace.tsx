@@ -42,9 +42,13 @@ import type {
 import { cn } from "@/lib/utils";
 
 const RANGES = [
+  // "Today" is the range a clinic actually reaches for: the end-of-day
+  // reconciliation against what is in the drawer. 90D went because it sat
+  // between two windows nobody asked for — a month is the billing rhythm and a
+  // year is the accounting one.
+  { label: "Today", days: 1 },
   { label: "7D", days: 7 },
   { label: "30D", days: 30 },
-  { label: "90D", days: 90 },
   { label: "1Y", days: 365 },
 ] as const;
 
