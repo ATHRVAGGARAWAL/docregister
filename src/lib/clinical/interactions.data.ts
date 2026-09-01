@@ -57,6 +57,70 @@ export const DRUGS: readonly KnownDrug[] = [
   // ── anticoagulant ───────────────────────────────────────────────────────
   { molecules: ["warfarin"], patterns: [/\bwarfarin\b/, /\bacitrom\b/, /\bnicoumalone\b/, /\bacenocoumarol\b/] },
 
+  // ── penicillins ─────────────────────────────────────────────────────────
+  // Generic names only in this entry, because a generic name is a statement
+  // about the molecule and needs no source beyond itself. Dentistry prescribes
+  // from this class constantly, which is what makes a recorded penicillin
+  // allergy worth checking against every prescription.
+  {
+    molecules: ["penicillin"],
+    patterns: [
+      /\bamoxicillin\b/,
+      /\bamoxycillin\b/,
+      /\bco-?amoxiclav\b/,
+      /\bclavulan/,
+      /\bampicillin\b/,
+      /\bcloxacillin\b/,
+      /\bpenicillin\b/,
+      /\bphenoxymethylpenicillin\b/,
+    ],
+  },
+  // Brands, each checked against its manufacturer's stated composition rather
+  // than asserted from memory — the rule the top of this file sets after a
+  // previous version classified Meftal-P as paracetamol.
+  {
+    molecules: ["penicillin"],
+    patterns: [
+      /\baugmentin\b/,   // GSK — amoxicillin + clavulanic acid
+      /\bclavam\b/,      // Alkem — amoxicillin + clavulanic acid
+      /\bmoxikind\b/,    // Mankind — amoxicillin + clavulanic acid
+      /\bmox\b/,         // Sun Pharma — amoxicillin
+    ],
+  },
+
+  // ── antiresorptives ─────────────────────────────────────────────────────
+  // Not prescribed by a dentist; matched because a patient's own medication
+  // list is what decides whether an extraction is safe.
+  {
+    molecules: ["antiresorptive"],
+    patterns: [
+      /\balendron/,
+      /\brisedron/,
+      /\bibandron/,
+      /\bzoledron/,
+      /\bpamidron/,
+      /\bbisphosphonate/,
+      /\bdenosumab\b/,
+      /\bprolia\b/,     // Amgen — denosumab
+      /\bxgeva\b/,      // Amgen — denosumab
+    ],
+  },
+
+  // ── direct oral anticoagulants ──────────────────────────────────────────
+  // Separate from warfarin: the bleeding advice is the same but the monitoring
+  // is not — there is no INR to check.
+  {
+    molecules: ["doac"],
+    patterns: [
+      /\bapixaban\b/,
+      /\brivaroxaban\b/,
+      /\bdabigatran\b/,
+      /\bedoxaban\b/,
+      /\beliquis\b/,    // BMS/Pfizer — apixaban
+      /\bxarelto\b/,    // Bayer — rivaroxaban
+    ],
+  },
+
   // ── NSAIDs, generic ─────────────────────────────────────────────────────
   {
     molecules: ["nsaid"],
@@ -87,6 +151,22 @@ export const DRUGS: readonly KnownDrug[] = [
   // classified it as paracetamol, which both invented a warning and suppressed a
   // real one. `\bmeftal\b` matches the suffixed forms too, which is correct.
   { molecules: ["nsaid"], patterns: [/\bmeftal\b/] },
+  // The rest of the NSAID brands a dentist actually writes. Each composition is
+  // the manufacturer's own, checked rather than recalled — and their absence was
+  // a real gap: `src/lib/llm/extract.ts` names Brufen and Hifenac to the model
+  // as expected dental prescriptions, so a prescription containing one was
+  // reaching the interaction checker as an unknown word.
+  {
+    molecules: ["nsaid"],
+    patterns: [
+      /\bbrufen\b/,     // Abbott — ibuprofen
+      /\bhifenac\b/,    // Intas — aceclofenac
+      /\bvoveran\b/,    // Novartis — diclofenac
+      /\bdolonex\b/,    // Pfizer — piroxicam
+      /\bketorol\b/,    // Dr Reddy's — ketorolac
+      /\bnise\b/,       // Dr Reddy's — nimesulide
+    ],
+  },
 
   // ── paracetamol ─────────────────────────────────────────────────────────
   // Dolo 650 is paracetamol 650 mg (1mg.com, PharmEasy). Crocin and Calpol are

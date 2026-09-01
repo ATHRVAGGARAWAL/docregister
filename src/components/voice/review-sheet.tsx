@@ -58,6 +58,11 @@ import {
 import type { CommitOutcome, PatientHistoryPayload } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { InteractionWarnings } from "@/components/clinical/interaction-warning";
+import { SafetyPanel } from "@/components/clinical/safety-panel";
+import type {
+  MedicalHistoryRecord,
+  PatientAlertRecord,
+} from "@/lib/clinical/safety";
 import { MedicationEditor } from "@/components/voice/medication-editor";
 import { ProcedureEditor } from "@/components/voice/procedure-editor";
 
@@ -195,6 +200,8 @@ export function ReviewSheet({
     new Map(),
   );
   const [chartLoading, setChartLoading] = useState(false);
+  const [patientAlerts, setPatientAlerts] = useState<PatientAlertRecord[]>([]);
+  const [patientHistory, setPatientHistory] = useState<MedicalHistoryRecord[]>([]);
   const checklist = useMemo(
     () =>
       buildReviewChecklist({
@@ -292,16 +299,31 @@ export function ReviewSheet({
           ? await historyResponse.json() as PatientHistoryPayload
           : null;
         const clinical = clinicalResponse.ok
-          ? await clinicalResponse.json() as { findings?: ToothFindingRecord[] }
+          ? await clinicalResponse.json() as {
+              findings?: ToothFindingRecord[];
+              alerts?: PatientAlertRecord[];
+              medicalHistory?: MedicalHistoryRecord[];
+            }
           : null;
         if (!controller.signal.aborted) {
           setPatientToothStatus(deriveToothStatus(
             (history?.toothProcedures ?? []) as ToothProcedureRecord[],
             clinical?.findings ?? [],
           ));
+          // The same request already carried these; they were being thrown
+          // away. An allergy the clinic recorded is worth more than any rule
+          // this app could invent.
+          setPatientAlerts(clinical?.alerts ?? []);
+          setPatientHistory(clinical?.medicalHistory ?? []);
         }
       } catch {
-        if (!controller.signal.aborted) setPatientToothStatus(new Map());
+        if (!controller.signal.aborted) {
+          setPatientToothStatus(new Map());
+          // Cleared rather than left stale. A safety banner describing the
+          // previous patient is worse than none at all.
+          setPatientAlerts([]);
+          setPatientHistory([]);
+        }
       } finally {
         if (!controller.signal.aborted) setChartLoading(false);
       }
@@ -698,6 +720,24 @@ export function ReviewSheet({
               onFocus={focusReviewItem}
             />
           )}
+
+          {/*
+            Above section 01, deliberately. This is what the chart already knows
+            about the patient — an allergy, an anticoagulant — and it is only
+            useful if it is read before the dentist decides anything. Placing it
+            beside the prescription, where `InteractionWarnings` sits, would put
+            it after the decision it exists to inform.
+
+            It appears only once a chart is linked, because until then there is
+            no record to speak for: a dictated name is not a patient yet.
+          */}
+          <SafetyPanel
+            alerts={patientAlerts}
+            medicalHistory={patientHistory}
+            prescription={drugs}
+            procedures={procedures}
+            className="mb-3 sm:mb-4"
+          />
 
           <div className="space-y-3 sm:space-y-4">
           {/* ---- Patient ---------------------------------------------------- */}
