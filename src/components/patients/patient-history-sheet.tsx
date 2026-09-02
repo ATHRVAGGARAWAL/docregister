@@ -30,7 +30,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
 import { maskPhone } from "@/lib/format";
-import { PermanentArchViewer } from "@/components/dental/permanent-arch-viewer";
+import { ToothChart } from "@/components/dental/tooth-chart";
 import { PatientConsentsPanel } from "@/components/practice/patient-consents-panel";
 import {
   deriveToothStatus,
@@ -261,10 +261,7 @@ export function PatientHistorySheet({
                     </p>
                   )}
                 </div>
-                <PermanentArchViewer
-                  status={toothStatus}
-                  label="Derived from every confirmed visit"
-                />
+                <ToothChart status={toothStatus} label="Derived from every confirmed visit" />
               </section>
 
               {/*

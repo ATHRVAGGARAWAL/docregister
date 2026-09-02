@@ -23,7 +23,6 @@
 # misc
 .DS_Store
 *.pem
-/.cache/dental-models/
 
 # debug
 npm-debug.log*
