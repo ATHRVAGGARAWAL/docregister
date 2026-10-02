@@ -27,6 +27,7 @@ const RANGES = [
   { label: "7 days", days: 7 },
   { label: "30 days", days: 30 },
   { label: "90 days", days: 90 },
+  { label: "1 year", days: 365 },
 ] as const;
 
 /** The widest window the filter offers, so the empty state never suggests a longer one. */

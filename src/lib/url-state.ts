@@ -21,7 +21,7 @@ export type RegisterStatus = "all" | "committed" | "draft" | "discarded";
 export const DEFAULT_REGISTER_DAYS = 30;
 
 /** The ranges the register filter offers. Anything else is not a range. */
-const REGISTER_DAY_CHOICES = [1, 7, 30, 90];
+const REGISTER_DAY_CHOICES = [1, 7, 30, 90, 365];
 
 export interface DashboardUrlState {
   view: AppView;
