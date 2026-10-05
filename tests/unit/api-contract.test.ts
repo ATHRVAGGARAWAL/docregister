@@ -253,6 +253,18 @@ test("a session that cannot be resolved is a 401, not a 500", async () => {
   }
 });
 
+test("unapproved clinic members cannot run handlers or spend provider quota", async () => {
+  for (const status of ["pending", "suspended", null]) {
+    resetSeams();
+    session = async () => ({ ...DOCTOR, membership_status: status });
+    const result = await call(undefined, { rateLimit: "extract" });
+    assert.equal(result.status, 403);
+    assert.match(String(result.body.error), /approved/);
+    assert.deepEqual(result.handled, []);
+    assert.deepEqual(rpcCalls, []);
+  }
+});
+
 test("the handler is handed the doctor the database returned, not one the caller named", async () => {
   resetSeams();
   const request = new Request("http://clinic.test/api/encounters/extract", {

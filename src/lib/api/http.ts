@@ -87,6 +87,9 @@ export function withDoctor<T = Record<string, never>>(
     }
 
     if (!doctor) return jsonError("Sign in to continue.", 401);
+    if (doctor.membership_status !== "active") {
+      return jsonError("Your clinic membership must be approved before you can use this workspace.", 403);
+    }
 
     if (options.rateLimit) {
       const denial = await spendRateLimit(supabase, options.rateLimit);
