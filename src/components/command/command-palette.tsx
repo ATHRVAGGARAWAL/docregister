@@ -29,7 +29,12 @@ import {
 } from "@/components/command/command-sources";
 import { useCommandRecents } from "@/components/command/use-command-recents";
 import { usePatientSearch } from "@/components/command/use-patient-search";
-import { LoaderCircleIcon, SearchIcon, TriangleAlertIcon, XIcon } from "@/components/icons";
+import {
+  LoaderCircleIcon,
+  SearchIcon,
+  TriangleAlertIcon,
+  XIcon,
+} from "@/components/icons";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
 import type { RegisterEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -75,6 +80,7 @@ export interface CommandPaletteProps {
   /** Also switches patient search on: without a handler there is nowhere for a name to lead. */
   onOpenPatient?: (patient: PatientMatch) => void;
 
+  onNewVisit?: () => void;
   onStartDictation?: () => void;
   onAddAccountEntry?: () => void;
   onExportRegister?: () => void;
@@ -123,6 +129,7 @@ function CommandPaletteContent({
   recentVisits = NO_VISITS,
   onOpenVisit,
   onOpenPatient,
+  onNewVisit,
   onStartDictation,
   onAddAccountEntry,
   onExportRegister,
@@ -137,7 +144,10 @@ function CommandPaletteContent({
   // only meaningful against the list it was chosen from, and comparing the two
   // is what retires it — no effect, and no frame where Enter would open the row
   // that has since slid into that position.
-  const [highlight, setHighlight] = useState<{ id: string; query: string } | null>(null);
+  const [highlight, setHighlight] = useState<{
+    id: string;
+    query: string;
+  } | null>(null);
   // Carries a counter because a screen reader treats writing the identical
   // sentence back into a live region as no change at all, and "8 results" about
   // a different eight results has to be spoken again.
@@ -161,6 +171,7 @@ function CommandPaletteContent({
         onOpenVisit,
         patients: patientSearch.patients,
         onOpenPatient,
+        onNewVisit,
         onStartDictation,
         onAddAccountEntry,
         onExportRegister,
@@ -173,6 +184,7 @@ function CommandPaletteContent({
       onOpenVisit,
       patientSearch.patients,
       onOpenPatient,
+      onNewVisit,
       onStartDictation,
       onAddAccountEntry,
       onExportRegister,
@@ -236,7 +248,9 @@ function CommandPaletteContent({
     (delta: number) => {
       if (flat.length === 0) return;
       movedByKeyboard.current = true;
-      setActive(flat[(activeIndex + delta + flat.length) % flat.length].item.id);
+      setActive(
+        flat[(activeIndex + delta + flat.length) % flat.length].item.id,
+      );
     },
     [activeIndex, flat, setActive],
   );
@@ -299,7 +313,9 @@ function CommandPaletteContent({
       return;
     }
 
-    const row = (event.target as HTMLElement).closest<HTMLElement>("[data-command-index]");
+    const row = (event.target as HTMLElement).closest<HTMLElement>(
+      "[data-command-index]",
+    );
     const index = row ? Number(row.dataset.commandIndex) : -1;
     if (!Number.isInteger(index) || index < 0 || index >= flat.length) return;
     if (index === activeIndex) return;
@@ -328,12 +344,16 @@ function CommandPaletteContent({
     >
       <Dialog.Title className="sr-only">Command palette</Dialog.Title>
       <Dialog.Description className="sr-only">
-        Search workspaces, patients, recent visits and actions. Use the up and down arrow keys to
-        move through the results, Enter to open the highlighted one, and Escape to close.
+        Search workspaces, patients, recent visits and actions. Use the up and
+        down arrow keys to move through the results, Enter to open the
+        highlighted one, and Escape to close.
       </Dialog.Description>
 
       <div className="border-border flex shrink-0 items-center gap-2 border-b px-3 py-2">
-        <SearchIcon className="text-muted-foreground size-4 shrink-0" aria-hidden />
+        <SearchIcon
+          className="text-muted-foreground size-4 shrink-0"
+          aria-hidden
+        />
         <label htmlFor={inputId} className="sr-only">
           Search patients, visits, workspaces and actions
         </label>
@@ -347,7 +367,9 @@ function CommandPaletteContent({
           role="combobox"
           aria-expanded={flat.length > 0}
           aria-controls={listboxId}
-          aria-activedescendant={activeIndex < 0 ? undefined : optionId(baseId, activeIndex)}
+          aria-activedescendant={
+            activeIndex < 0 ? undefined : optionId(baseId, activeIndex)
+          }
           aria-autocomplete="list"
           autoComplete="off"
           autoCorrect="off"
@@ -393,8 +415,13 @@ function CommandPaletteContent({
         <div className="border-border flex shrink-0 items-center gap-2 border-b px-3.5 py-2 text-xs">
           {patientSearch.error ? (
             <>
-              <TriangleAlertIcon className="text-destructive size-3.5 shrink-0" aria-hidden />
-              <span className="text-destructive leading-relaxed">{patientSearch.error}</span>
+              <TriangleAlertIcon
+                className="text-destructive size-3.5 shrink-0"
+                aria-hidden
+              />
+              <span className="text-destructive leading-relaxed">
+                {patientSearch.error}
+              </span>
             </>
           ) : (
             <>
@@ -425,7 +452,12 @@ function CommandPaletteContent({
           {groups.map((group) => {
             const headingId = `${baseId}-group-${group.id}`;
             return (
-              <div key={group.id} role="group" aria-labelledby={headingId} className="mb-1 last:mb-0">
+              <div
+                key={group.id}
+                role="group"
+                aria-labelledby={headingId}
+                className="mb-1 last:mb-0"
+              >
                 <div
                   id={headingId}
                   role="presentation"
@@ -454,7 +486,9 @@ function CommandPaletteContent({
         {flat.length === 0 && (
           <div className="px-6 py-10 text-center">
             <p className="text-foreground text-sm font-medium">
-              {trimmed === "" ? "Nothing to search yet" : `No matches for “${trimmed}”`}
+              {trimmed === ""
+                ? "Nothing to search yet"
+                : `No matches for “${trimmed}”`}
             </p>
             <p className="text-muted-foreground mx-auto mt-1.5 max-w-xs text-xs leading-relaxed">
               {trimmed === ""
@@ -484,13 +518,20 @@ function CommandPaletteContent({
             <Key>esc</Key> to close
           </span>
         </span>
-        <span className="tnum">{flat.length === 1 ? "1 result" : `${flat.length} results`}</span>
+        <span className="tnum">
+          {flat.length === 1 ? "1 result" : `${flat.length} results`}
+        </span>
       </div>
 
       {/* Mounted empty and filled a moment later. A live region inserted into the
           DOM together with its text is usually not announced at all, because
           assistive technology has to be watching the node before it changes. */}
-      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
         <span>{status.id % 2 === 0 ? status.text : ""}</span>
         <span>{status.id % 2 === 1 ? status.text : ""}</span>
       </div>
@@ -516,7 +557,10 @@ function optionId(baseId: string, index: number): string {
  * id is what `aria-activedescendant` points at, two rows claiming one id leave a
  * screen reader announcing whichever the DOM reaches first.
  */
-function promoteRecents(items: CommandItem[], recentIds: readonly string[]): CommandItem[] {
+function promoteRecents(
+  items: CommandItem[],
+  recentIds: readonly string[],
+): CommandItem[] {
   if (recentIds.length === 0) return items;
 
   const order = new Map(recentIds.map((id, index) => [id, index]));
@@ -531,6 +575,7 @@ function promoteRecents(items: CommandItem[], recentIds: readonly string[]): Com
 function summarise(count: number, query: string, error: string | null): string {
   // The failure is the news. A count of the rows that survived it is not.
   if (error) return error;
-  if (count === 0) return query === "" ? "Nothing to show." : `No matches for ${query}.`;
+  if (count === 0)
+    return query === "" ? "Nothing to show." : `No matches for ${query}.`;
   return count === 1 ? "1 result." : `${count} results.`;
 }

@@ -7,6 +7,7 @@ import {
   ClipboardListIcon,
   LoaderCircleIcon,
   PencilIcon,
+  PlusIcon,
   SaveIcon,
   ShieldCheckIcon,
   StethoscopeIcon,
@@ -44,12 +45,14 @@ export function PatientHistorySheet({
   open,
   onOpenChange,
   onUsePatient,
+  onStartVisit,
   onPatientUpdated,
 }: {
   patient: PatientMatch | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUsePatient?: (patient: PatientMatch) => void;
+  onStartVisit?: (patient: PatientMatch) => void;
   onPatientUpdated?: (patient: PatientHistoryPayload["patient"]) => void;
 }) {
   const [request, setRequest] = useState<{
@@ -434,8 +437,11 @@ export function PatientHistorySheet({
 
         <SheetFooter className="relative border-border bg-card sm:px-7">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-none">
-            Back to review
+            {onUsePatient ? "Back to review" : "Close chart"}
           </Button>
+          {patient && onStartVisit && !onUsePatient && (
+            <Button disabled={!history || savingDetails || Boolean(editForm)} onClick={() => onStartVisit({ ...patient, full_name: history?.patient.full_name ?? patient.full_name, phone: history?.patient.phone ?? patient.phone, age_years: history?.patient.age_years ?? patient.age_years })}><PlusIcon aria-hidden />Start visit</Button>
+          )}
           {patient && onUsePatient && (
             <Button onClick={() => onUsePatient(patient)} className="flex-1 sm:flex-none">
               <CheckIcon aria-hidden />

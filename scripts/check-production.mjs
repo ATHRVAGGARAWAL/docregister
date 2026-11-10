@@ -56,11 +56,11 @@ async function checkSignedOutRedirect() {
   assert.ok([302, 303, 307, 308].includes(response.status));
   const destination = new URL(requiredHeader(response, "location"), appUrl);
   assert.equal(destination.origin, new URL(appUrl).origin);
-  assert.equal(destination.pathname, "/login");
+  assert.equal(destination.pathname, "/sign-in");
 }
 
 async function checkLoginPage() {
-  const response = await get(`${appUrl}/login`);
+  const response = await get(`${appUrl}/sign-in`);
   assert.equal(response.status, 200);
   assert.match(requiredHeader(response, "content-type"), /^text\/html\b/);
   assertSecurityHeaders(response);

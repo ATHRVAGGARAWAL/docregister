@@ -132,6 +132,7 @@ export interface PatientMatch {
 export interface UseVoiceCaptureOptions {
   /** Supabase access token, for the live proxy. Omit to skip live text. */
   accessToken?: string;
+  getAccessToken?: () => Promise<string | null>;
   liveProxyUrl?: string;
   languages?: string[];
   /**
@@ -155,7 +156,7 @@ export interface UseVoiceCaptureOptions {
 const DEFAULT_LANGUAGES = ["hi-IN", "en-IN"];
 
 export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
-  const { accessToken, liveProxyUrl } = options;
+  const { accessToken, getAccessToken, liveProxyUrl } = options;
   // Reduced to the string the request actually carries, because `languages` is
   // an array most callers build inline: its identity changes on every render of
   // the caller, including the ten renders a second the elapsed timer causes
@@ -279,10 +280,12 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
     });
     recorderRef.current = recorder;
 
-    if (accessToken && liveProxyUrl) {
+    // Clerk tokens are short-lived: fetch one when recording actually starts.
+    const token = getAccessToken ? await getAccessToken().catch(() => null) : accessToken;
+    if (token && liveProxyUrl) {
       const socket = new LiveTranscriptSocket({
         url: liveProxyUrl,
-        token: accessToken,
+        token,
         languages: languageParam ? languageParam.split(",") : DEFAULT_LANGUAGES,
         onEvent: (event) => {
           if (!aliveRef.current) return;
@@ -385,7 +388,7 @@ export function useVoiceCapture(options: UseVoiceCaptureOptions = {}) {
     timerRef.current = setInterval(() => {
       setElapsedMs(performance.now() - startedAtRef.current);
     }, 100);
-  }, [accessToken, languageParam, liveProxyUrl, phase, teardownCapture]);
+  }, [accessToken, getAccessToken, languageParam, liveProxyUrl, phase, teardownCapture]);
 
   const process = useCallback(
     async (recording: RecordingResult) => {

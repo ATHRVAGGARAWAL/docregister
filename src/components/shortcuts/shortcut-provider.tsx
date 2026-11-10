@@ -38,18 +38,18 @@ const SEQUENCE_WINDOW_MS = 1500;
  * its own initial.
  */
 const WORKSPACE_KEYS: Record<AppView, { key: string; label: string }> = {
-  overview: { key: "o", label: "Overview" },
+  overview: { key: "o", label: "Today" },
   register: { key: "r", label: "Register" },
   patients: { key: "p", label: "Patients" },
-  recall: { key: "l", label: "Recall" },
+  recall: { key: "l", label: "Search history" },
   "follow-ups": { key: "f", label: "Follow-ups" },
-  accounts: { key: "a", label: "Accounts" },
+  accounts: { key: "a", label: "Cashbook" },
   // The practice workspaces get the letters their names actually start with,
   // except Treatments — "t" is taken by nothing yet but "d" reads as dental.
   schedule: { key: "c", label: "Schedule" },
   treatments: { key: "d", label: "Treatments" },
   operations: { key: "b", label: "Lab & stock" },
-  finance: { key: "n", label: "Finance" },
+  finance: { key: "n", label: "Billing & payments" },
   reports: { key: "e", label: "Reports" },
   settings: { key: "s", label: "Settings" },
 };

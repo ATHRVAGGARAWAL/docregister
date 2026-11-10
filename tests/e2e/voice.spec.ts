@@ -167,7 +167,7 @@ test("the review sheet shows what was dictated and files nothing on its own", as
 
   // The sheet says out loud what the assertion below checks: reaching this
   // screen is not the same as being in the register.
-  await expect(sheet.getByText("Not saved yet")).toBeVisible();
+  await expect(sheet.getByText("Awaiting confirmation")).toBeVisible();
 
   // Settled, not merely rendered: the patient lookup has answered and the
   // footer is offering to save. Asserting "no commit" before the sheet has

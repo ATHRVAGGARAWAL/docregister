@@ -48,7 +48,7 @@ test("every visible dictation entry point can stop an active recording", () => {
   const dashboard = readFileSync("src/components/dashboard/dashboard.tsx", "utf8");
 
   assert.match(overview, /onClick=\{recording \? onStopDictation : onStartDictation\}/);
-  assert.match(overview, /recording \? "Stop & review" : "Dictate a visit"/);
+  assert.match(overview, /recording\s*\?\s*"Stop & review"\s*:\s*"Dictate a visit"/);
   assert.match(dashboard, /onStopDictation=\{\(\) => void capture\.stop\(\)\}/);
 });
 

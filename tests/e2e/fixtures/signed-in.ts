@@ -1,26 +1,18 @@
 import { test as base } from "playwright/test";
 
 import { appBaseUrl } from "./app-url";
-import { mintDoctorSession, type StorageState } from "./supabase-session";
+import { mintDoctorSession, type StorageState } from "./clerk-session";
 
 export { expect } from "playwright/test";
-export { authRequirement } from "./supabase-session";
+export { authRequirement } from "./clerk-session";
 
-/**
- * `test`, but every page and every `request` starts signed in as the doctor.
- *
- * The session is worker-scoped, so one magic link is redeemed per worker
- * process rather than one per test. Sign-in is not what any of these tests are
- * about, and Supabase's auth endpoints are rate limited — a suite that mints
- * thirty sessions to assert thirty things about the UI eventually fails on the
- * thirty-first for a reason that has nothing to do with the app.
- */
+/** Each worker authenticates once through Clerk, then isolates browser storage per test. */
 export const test = base.extend<object, { doctorSession: StorageState }>({
   doctorSession: [
     // The empty pattern stays: Playwright reads the destructuring pattern to
     // work out a fixture's dependencies, so removing it changes behaviour.
-    async ({}, use) => {
-      await use(await mintDoctorSession(appBaseUrl()));
+    async ({ browser }, use) => {
+      await use(await mintDoctorSession(appBaseUrl(), browser));
     },
     { scope: "worker" },
   ],

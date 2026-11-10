@@ -49,7 +49,10 @@ psql_run() { "$ENGINE" exec -i "$CONTAINER" psql -U postgres -d docregister -v O
 # surface they actually use: auth.uid(), auth.jwt(), auth.users, and the three
 # storage objects 0002 touches.
 psql_run <<'SQL'
-create extension if not exists pgcrypto;
+-- Match hosted Supabase: these extensions are preinstalled outside public.
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+create extension if not exists "uuid-ossp" with schema extensions;
 do $$ begin
   if not exists (select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
   if not exists (select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
@@ -59,6 +62,7 @@ create schema if not exists auth;
 create table auth.users (
   id uuid primary key default gen_random_uuid(),
   email text unique,
+  email_confirmed_at timestamptz,
   raw_user_meta_data jsonb default '{}'::jsonb,
   created_at timestamptz default now()
 );
@@ -140,7 +144,7 @@ fi
 #                                      holds no table grants — so this is a gap
 #                                      in the stated policy rather than a hole.
 #                                      0030 should close it.
-BASELINE="approve_clinic_member auth_clinic_id decline_clinic_member doctor_top_drugs is_platform_admin list_patients match_patients"
+BASELINE="current_doctor_id approve_clinic_member auth_clinic_id decline_clinic_member doctor_top_drugs is_platform_admin list_patients match_patients"
 
 granted=$("$ENGINE" exec -i "$CONTAINER" psql -U postgres -d docregister -tAq <<'SQL'
 select p.proname

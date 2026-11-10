@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { CalendarDaysIcon, CircleAlertIcon, ClipboardPenLineIcon } from "@/components/icons";
+import {
+  CircleAlertIcon,
+  PlusIcon,
+  SearchIcon,
+  ChevronRightIcon,
+} from "@/components/icons";
 
 import { AccountsWorkspace } from "@/components/accounts/accounts-workspace";
 import {
@@ -13,24 +18,35 @@ import {
   ScheduleWorkspace,
   TreatmentsWorkspace,
 } from "@/components/lazy/practice";
-import { AppNavigation, type AppView } from "@/components/dashboard/app-navigation";
+import {
+  AppNavigation,
+  type AppView,
+} from "@/components/dashboard/app-navigation";
 import { FollowUpWorkspace } from "@/components/follow-ups/follow-up-workspace";
-import { type DashboardUrlState, type RegisterStatus } from "@/lib/url-state";
+import {
+  parseDashboardUrlState,
+  type DashboardUrlState,
+  type RegisterStatus,
+} from "@/lib/url-state";
 import { OverviewView } from "@/components/dashboard/overview-view";
 import { CommandPalette, useCommandPalette } from "@/components/command";
 import { ShortcutProvider } from "@/components/shortcuts";
 import { RecallWorkspace } from "@/components/dashboard/recall-workspace";
-import { patientFromRecall, type RecallResult } from "@/components/dashboard/recall-panel";
+import {
+  patientFromRecall,
+  type RecallResult,
+} from "@/components/dashboard/recall-panel";
 import { RegisterWorkspace } from "@/components/dashboard/register-workspace";
 import { VisitDetailSheet } from "@/components/dashboard/visit-detail-sheet";
 import {
   SettingsWorkspace,
   type DoctorProfile,
 } from "@/components/dashboard/settings-workspace";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { PatientDirectory } from "@/components/patients/patient-directory";
 import { PatientHistorySheet } from "@/components/patients/patient-history-sheet";
 import { ReviewSheet } from "@/components/voice/review-sheet";
+import { useNetworkStatus } from "@/hooks/use-network-status";
+import { OfflineNotice } from "@/components/voice/offline-notice";
 import { VoiceDock } from "@/components/voice/voice-dock";
 import { ManualVisitFlow } from "@/components/voice/manual-visit-flow";
 import {
@@ -39,8 +55,12 @@ import {
   type PatientMatch,
   useVoiceCapture,
 } from "@/hooks/use-voice-capture";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import type { AnalyticsPayload, CommitOutcome, RegisterEntry } from "@/lib/types";
+import { useAuth, useClerk } from "@clerk/nextjs";
+import type {
+  AnalyticsPayload,
+  CommitOutcome,
+  RegisterEntry,
+} from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,17 +75,16 @@ const viewTitles: Record<AppView, string> = {
   overview: "Today",
   register: "Patient register",
   patients: "Patient directory",
-  recall: "Patient recall",
+  recall: "Search history",
   "follow-ups": "Follow-ups",
-  accounts: "Accounts",
+  accounts: "Cashbook",
   schedule: "Schedule",
   treatments: "Treatment plans",
   operations: "Lab and inventory",
-  finance: "Finance",
+  finance: "Billing & payments",
   reports: "Reports",
   settings: "Settings",
 };
-
 
 /** The register opens on a month; the Today chip narrows it. */
 
@@ -84,12 +103,18 @@ export function Dashboard({
   liveProxyUrl: string;
 }) {
   const router = useRouter();
+  const { offline } = useNetworkStatus();
   const [view, setView] = useState<AppView>(initialUrlState.view);
   const [profile, setProfile] = useState(initialProfile);
   const [analytics, setAnalytics] = useState(initialAnalytics);
-  const [accessToken, setAccessToken] = useState<string | undefined>();
+  const { getToken } = useAuth();
+  const { signOut: clerkSignOut } = useClerk();
   const [manualVisitOpen, setManualVisitOpen] = useState(false);
-  const [followUpContext, setFollowUpContext] = useState<CommitOutcome | null>(null);
+  const [visitPatient, setVisitPatient] = useState<PatientMatch | null>(null);
+  const [visitSession, setVisitSession] = useState(0);
+  const [followUpContext, setFollowUpContext] = useState<CommitOutcome | null>(
+    null,
+  );
   const [accountsRefreshKey, setAccountsRefreshKey] = useState(0);
   const [sessionExpired, setSessionExpired] = useState(false);
   const signingOut = useRef(false);
@@ -106,11 +131,14 @@ export function Dashboard({
    * the utterance the panel is showing, not whatever the microphone heard last.
    * Null whenever the question was typed, which is what hides the action.
    */
-  const [spokenQuestion, setSpokenQuestion] = useState<CaptureTranscript | null>(null);
+  const [spokenQuestion, setSpokenQuestion] =
+    useState<CaptureTranscript | null>(null);
 
   const [registerEntries, setRegisterEntries] = useState(initialEntries);
   const [registerDays, setRegisterDays] = useState(initialUrlState.days);
-  const [registerStatus, setRegisterStatus] = useState<RegisterStatus>(initialUrlState.status);
+  const [registerStatus, setRegisterStatus] = useState<RegisterStatus>(
+    initialUrlState.status,
+  );
   const [registerQuery, setRegisterQuery] = useState(initialUrlState.query);
   const [registerOffset, setRegisterOffset] = useState(initialUrlState.offset);
   const registerLimit = 50;
@@ -122,7 +150,13 @@ export function Dashboard({
   // list, and the full directory is one keystroke away within the palette
   // itself. Memoised because it is a memo dependency there — a fresh slice each
   // render would rebuild every row on every keystroke.
-  const paletteVisits = useMemo(() => registerEntries.slice(0, 20), [registerEntries]);
+  const paletteVisits = useMemo(
+    () =>
+      registerEntries
+        .filter((entry) => entry.status !== "discarded")
+        .slice(0, 20),
+    [registerEntries],
+  );
 
   const settingsDirty = useRef(false);
   // Stable identity on purpose: the settings form reports through this from an
@@ -148,13 +182,18 @@ export function Dashboard({
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [registerTotals, setRegisterTotals] = useState({
     count: 0,
-    committedCount: initialEntries.filter((entry) => entry.status === "committed").length,
-    draftCount: initialEntries.filter((entry) => entry.status === "draft").length,
+    committedCount: initialEntries.filter(
+      (entry) => entry.status === "committed",
+    ).length,
+    draftCount: initialEntries.filter((entry) => entry.status === "draft")
+      .length,
     discardedCount: 0,
   });
   const [chartPatient, setChartPatient] = useState<PatientMatch | null>(null);
   const [visitDetailId, setVisitDetailId] = useState<string | null>(null);
-  const [recoveredDraft, setRecoveredDraft] = useState<CaptureDraft | null>(null);
+  const [recoveredDraft, setRecoveredDraft] = useState<CaptureDraft | null>(
+    null,
+  );
   const [discardedDraftId, setDiscardedDraftId] = useState<string | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
 
@@ -176,7 +215,7 @@ export function Dashboard({
   const [patientsError, setPatientsError] = useState<string | null>(null);
 
   const capture = useVoiceCapture({
-    accessToken,
+    getAccessToken: getToken,
     liveProxyUrl,
     languages: profile.dictationLangs,
     // The recording was a question, so it never became a draft. Ask it, and
@@ -189,27 +228,9 @@ export function Dashboard({
   });
 
   useEffect(() => {
-    let cancelled = false;
-    const client = getSupabaseBrowserClient();
-    client.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!cancelled) setAccessToken(data.session?.access_token);
-      });
-
-    const { data: authListener } = client.auth.onAuthStateChange((event, session) => {
-      if (cancelled) return;
-      setAccessToken(session?.access_token);
-      if (event === "SIGNED_OUT" && !signingOut.current) setSessionExpired(true);
-    });
-
     const showExpired = () => setSessionExpired(true);
     window.addEventListener("docregister:session-expired", showExpired);
-    return () => {
-      cancelled = true;
-      authListener.subscription.unsubscribe();
-      window.removeEventListener("docregister:session-expired", showExpired);
-    };
+    return () => window.removeEventListener("docregister:session-expired", showExpired);
   }, []);
 
   // One counter per fetcher. Clicking 7 days then 90 days fires two requests,
@@ -227,6 +248,8 @@ export function Dashboard({
   const registerLoaded = useRef(false);
   const patientsLoaded = useRef(false);
 
+  const historyView = useRef(initialUrlState.view);
+  const historyUrl = useRef("");
   useEffect(() => {
     const params = new URLSearchParams();
     if (view !== "overview") params.set("view", view);
@@ -237,7 +260,11 @@ export function Dashboard({
       if (registerOffset > 0) params.set("offset", String(registerOffset));
     }
     const search = params.toString();
-    window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}`);
+    const url = `${window.location.pathname}${search ? `?${search}` : ""}`;
+    if (historyView.current !== view) window.history.pushState(null, "", url);
+    else window.history.replaceState(null, "", url);
+    historyView.current = view;
+    historyUrl.current = url;
   }, [registerDays, registerOffset, registerQuery, registerStatus, view]);
 
   const refreshAnalytics = useCallback(async () => {
@@ -252,55 +279,65 @@ export function Dashboard({
     }
   }, []);
 
-  const loadRegister = useCallback(async (days: number, status: RegisterStatus, query: string, offset = 0) => {
-    const ticket = ++registerTicket.current;
-    setRegisterLoading(true);
-    setRegisterError(null);
-    try {
-      const params = new URLSearchParams({ days: String(days), limit: String(registerLimit), offset: String(offset) });
-      if (status !== "all") params.set("status", status);
-      if (query.trim()) params.set("q", query.trim());
-      const payload = (await getJson(`/api/register?${params}`)) as {
-        entries?: RegisterEntry[];
-        totalCount?: number;
-        committedCount?: number;
-        draftCount?: number;
-        discardedCount?: number;
-      };
-      if (ticket !== registerTicket.current) return;
-      setRegisterEntries(payload.entries ?? []);
-      setRegisterOffset(offset);
-      setRegisterTotals({
-        count: payload.totalCount ?? 0,
-        committedCount: payload.committedCount ?? 0,
-        draftCount: payload.draftCount ?? 0,
-        discardedCount: payload.discardedCount ?? 0,
-      });
-    } catch (error) {
-      if (ticket !== registerTicket.current) return;
-      setRegisterError(messageFor(error, "Could not load the register."));
-    } finally {
-      if (ticket === registerTicket.current) setRegisterLoading(false);
-    }
-  }, [registerLimit]);
+  const loadRegister = useCallback(
+    async (days: number, status: RegisterStatus, query: string, offset = 0) => {
+      const ticket = ++registerTicket.current;
+      setRegisterLoading(true);
+      setRegisterError(null);
+      try {
+        const params = new URLSearchParams({
+          days: String(days),
+          limit: String(registerLimit),
+          offset: String(offset),
+        });
+        if (status !== "all") params.set("status", status);
+        if (query.trim()) params.set("q", query.trim());
+        const payload = (await getJson(`/api/register?${params}`)) as {
+          entries?: RegisterEntry[];
+          totalCount?: number;
+          committedCount?: number;
+          draftCount?: number;
+          discardedCount?: number;
+        };
+        if (ticket !== registerTicket.current) return;
+        setRegisterEntries(payload.entries ?? []);
+        setRegisterOffset(offset);
+        setRegisterTotals({
+          count: payload.totalCount ?? 0,
+          committedCount: payload.committedCount ?? 0,
+          draftCount: payload.draftCount ?? 0,
+          discardedCount: payload.discardedCount ?? 0,
+        });
+      } catch (error) {
+        if (ticket !== registerTicket.current) return;
+        setRegisterError(messageFor(error, "Could not load the register."));
+      } finally {
+        if (ticket === registerTicket.current) setRegisterLoading(false);
+      }
+    },
+    [registerLimit],
+  );
 
-
-  const openDraft = useCallback(async (entry: RegisterEntry | { id: string }) => {
-    setDraftError(null);
-    try {
-      const payload = await getJson(`/api/drafts/${entry.id}`);
-      setRecoveredDraft(payload as CaptureDraft);
-      setView("register");
-    } catch (error) {
-      setDraftError(messageFor(error, "Could not open this draft."));
-    }
-  }, []);
+  const openDraft = useCallback(
+    async (entry: RegisterEntry | { id: string }) => {
+      setDraftError(null);
+      try {
+        const payload = await getJson(`/api/drafts/${entry.id}`);
+        setRecoveredDraft(payload as CaptureDraft);
+      } catch (error) {
+        setDraftError(messageFor(error, "Could not open this draft."));
+      }
+    },
+    [],
+  );
 
   const reviewNext = useCallback(async () => {
     const visible = registerEntries.find((entry) => entry.status === "draft");
     if (visible) return openDraft(visible);
     try {
-      const payload = (await getJson(`/api/register?days=${registerDays}&status=draft&limit=1&offset=0`)) as {
+      const payload = (await getJson(
+        `/api/register?days=${registerDays}&status=draft&limit=1&offset=0`,
+      )) as {
         entries?: RegisterEntry[];
       };
       const next = payload.entries?.[0];
@@ -322,7 +359,9 @@ export function Dashboard({
       if (query.trim()) params.set("q", query.trim());
       if (days > 0) params.set("days", String(days));
       const search = params.toString();
-      const payload = (await getJson(`/api/patients${search ? `?${search}` : ""}`)) as {
+      const payload = (await getJson(
+        `/api/patients${search ? `?${search}` : ""}`,
+      )) as {
         patients?: PatientMatch[];
         totalCount?: number;
       };
@@ -342,6 +381,41 @@ export function Dashboard({
     }
   }, []);
 
+  useEffect(() => {
+    const restoreView = () => {
+      const state = parseDashboardUrlState(
+        Object.fromEntries(new URLSearchParams(window.location.search)),
+      );
+      if (
+        historyView.current === "settings" &&
+        state.view !== "settings" &&
+        settingsDirty.current
+      ) {
+        if (
+          !window.confirm(
+            "You have unsaved changes to your profile. Leave without saving?",
+          )
+        ) {
+          window.history.pushState(null, "", historyUrl.current);
+          return;
+        }
+        settingsDirty.current = false;
+      }
+      historyView.current = state.view;
+      setView(state.view);
+      if (state.view === "register") {
+        setRegisterDays(state.days);
+        setRegisterStatus(state.status);
+        setRegisterQuery(state.query);
+        setRegisterOffset(state.offset);
+        registerLoaded.current = true;
+        void loadRegister(state.days, state.status, state.query, state.offset);
+      }
+    };
+    window.addEventListener("popstate", restoreView);
+    return () => window.removeEventListener("popstate", restoreView);
+  }, [loadRegister]);
+
   // First load for whichever workspace is showing, however it got here.
   //
   // `changeView` fetches on a click, which covers navigation but not arrival:
@@ -355,7 +429,12 @@ export function Dashboard({
   useEffect(() => {
     if (view === "register" && !registerLoaded.current) {
       registerLoaded.current = true;
-      void loadRegister(registerDays, registerStatus, registerQuery, registerOffset);
+      void loadRegister(
+        registerDays,
+        registerStatus,
+        registerQuery,
+        registerOffset,
+      );
     }
     if (view === "patients" && !patientsLoaded.current) {
       patientsLoaded.current = true;
@@ -470,25 +549,14 @@ export function Dashboard({
   }, [capture, spokenQuestion]);
 
   function changeView(next: AppView) {
-
-    // Leaving settings mid-edit is a client-side transition, so nothing warns
-
-    // by default and the edits are simply gone. Ask instead — and only when
-
-    // there is genuinely something to lose, so this never nags.
+    // Preserve unsaved profile edits when navigating between workspaces.
 
     if (view === "settings" && next !== "settings" && settingsDirty.current) {
-
       const leave = window.confirm(
-
         "You have unsaved changes to your profile. Leave without saving?",
-
       );
-
       if (!leave) return;
-
       settingsDirty.current = false;
-
     }
 
     setView(next);
@@ -499,7 +567,12 @@ export function Dashboard({
     // make it stick.
     if (next === "register" && !registerLoaded.current) {
       registerLoaded.current = true;
-      void loadRegister(registerDays, registerStatus, registerQuery, registerOffset);
+      void loadRegister(
+        registerDays,
+        registerStatus,
+        registerQuery,
+        registerOffset,
+      );
     }
     // Same flag, same reason: coming back to the directory should not throw
     // away the search the doctor left in the box.
@@ -510,19 +583,43 @@ export function Dashboard({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function openNewVisit(patient: PatientMatch | null = null) {
+    if (capture.phase !== "idle" && capture.phase !== "error") return;
+    setChartPatient(null);
+    setVisitPatient(patient);
+    setVisitSession((value) => value + 1);
+    setManualVisitOpen(true);
+  }
+
+  function openReviewQueue() {
+    setRegisterDays(365);
+    setRegisterStatus("draft");
+    setRegisterQuery("");
+    setRegisterOffset(0);
+    registerLoaded.current = true;
+    changeView("register");
+    void loadRegister(365, "draft", "", 0);
+  }
+
   const onCommitted = useCallback(() => {
     setDiscardedDraftId(null);
     setAccountsRefreshKey((current) => current + 1);
     router.refresh();
     void refreshAnalytics();
-    void loadRegister(registerDays, registerStatus, registerQuery, registerOffset);
+    void loadRegister(
+      registerDays,
+      registerStatus,
+      registerQuery,
+      registerOffset,
+    );
     // A commit moves a patient's visit count and last-seen date, so a directory
     // already on screen would be wrong. Only when it has been opened, though:
     // refreshing a workspace nobody has looked at spends a lookup token from
     // the shared hourly bucket for nothing.
     // The window is carried through, or a commit would silently reset a
     // "Today" filter back to the whole directory under the doctor's cursor.
-    if (patientsLoaded.current) void loadPatientDirectory(patientsQuery, patientsDays);
+    if (patientsLoaded.current)
+      void loadPatientDirectory(patientsQuery, patientsDays);
   }, [
     loadPatientDirectory,
     refreshAnalytics,
@@ -541,12 +638,15 @@ export function Dashboard({
     setRecoveredDraft(null);
   }, [capture]);
 
-  const scheduleCommittedFollowUp = useCallback((outcome: CommitOutcome) => {
-    setFollowUpContext(outcome);
-    finishCommittedReview();
-    setManualVisitOpen(false);
-    setView("follow-ups");
-  }, [finishCommittedReview]);
+  const scheduleCommittedFollowUp = useCallback(
+    (outcome: CommitOutcome) => {
+      setFollowUpContext(outcome);
+      finishCommittedReview();
+      setManualVisitOpen(false);
+      setView("follow-ups");
+    },
+    [finishCommittedReview],
+  );
 
   const viewRegisterAfterCommit = useCallback(() => {
     finishCommittedReview();
@@ -556,41 +656,64 @@ export function Dashboard({
 
   const startNextVisit = useCallback(() => {
     finishCommittedReview();
-    setManualVisitOpen(false);
-    void capture.start();
-  }, [capture, finishCommittedReview]);
+    setVisitPatient(null);
+    setVisitSession((value) => value + 1);
+    setManualVisitOpen(true);
+  }, [finishCommittedReview]);
 
   const onDiscard = useCallback(async () => {
     const id = recoveredDraft?.encounterId ?? capture.draft?.encounterId;
     if (!id) return;
     try {
       const response = await fetch(`/api/drafts/${id}`, { method: "DELETE" });
-      if (!response.ok) throw new Error(await errorMessage(response, "Could not discard the draft."));
+      if (!response.ok)
+        throw new Error(
+          await errorMessage(response, "Could not discard the draft."),
+        );
       setDiscardedDraftId(id);
       setRecoveredDraft(null);
       capture.reset();
-      void loadRegister(registerDays, registerStatus, registerQuery, registerOffset);
+      router.refresh();
+      void loadRegister(
+        registerDays,
+        registerStatus,
+        registerQuery,
+        registerOffset,
+      );
     } catch (error) {
       setDraftError(messageFor(error, "Could not discard the draft."));
     }
-  }, [capture, loadRegister, recoveredDraft, registerDays, registerOffset, registerQuery, registerStatus]);
+  }, [
+    capture,
+    loadRegister,
+    recoveredDraft,
+    registerDays,
+    registerOffset,
+    registerQuery,
+    registerStatus,
+    router,
+  ]);
 
   const keepDraftForLater = useCallback(() => {
     setRecoveredDraft(null);
     capture.reset();
     setDraftError(null);
+    router.refresh();
     setView("register");
     setRegisterStatus("draft");
     setRegisterQuery("");
     setRegisterOffset(0);
     void loadRegister(registerDays, "draft", "", 0);
-  }, [capture, loadRegister, registerDays]);
+  }, [capture, loadRegister, registerDays, router]);
 
   async function restoreDraft(id = discardedDraftId) {
     if (!id) return;
     try {
       const response = await fetch(`/api/drafts/${id}`, { method: "POST" });
-      if (!response.ok) throw new Error(await errorMessage(response, "Could not restore the draft."));
+      if (!response.ok)
+        throw new Error(
+          await errorMessage(response, "Could not restore the draft."),
+        );
       setDiscardedDraftId(null);
       setRegisterStatus("draft");
       setRegisterQuery("");
@@ -610,11 +733,11 @@ export function Dashboard({
     // /login on the next navigation.
     try {
       signingOut.current = true;
-      await getSupabaseBrowserClient().auth.signOut();
+      await clerkSignOut({ redirectUrl: "/sign-in" });
     } catch (error) {
       console.error("[dashboard] sign out failed", error);
     }
-    router.replace("/login");
+    router.replace("/sign-in");
     router.refresh();
   }
 
@@ -627,7 +750,7 @@ export function Dashboard({
       onNavigate={changeView}
       onNewDictation={() => void capture.start()}
     >
-      <div className="min-h-dvh overflow-x-clip bg-background">
+      <div className="workspace-shell min-h-dvh overflow-x-clip">
         <AppNavigation
           active={view}
           doctorName={profile.fullName}
@@ -637,51 +760,67 @@ export function Dashboard({
             setFollowUpContext(null);
             changeView(next);
           }}
-          onManualEntry={() => setManualVisitOpen(true)}
+          onManualEntry={() => openNewVisit()}
           onSignOut={() => void signOut()}
+          onSearch={() => palette.setOpen(true)}
+          newVisitDisabled={capture.phase !== "idle" && capture.phase !== "error"}
         />
 
         <div className="lg:pl-60">
-          <header className="sticky top-0 z-20 hidden border-b border-border/80 bg-background/95 lg:block">
-            <div className="mx-auto flex h-14 max-w-[90rem] items-center justify-between gap-4 px-8">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold tracking-[-0.025em]">
-                    {viewTitles[view]}
-                  </p>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <CalendarDaysIcon className="size-3 text-primary" aria-hidden />
-                    {new Intl.DateTimeFormat("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                      timeZone: "Asia/Kolkata",
-                    }).format(new Date())}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setManualVisitOpen(true)}>
-                  <ClipboardPenLineIcon className="size-4" aria-hidden />
-                  Manual entry
-                </Button>
-                <ThemeToggle />
-              </div>
+          <header className="workspace-topbar">
+            <div className="workspace-breadcrumb">
+              <span>Workspace</span>
+              <ChevronRightIcon aria-hidden />
+              <strong>{viewTitles[view]}</strong>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                className="workspace-global-search"
+                onClick={() => palette.setOpen(true)}
+              >
+                <SearchIcon aria-hidden />
+                <span>Search patients, visits, tools…</span>
+                <kbd>⌘ K</kbd>
+              </button>
+              <Button size="sm" onClick={() => openNewVisit()} disabled={capture.phase !== "idle" && capture.phase !== "error"}>
+                <PlusIcon aria-hidden />
+                New visit
+              </Button>
             </div>
           </header>
 
-          <main className={`mx-auto w-full max-w-[90rem] px-4 pt-32 sm:px-6 lg:px-8 lg:pt-7 ${view === "overview" && capture.phase === "idle" ? "pb-8" : "pb-[calc(var(--dock-height,7rem)+1.5rem)]"}`}>
+          <main
+            className={`workspace-main mx-auto w-full max-w-[90rem] px-4 pt-32 sm:px-6 lg:px-8 lg:pt-8 ${capture.phase === "idle" ? "pb-10" : "pb-[calc(var(--dock-height,7rem)+1.5rem)]"}`}
+          >
+            {offline && capture.phase === "idle" && (
+              <div className="mb-4">
+                <OfflineNotice
+                  offline
+                  heldRecording={false}
+                  onSend={() => {}}
+                  onManualEntry={() => openNewVisit()}
+                />
+              </div>
+            )}
             {(discardedDraftId || draftError) && (
               <Alert
                 variant={draftError ? "destructive" : "default"}
                 role={draftError ? "alert" : "status"}
                 className="mb-4"
               >
-                <AlertTitle>{draftError ? "Draft action failed" : "Draft discarded"}</AlertTitle>
+                <AlertTitle>
+                  {draftError ? "Draft action failed" : "Draft discarded"}
+                </AlertTitle>
                 <AlertDescription className="flex items-center justify-between gap-3">
-                  {draftError ?? "You can restore it while this message is visible."}
+                  {draftError ??
+                    "You can restore it while this message is visible."}
                   {discardedDraftId && !draftError && (
-                    <Button type="button" size="sm" variant="outline" onClick={() => void restoreDraft()}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void restoreDraft()}
+                    >
                       Restore
                     </Button>
                   )}
@@ -694,22 +833,22 @@ export function Dashboard({
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.12, ease: "easeOut" }}
               >
                 {view === "overview" && (
                   <OverviewView
                     doctorName={shortName(profile.fullName)}
                     analytics={analytics}
-                    entries={registerEntries}
+                    entries={initialEntries}
                     dictationPhase={capture.phase}
                     onStartDictation={() => void capture.start()}
                     onStopDictation={() => void capture.stop()}
-                    onManualEntry={() => setManualVisitOpen(true)}
-                    onReviewNext={() => void reviewNext()}
-                    onOpenRegister={() => changeView("register")}
-                    onOpenRecall={() => changeView("recall")}
-                    onOpenPatients={() => changeView("patients")}
+                    onManualEntry={() => openNewVisit()}
+                    onNavigate={changeView}
+                    onOpenDraft={(entry) => void openDraft(entry)}
+                    onOpenVisit={(entry) => setVisitDetailId(entry.id)}
                     onOpenPatient={setChartPatient}
+                    onReviewAll={openReviewQueue}
                   />
                 )}
                 {view === "register" && (
@@ -721,7 +860,9 @@ export function Dashboard({
                     discardedCount={registerTotals.discardedCount}
                     offset={registerOffset}
                     limit={registerLimit}
-                    hasMore={registerOffset + registerLimit < registerTotals.count}
+                    hasMore={
+                      registerOffset + registerLimit < registerTotals.count
+                    }
                     loading={registerLoading}
                     error={registerError}
                     days={registerDays}
@@ -741,8 +882,22 @@ export function Dashboard({
                       setRegisterQuery(query);
                       setRegisterOffset(0);
                     }}
-                    onSearch={() => void loadRegister(registerDays, registerStatus, registerQuery, 0)}
-                    onPageChange={(nextOffset) => void loadRegister(registerDays, registerStatus, registerQuery, nextOffset)}
+                    onSearch={() =>
+                      void loadRegister(
+                        registerDays,
+                        registerStatus,
+                        registerQuery,
+                        0,
+                      )
+                    }
+                    onPageChange={(nextOffset) =>
+                      void loadRegister(
+                        registerDays,
+                        registerStatus,
+                        registerQuery,
+                        nextOffset,
+                      )
+                    }
                     onReviewNext={() => void reviewNext()}
                     onOpenPatient={setChartPatient}
                     onOpenDraft={(entry) => void openDraft(entry)}
@@ -752,6 +907,7 @@ export function Dashboard({
                 )}
                 {view === "patients" && (
                   <PatientDirectory
+                    onNewVisit={() => openNewVisit()}
                     patients={patients}
                     totalCount={patientsTotal}
                     loading={patientsLoading}
@@ -790,28 +946,42 @@ export function Dashboard({
                       if (question) void ask(question, patientId);
                     }}
                     onOpenPatient={setChartPatient}
-                    onRecordAsVisit={spokenQuestion ? recordSpokenAsVisit : undefined}
+                    onRecordAsVisit={
+                      spokenQuestion ? recordSpokenAsVisit : undefined
+                    }
                   />
                 )}
                 {view === "follow-ups" && (
                   <FollowUpWorkspace
                     initialPatientId={followUpContext?.patientId}
                     initialEncounterId={followUpContext?.encounterId}
-                    encounterContext={followUpContext ? {
-                      encounterId: followUpContext.encounterId,
-                      patientId: followUpContext.patientId,
-                      visitNumber: followUpContext.visitNumber ?? undefined,
-                      isNewPatient: followUpContext.isNewPatient ?? undefined,
-                      alreadyCommitted: followUpContext.alreadyCommitted,
-                    } : null}
+                    encounterContext={
+                      followUpContext
+                        ? {
+                            encounterId: followUpContext.encounterId,
+                            patientId: followUpContext.patientId,
+                            visitNumber:
+                              followUpContext.visitNumber ?? undefined,
+                            isNewPatient:
+                              followUpContext.isNewPatient ?? undefined,
+                            alreadyCommitted: followUpContext.alreadyCommitted,
+                          }
+                        : null
+                    }
                   />
                 )}
-                {view === "accounts" && <AccountsWorkspace refreshKey={accountsRefreshKey} />}
-                {view === "schedule" && <ScheduleWorkspace />}
+                {view === "accounts" && (
+                  <AccountsWorkspace refreshKey={accountsRefreshKey} />
+                )}
+                {view === "schedule" && (
+                  <ScheduleWorkspace onOpenPatient={setChartPatient} />
+                )}
                 {view === "treatments" && <TreatmentsWorkspace />}
                 {view === "operations" && <OperationsWorkspace />}
                 {view === "finance" && <FinanceWorkspace />}
-                {view === "reports" && <ReportsWorkspace analytics={analytics} />}
+                {view === "reports" && (
+                  <ReportsWorkspace analytics={analytics} />
+                )}
                 {view === "settings" && (
                   <SettingsWorkspace
                     onDirtyChange={handleSettingsDirty}
@@ -831,8 +1001,13 @@ export function Dashboard({
           activeWorkspace={view}
           onNavigate={changeView}
           recentVisits={paletteVisits}
-          onOpenVisit={(entry) => setVisitDetailId(entry.id)}
+          onOpenVisit={(entry) =>
+            entry.status === "draft"
+              ? void openDraft(entry)
+              : setVisitDetailId(entry.id)
+          }
           onOpenPatient={setChartPatient}
+          onNewVisit={() => openNewVisit()}
           onStartDictation={() => void capture.start()}
           onExportRegister={() => {
             // The palette runs the command and closes. The export control,
@@ -843,7 +1018,7 @@ export function Dashboard({
           }}
         />
 
-        {(view !== "overview" || capture.phase !== "idle") && (
+        {capture.phase !== "idle" && (
           <VoiceDock
             phase={capture.phase}
             level={capture.level}
@@ -866,13 +1041,15 @@ export function Dashboard({
               setSpokenQuestion(null);
               void ask(text);
             }}
-            onManualEntry={() => setManualVisitOpen(true)}
+            onManualEntry={() => openNewVisit()}
           />
         )}
 
-        {(capture.phase === "review" && capture.draft || recoveredDraft) && (
+        {((capture.phase === "review" && capture.draft) || recoveredDraft) && (
           <ReviewSheet
+            key={(recoveredDraft ?? capture.draft)!.encounterId}
             draft={(recoveredDraft ?? capture.draft)!}
+            actionError={draftError}
             onCommitted={onCommitted}
             onDiscard={() => void onDiscard()}
             onKeepForLater={keepDraftForLater}
@@ -884,9 +1061,12 @@ export function Dashboard({
         )}
 
         <ManualVisitFlow
+          key={visitSession}
+          initialPatient={visitPatient}
+          onDraftDiscarded={onCommitted}
           open={manualVisitOpen}
           onOpenChange={setManualVisitOpen}
-          onCommitted={onCommitted}
+          onCommitted={() => { capture.reset(); onCommitted(); }}
           onKeepForLater={keepDraftForLater}
           onScheduleFollowUp={scheduleCommittedFollowUp}
           onViewRegister={viewRegisterAfterCommit}
@@ -899,6 +1079,7 @@ export function Dashboard({
           onOpenChange={(open) => {
             if (!open) setChartPatient(null);
           }}
+          onStartVisit={openNewVisit}
           onPatientUpdated={(updated) => {
             setRegisterEntries((current) =>
               current.map((entry) =>
@@ -950,14 +1131,19 @@ export function Dashboard({
             // The amendment is intentionally not merged into the register row:
             // register rows remain the signed source snapshot. Re-opened details
             // replay amendments from the append-only history.
-            void loadRegister(registerDays, registerStatus, registerQuery, registerOffset);
+            void loadRegister(
+              registerDays,
+              registerStatus,
+              registerQuery,
+              registerOffset,
+            );
           }}
         />
 
         <SessionExpiredDialog
           open={sessionExpired}
           onContinue={() => {
-            router.replace("/login");
+            router.replace("/sign-in");
             router.refresh();
           }}
         />
@@ -966,7 +1152,13 @@ export function Dashboard({
   );
 }
 
-function SessionExpiredDialog({ open, onContinue }: { open: boolean; onContinue: () => void }) {
+function SessionExpiredDialog({
+  open,
+  onContinue,
+}: {
+  open: boolean;
+  onContinue: () => void;
+}) {
   return (
     <Sheet open={open}>
       <SheetContent
@@ -981,11 +1173,17 @@ function SessionExpiredDialog({ open, onContinue }: { open: boolean; onContinue:
           </span>
           <SheetTitle>Session expired</SheetTitle>
           <SheetDescription className="text-sm">
-            Sign in again to continue. Any draft already saved for recovery will still be available.
+            Sign in again to continue. Any draft already saved for recovery will
+            still be available.
           </SheetDescription>
         </SheetHeader>
         <div className="px-6 pb-6">
-          <Button type="button" size="lg" className="w-full" onClick={onContinue}>
+          <Button
+            type="button"
+            size="lg"
+            className="w-full"
+            onClick={onContinue}
+          >
             Return to sign in
           </Button>
         </div>
@@ -1024,7 +1222,9 @@ async function getJson(input: string, init?: RequestInit): Promise<unknown> {
       window.dispatchEvent(new Event("docregister:session-expired"));
     }
     const error = (payload as { error?: unknown } | null)?.error;
-    throw new Error(typeof error === "string" ? error : `Request failed (${response.status})`);
+    throw new Error(
+      typeof error === "string" ? error : `Request failed (${response.status})`,
+    );
   }
   return payload;
 }
@@ -1033,7 +1233,10 @@ function messageFor(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-async function errorMessage(response: Response, fallback: string): Promise<string> {
+async function errorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
   try {
     const body = await response.json();
     return typeof body?.error === "string" ? body.error : fallback;

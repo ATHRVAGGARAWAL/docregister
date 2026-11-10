@@ -1,11 +1,42 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import {
+  ArrowRightIcon,
+  CalendarDaysIcon,
+  CheckIcon,
+  ClipboardClockIcon,
+  ClipboardListIcon,
+  CalendarClockIcon,
+  LoaderCircleIcon,
+  Mic,
+  PlusIcon,
+  UsersRoundIcon,
+} from "@/components/icons";
+import { Button } from "@/components/ui/button";
+import type { AppView } from "@/components/dashboard/app-navigation";
 import type { CapturePhase, PatientMatch } from "@/hooks/use-voice-capture";
-import { formatClock } from "@/lib/format";
+import { formatClock, formatCount, formatVisitDay } from "@/lib/format";
+import type { Appointment } from "@/lib/practice/types";
 import type { AnalyticsPayload, RegisterEntry } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import {
+  APPOINTMENT_LABELS,
+  clinicDay,
+  clinicDayWindow,
+} from "@/lib/workspace";
 
-const RECENT_LIMIT = 6;
+interface FollowUp {
+  id: string;
+  due_at: string;
+  patient_name?: string;
+  reason: string;
+}
+interface Drafts {
+  entries: RegisterEntry[];
+  draftCount: number;
+}
+type Resource<T> = { data: T | null; error: boolean };
+const pending = { data: null, error: false };
 
 export function OverviewView({
   doctorName,
@@ -15,11 +46,11 @@ export function OverviewView({
   onStartDictation,
   onStopDictation,
   onManualEntry,
-  onReviewNext,
-  onOpenRegister,
-  onOpenRecall,
-  onOpenPatients,
+  onNavigate,
+  onOpenDraft,
+  onOpenVisit,
   onOpenPatient,
+  onReviewAll,
 }: {
   doctorName: string;
   analytics: AnalyticsPayload;
@@ -28,214 +59,575 @@ export function OverviewView({
   onStartDictation: () => void;
   onStopDictation: () => void;
   onManualEntry: () => void;
-  onReviewNext: () => void;
-  onOpenRegister: () => void;
-  onOpenRecall: () => void;
-  onOpenPatients: () => void;
+  onNavigate: (view: AppView) => void;
+  onOpenDraft: (entry: RegisterEntry) => void;
+  onOpenVisit: (entry: RegisterEntry) => void;
   onOpenPatient: (patient: PatientMatch) => void;
+  onReviewAll: () => void;
 }) {
-  const recording = dictationPhase === "arming" || dictationPhase === "listening";
-  const processing = dictationPhase === "transcribing" || dictationPhase === "extracting";
-  const draftCount = entries.filter((entry) => entry.status === "draft").length;
-  const committedCount = entries.filter((entry) => entry.status === "committed").length;
+  const [appointments, setAppointments] =
+    useState<Resource<Appointment[]>>(pending);
+  const [followUps, setFollowUps] = useState<Resource<FollowUp[]>>(pending);
+  const [drafts, setDrafts] = useState<Resource<Drafts>>(pending);
+  const [retry, setRetry] = useState(0);
+  const day = clinicDay();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const window = clinicDayWindow(day);
+    const read = async <T,>(
+      url: string,
+      select: (body: T) => void,
+      fail: () => void,
+    ) => {
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error("Workspace request failed");
+        const body = (await response.json()) as T;
+        if (!controller.signal.aborted) select(body);
+      } catch {
+        if (!controller.signal.aborted) fail();
+      }
+    };
+    void Promise.all([
+      read<{ appointments: Appointment[] }>(
+        `/api/appointments?${new URLSearchParams(window)}`,
+        (body) => setAppointments({ data: body.appointments, error: false }),
+        () => setAppointments({ data: null, error: true }),
+      ),
+      read<{ followUps: FollowUp[] }>(
+        "/api/follow-ups?status=open&limit=200",
+        (body) =>
+          setFollowUps({
+            data: body.followUps
+              .filter((item) => clinicDay(item.due_at) <= day)
+              .sort((a, b) => a.due_at.localeCompare(b.due_at)),
+            error: false,
+          }),
+        () => setFollowUps({ data: null, error: true }),
+      ),
+      read<Drafts>(
+        "/api/register?days=365&status=draft&limit=4&offset=0",
+        (body) => setDrafts({ data: body, error: false }),
+        () => setDrafts({ data: null, error: true }),
+      ),
+    ]);
+    return () => controller.abort();
+  }, [day, entries, retry]);
+
+  const recording =
+    dictationPhase === "arming" || dictationPhase === "listening";
+  const processing =
+    dictationPhase === "transcribing" || dictationPhase === "extracting";
+  const active = appointments.data?.filter(
+    (item) => !["cancelled", "no_show"].includes(item.status),
+  );
+  const upcoming = active
+    ?.filter((item) => item.status !== "completed")
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const saved = entries.filter((entry) => entry.status === "committed");
+  const draftCount = drafts.data?.draftCount;
+  const dueCount = followUps.data?.length;
 
   return (
-    <div className="clinical-home">
-      <header className="clinical-home-header">
+    <div className="workspace-home">
+      <header className="workspace-heading">
         <div>
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            {todayLabel()}
+          <p className="workspace-eyebrow">
+            {new Intl.DateTimeFormat("en-IN", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+              timeZone: "Asia/Kolkata",
+            }).format(new Date())}
           </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">
-            {greeting()}, {doctorName}
-          </h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-            Capture the consultation now. Check the clinical details before anything enters the patient record.
-          </p>
+          <h1>Today</h1>
+          <p>Welcome back, {doctorName}. Here is what needs your attention.</p>
         </div>
-        <div className="hidden items-center gap-6 text-sm lg:flex" aria-label="Today at a glance">
-          <div className="flex items-baseline gap-2">
-            <strong className="tnum text-2xl font-semibold">{analytics.today?.patient_count ?? committedCount}</strong>
-            <span className="text-muted-foreground">notes today</span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <strong className={cn("tnum text-2xl font-semibold", draftCount > 0 && "text-warning")}>{draftCount}</strong>
-            <span className="text-muted-foreground">need review</span>
-          </div>
-        </div>
+        <Button variant="outline" onClick={() => onNavigate("schedule")}>
+          <CalendarDaysIcon aria-hidden />
+          Open schedule
+        </Button>
       </header>
 
-      <section className={cn("encounter-start", recording && "is-recording")} aria-labelledby="new-note-title">
-        <div className="encounter-start-copy">
-          <span className="encounter-step">New clinical note</span>
-          <h2 id="new-note-title">What happened in the chair?</h2>
-          <p>
-            Say the patient, diagnosis, tooth and procedure naturally. You will review every extracted detail before saving.
-          </p>
-          <ol className="encounter-path" aria-label="Clinical note workflow">
-            <li><span>1</span> Speak</li>
-            <li><span>2</span> Review</li>
-            <li><span>3</span> Confirm</li>
-          </ol>
-        </div>
+      <div className="workspace-metrics" aria-label="Today at a glance">
+        <Metric
+          label="Appointments today"
+          value={active?.length}
+          error={appointments.error}
+          detail="View the daily schedule"
+          icon={CalendarDaysIcon}
+          onClick={() => onNavigate("schedule")}
+        />
+        <Metric
+          label="Visits completed"
+          value={analytics.today?.patient_count ?? saved.length}
+          detail="Open your patient register"
+          icon={CheckIcon}
+          onClick={() => onNavigate("register")}
+        />
+        <Metric
+          label="Awaiting review"
+          value={draftCount}
+          error={drafts.error}
+          detail="Unfinished visits · past 12 months"
+          icon={ClipboardListIcon}
+          onClick={onReviewAll}
+          attention={Boolean(draftCount)}
+        />
+        <Metric
+          label="Follow-ups due"
+          atLeast={dueCount === 200}
+          value={dueCount}
+          error={followUps.error}
+          detail="Due today or overdue"
+          icon={ClipboardClockIcon}
+          onClick={() => onNavigate("follow-ups")}
+          attention={Boolean(dueCount)}
+        />
+      </div>
 
-        <div className="encounter-start-actions">
-          <button
-            type="button"
-            onClick={recording ? onStopDictation : onStartDictation}
-            disabled={processing}
-            aria-pressed={recording}
-            className={cn("clinical-record-button", recording && "is-live")}
+      <div className="workspace-columns">
+        <div className="workspace-stack">
+          <section
+            className="workspace-panel"
+            aria-labelledby="schedule-heading"
           >
-            <span className="clinical-record-button-icon">
-              {recording ? (
-                <span className="size-4 rounded-[0.2rem] bg-current" aria-hidden />
+            <PanelHeading
+              id="schedule-heading"
+              title="Today’s appointments"
+              description={
+                upcoming
+                  ? `${upcoming.length} still to see`
+                  : "Your clinic’s schedule"
+              }
+              action="View schedule"
+              onClick={() => onNavigate("schedule")}
+            />
+            {appointments.error ? (
+              <LoadFailure
+                label="appointments"
+                onRetry={() => setRetry((value) => value + 1)}
+              />
+            ) : !upcoming ? (
+              <Loading />
+            ) : upcoming.length === 0 ? (
+              <Empty
+                icon={CalendarDaysIcon}
+                title={
+                  active?.length
+                    ? "All appointments completed"
+                    : "Your schedule is clear"
+                }
+                description="Book an appointment, or start a visit for a walk-in patient."
+                action="Open schedule"
+                onClick={() => onNavigate("schedule")}
+              />
+            ) : (
+              <ol className="workspace-rows">
+                {upcoming.slice(0, 5).map((appointment) => (
+                  <li key={appointment.id}>
+                    <button
+                      className="workspace-appointment"
+                      onClick={() =>
+                        appointment.patient
+                          ? onOpenPatient({
+                              ...appointment.patient,
+                              age_years: null,
+                              last_visit: null,
+                              visit_count: null,
+                            })
+                          : onNavigate("schedule")
+                      }
+                    >
+                      <span className="workspace-time">
+                        <strong>{formatClock(appointment.starts_at)}</strong>
+                        <small>
+                          {Math.round(
+                            (Date.parse(appointment.ends_at) -
+                              Date.parse(appointment.starts_at)) /
+                              60000,
+                          )}{" "}
+                          min
+                        </small>
+                      </span>
+                      <span className="workspace-row-copy">
+                        <strong>
+                          {appointment.patient?.full_name ??
+                            appointment.reason ??
+                            "Reserved time"}
+                        </strong>
+                        <small>
+                          {appointment.reason || appointment.appointment_type}
+                          {appointment.operatory
+                            ? ` · ${appointment.operatory.name}`
+                            : ""}
+                        </small>
+                      </span>
+                      <span
+                        className={`workspace-status ${["checked_in", "in_chair"].includes(appointment.status) ? "is-attention" : ""}`}
+                      >
+                        {APPOINTMENT_LABELS[appointment.status]}
+                      </span>
+                      <ArrowRightIcon
+                        className="size-4 text-muted-foreground"
+                        aria-hidden
+                      />
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+
+          <section className="workspace-panel" aria-labelledby="recent-heading">
+            <PanelHeading
+              id="recent-heading"
+              title="Recent visits"
+              description="Confirmed in your register today"
+              action="View register"
+              onClick={() => onNavigate("register")}
+            />
+            {saved.length === 0 ? (
+              <Empty
+                icon={ClipboardListIcon}
+                title="Ready for your first visit"
+                description="Confirmed visits appear here. Unfinished notes stay in the review queue."
+              />
+            ) : (
+              <ol className="workspace-rows">
+                {saved.slice(0, 5).map((entry) => (
+                  <li key={entry.id}>
+                    <button
+                      className="workspace-appointment"
+                      onClick={() => onOpenVisit(entry)}
+                    >
+                      <span className="workspace-initials" aria-hidden>
+                        {initials(entry.patient_name)}
+                      </span>
+                      <span className="workspace-row-copy">
+                        <strong>{entry.patient_name}</strong>
+                        <small>
+                          {entry.procedures[0] ||
+                            entry.diagnosis ||
+                            entry.treatment ||
+                            "Consultation"}
+                        </small>
+                      </span>
+                      <time
+                        className="text-xs text-muted-foreground"
+                        dateTime={entry.occurred_at}
+                      >
+                        {formatClock(entry.occurred_at)}
+                      </time>
+                      <ArrowRightIcon
+                        className="size-4 text-muted-foreground"
+                        aria-hidden
+                      />
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        </div>
+
+        <div className="workspace-stack">
+          <section
+            className="workspace-panel workspace-start"
+            aria-labelledby="start-heading"
+          >
+            <span className="workspace-start-icon">
+              <PlusIcon aria-hidden />
+            </span>
+            <h2 id="start-heading">Start a visit</h2>
+            <p>Select a patient, add your notes, then review and confirm.</p>
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={onManualEntry}
+              disabled={recording || processing}
+            >
+              <PlusIcon aria-hidden />
+              New visit
+            </Button>
+            <Button
+              className="w-full"
+              variant="outline"
+              size="lg"
+              onClick={recording ? onStopDictation : onStartDictation}
+              disabled={processing}
+              aria-label={
+                processing
+                  ? "Preparing review"
+                  : recording
+                    ? "Stop dictation"
+                    : "Start recording a visit"
+              }
+              aria-pressed={recording}
+            >
+              {processing ? (
+                <LoaderCircleIcon className="animate-spin" aria-hidden />
               ) : (
-                <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-                  <rect x="8" y="3" width="8" height="12" rx="4" />
-                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7" />
-                </svg>
+                <Mic aria-hidden />
               )}
-            </span>
-            <span className="text-left">
-              <strong>{processing ? "Preparing review…" : recording ? "Stop & review" : "Dictate a visit"}</strong>
-              <small>{recording ? "Your note is being captured" : "Hindi, Punjabi or English"}</small>
-            </span>
-          </button>
-          <button type="button" onClick={onManualEntry} className="clinical-manual-button">
-            Type the note instead
+              {processing
+                ? "Preparing review…"
+                : recording
+                  ? "Stop & review"
+                  : "Dictate a visit"}
+            </Button>
+            <small>Dictation supports Hindi, Punjabi and English.</small>
+          </section>
+
+          <section
+            className="workspace-panel"
+            aria-labelledby="attention-heading"
+          >
+            <PanelHeading
+              id="attention-heading"
+              title="Needs attention"
+              description="Pick up where you left off"
+            />
+            <div className="workspace-attention">
+              <div className="workspace-mini-heading">
+                <ClipboardListIcon aria-hidden />
+                <h3>Unfinished visits</h3>
+                {draftCount !== undefined && (
+                  <span>{formatCount(draftCount)}</span>
+                )}
+              </div>
+              {drafts.error ? (
+                <LoadFailure
+                  label="drafts"
+                  onRetry={() => setRetry((value) => value + 1)}
+                />
+              ) : !drafts.data ? (
+                <Loading />
+              ) : draftCount === 0 ? (
+                <p className="workspace-clear">
+                  <CheckIcon aria-hidden />
+                  All visit notes are reviewed.
+                </p>
+              ) : (
+                <ul>
+                  {drafts.data.entries.map((entry) => (
+                    <li key={entry.id}>
+                      <button
+                        className="workspace-task"
+                        onClick={() => onOpenDraft(entry)}
+                      >
+                        <span>
+                          <strong>{entry.patient_name}</strong>
+                          <small>
+                            {formatVisitDay(entry.occurred_at)} · Draft
+                          </small>
+                        </span>
+                        <span className="workspace-task-action">
+                          Review <ArrowRightIcon aria-hidden />
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {draftCount !== undefined && draftCount > 4 && (
+                <button className="workspace-text-link" onClick={onReviewAll}>
+                  View all {draftCount} drafts <ArrowRightIcon aria-hidden />
+                </button>
+              )}
+              <div className="workspace-mini-heading border-t border-border pt-4">
+                <CalendarClockIcon aria-hidden />
+                <h3>Follow-ups due</h3>
+                {dueCount !== undefined && (
+                  <span>
+                    {dueCount}
+                    {dueCount === 200 ? "+" : ""}
+                  </span>
+                )}
+              </div>
+              {followUps.error ? (
+                <LoadFailure
+                  label="follow-ups"
+                  onRetry={() => setRetry((value) => value + 1)}
+                />
+              ) : !followUps.data ? (
+                <Loading />
+              ) : dueCount === 0 ? (
+                <p className="workspace-clear">
+                  <CheckIcon aria-hidden />
+                  No follow-ups due today.
+                </p>
+              ) : (
+                <ul>
+                  {followUps.data.slice(0, 3).map((item) => (
+                    <li key={item.id}>
+                      <button
+                        className="workspace-task"
+                        onClick={() => onNavigate("follow-ups")}
+                      >
+                        <span>
+                          <strong>
+                            {item.patient_name || "Patient follow-up"}
+                          </strong>
+                          <small>
+                            {item.reason} ·{" "}
+                            {clinicDay(item.due_at) < day ? "Overdue" : "Today"}
+                          </small>
+                        </span>
+                        <ArrowRightIcon
+                          className="size-4 shrink-0"
+                          aria-hidden
+                        />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+          <button
+            className="workspace-directory-link"
+            onClick={() => onNavigate("patients")}
+          >
+            <UsersRoundIcon aria-hidden />
+            <span>Find a patient or open their chart</span>
+            <ArrowRightIcon aria-hidden />
           </button>
         </div>
-      </section>
-
-      <div className="clinical-work-grid">
-        <section className="clinical-list" aria-labelledby="today-notes-title">
-          <div className="clinical-section-heading">
-            <div>
-              <h2 id="today-notes-title">Today&rsquo;s clinical notes</h2>
-              <p>{entries.length === 0 ? "No encounters recorded yet" : `${entries.length} encounter${entries.length === 1 ? "" : "s"}`}</p>
-            </div>
-            <button type="button" className="clinical-link-button" onClick={onOpenRegister}>
-              Full register <span aria-hidden>→</span>
-            </button>
-          </div>
-
-          {entries.length === 0 ? (
-            <div className="clinical-empty">
-              <span className="text-2xl" aria-hidden>∿</span>
-              <div>
-                <p>No notes for today</p>
-                <span>Your first confirmed encounter will appear here.</span>
-              </div>
-            </div>
-          ) : (
-            <ol className="clinical-visit-list">
-              {entries.slice(0, RECENT_LIMIT).map((entry) => (
-                <li key={entry.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!entry.patient_id) return;
-                      onOpenPatient({
-                        id: entry.patient_id,
-                        full_name: entry.patient_name,
-                        phone: null,
-                        age_years: entry.age_years,
-                        last_visit: entry.occurred_at,
-                        visit_count: entry.visit_number,
-                      });
-                    }}
-                    disabled={!entry.patient_id}
-                    className="clinical-visit-row"
-                  >
-                    <time dateTime={entry.occurred_at}>{formatClock(entry.occurred_at)}</time>
-                    <span className={cn("clinical-visit-state", entry.status === "draft" && "is-draft")} aria-hidden>
-                      {entry.status === "draft" ? "!" : "✓"}
-                    </span>
-                    <span className="min-w-0 flex-1 text-left">
-                      <strong>{entry.patient_name}</strong>
-                      <small>
-                        {entry.procedures[0] || entry.diagnosis || entry.treatment || (entry.status === "draft" ? "Draft awaiting review" : "Clinical note")}
-                      </small>
-                    </span>
-                    <span className={cn("clinical-status", entry.status === "draft" && "is-draft")}>
-                      {entry.status === "draft" ? "Review" : "Saved"}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
-
-        <aside className="clinical-actions" aria-labelledby="next-actions-title">
-          <div className="clinical-section-heading">
-            <div>
-              <h2 id="next-actions-title">Next action</h2>
-              <p>Move directly to the patient task.</p>
-            </div>
-          </div>
-
-          <div className="clinical-action-list">
-            {draftCount > 0 && (
-              <button type="button" className="clinical-action-row" onClick={onReviewNext}>
-                <span className="clinical-action-icon is-attention" aria-hidden>!</span>
-                <span className="min-w-0 flex-1 text-left">
-                  <strong>{`Review ${draftCount} unfinished note${draftCount === 1 ? "" : "s"}`}</strong>
-                  <small>Confirm the clinical record before the next patient.</small>
-                </span>
-                <span className="text-muted-foreground" aria-hidden>→</span>
-              </button>
-            )}
-            <button type="button" className="clinical-action-row" onClick={onOpenPatients}>
-              <span className="clinical-action-icon" aria-hidden>P</span>
-              <span className="min-w-0 flex-1 text-left">
-                <strong>Open a patient chart</strong>
-                <small>History, prescriptions and the dental arch.</small>
-              </span>
-              <span className="text-muted-foreground" aria-hidden>→</span>
-            </button>
-            <button type="button" className="clinical-action-row" onClick={onOpenRecall}>
-              <span className="clinical-action-icon" aria-hidden>?</span>
-              <span className="min-w-0 flex-1 text-left">
-                <strong>Ask the register</strong>
-                <small>Find a previous diagnosis, treatment or prescription.</small>
-              </span>
-              <span className="text-muted-foreground" aria-hidden>→</span>
-            </button>
-            <button type="button" className="clinical-action-row" onClick={onOpenRegister}>
-              <span className="clinical-action-icon" aria-hidden>R</span>
-              <span className="min-w-0 flex-1 text-left">
-                <strong>Browse all encounters</strong>
-                <small>Open confirmed notes and recover drafts.</small>
-              </span>
-              <span className="text-muted-foreground" aria-hidden>→</span>
-            </button>
-          </div>
-        </aside>
       </div>
     </div>
   );
 }
 
-function greeting(): string {
-  const hour = Number(
-    new Intl.DateTimeFormat("en-GB", {
-      hour: "numeric",
-      hour12: false,
-      timeZone: "Asia/Kolkata",
-    }).format(new Date()),
+function Metric({
+  label,
+  value,
+  error,
+  detail,
+  icon: Icon,
+  onClick,
+  attention,
+  atLeast,
+}: {
+  label: string;
+  value?: number;
+  error?: boolean;
+  detail: string;
+  icon: typeof CalendarDaysIcon;
+  onClick: () => void;
+  attention?: boolean;
+  atLeast?: boolean;
+}) {
+  return (
+    <button
+      className={`workspace-metric ${attention ? "is-attention" : ""}`}
+      onClick={onClick}
+    >
+      <span className="workspace-metric-label">
+        {label}
+        <Icon aria-hidden />
+      </span>
+      <strong>
+        {error ? (
+          "—"
+        ) : value === undefined ? (
+          <span className="workspace-metric-loading" aria-label="Loading" />
+        ) : (
+          `${formatCount(value)}${atLeast ? "+" : ""}`
+        )}
+      </strong>
+      <small>{error ? "Unavailable · open to retry" : detail}</small>
+    </button>
   );
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
 }
-
-function todayLabel(): string {
-  return new Intl.DateTimeFormat("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "Asia/Kolkata",
-  }).format(new Date());
+function PanelHeading({
+  id,
+  title,
+  description,
+  action,
+  onClick,
+}: {
+  id: string;
+  title: string;
+  description: string;
+  action?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <div className="workspace-panel-heading">
+      <div>
+        <h2 id={id}>{title}</h2>
+        <p>{description}</p>
+      </div>
+      {action && (
+        <button className="workspace-text-link" onClick={onClick}>
+          {action}
+          <ArrowRightIcon aria-hidden />
+        </button>
+      )}
+    </div>
+  );
+}
+function Empty({
+  icon: Icon,
+  title,
+  description,
+  action,
+  onClick,
+}: {
+  icon: typeof CalendarDaysIcon;
+  title: string;
+  description: string;
+  action?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <div className="workspace-empty">
+      <span>
+        <Icon aria-hidden />
+      </span>
+      <h3>{title}</h3>
+      <p>{description}</p>
+      {action && (
+        <Button variant="outline" size="sm" onClick={onClick}>
+          {action}
+        </Button>
+      )}
+    </div>
+  );
+}
+function Loading() {
+  return (
+    <p className="workspace-loading" role="status">
+      <LoaderCircleIcon className="size-4 animate-spin" aria-hidden />
+      Loading…
+    </p>
+  );
+}
+function LoadFailure({
+  label,
+  onRetry,
+}: {
+  label: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="workspace-load-error" role="status">
+      <p>Could not load {label}.</p>
+      <Button variant="outline" size="sm" onClick={onRetry}>
+        Retry
+      </Button>
+    </div>
+  );
+}
+function initials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
 }

@@ -10,7 +10,7 @@ export function PracticePage({
   className?: string;
 }) {
   return (
-    <div className={cn("mx-auto w-full max-w-[96rem] space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-7", className)}>
+    <div className={cn("w-full space-y-6", className)}>
       {children}
     </div>
   );
@@ -30,7 +30,7 @@ export function PracticePageHeader({
   return (
     <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        {eyebrow && <p className="section-kicker">{eyebrow}</p>}
+        {eyebrow && <p className="text-xs font-medium text-muted-foreground">{eyebrow}</p>}
         <h1 className="mt-1.5 text-2xl font-semibold tracking-[-0.045em] text-foreground sm:text-3xl">
           {title}
         </h1>

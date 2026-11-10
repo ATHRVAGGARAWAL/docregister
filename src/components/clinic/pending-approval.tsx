@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { CalendarClockIcon, CircleCheckIcon, MailIcon } from "@/components/icons";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useClerk } from "@clerk/nextjs";
 
 /**
  * What a doctor sees between asking to join a clinic and being let in.
@@ -101,6 +101,7 @@ export function PendingApproval({
 
 function SignOutButton() {
   const router = useRouter();
+  const { signOut: clerkSignOut } = useClerk();
   const [leaving, setLeaving] = useState(false);
 
   return (
@@ -113,11 +114,11 @@ function SignOutButton() {
         // session is cleared either way, and leaving a doctor on this screen
         // with nothing said is indistinguishable from a dead button.
         try {
-          await getSupabaseBrowserClient().auth.signOut();
+          await clerkSignOut({ redirectUrl: "/sign-in" });
         } catch (error) {
           console.error("[pending] sign out failed", error);
         }
-        router.replace("/login");
+        router.replace("/sign-in");
         router.refresh();
       }}
       className="pressable mt-6 h-11 w-full rounded-xl border border-border text-sm font-medium disabled:opacity-60"

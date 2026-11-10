@@ -65,6 +65,9 @@ export const env = {
   get anthropicApiKey() {
     return required("ANTHROPIC_API_KEY");
   },
+  get openaiApiKey() {
+    return required("OPENAI_API_KEY");
+  },
 } as const;
 
 /**
@@ -85,7 +88,7 @@ export function sttProviderName(): SttProviderName {
  * STT mock above — deterministic offline output so the review-and-commit loop
  * can be demoed and tested with no keys and no network.
  */
-export type LlmProviderName = "gemini" | "anthropic" | "mock";
+export type LlmProviderName = "gemini" | "anthropic" | "openai" | "mock";
 
 export function llmProviderName(): LlmProviderName {
   // `LLM_MOCK=1` predates `LLM_PROVIDER` and still wins. An existing .env that
@@ -93,7 +96,7 @@ export function llmProviderName(): LlmProviderName {
   // provider default appeared underneath it.
   if (process.env.LLM_MOCK === "1") return "mock";
   const raw = (process.env.LLM_PROVIDER ?? "gemini").toLowerCase();
-  if (raw === "gemini" || raw === "anthropic" || raw === "mock") return raw;
+  if (raw === "gemini" || raw === "anthropic" || raw === "openai" || raw === "mock") return raw;
   throw new Error(`Unknown LLM_PROVIDER "${raw}"`);
 }
 

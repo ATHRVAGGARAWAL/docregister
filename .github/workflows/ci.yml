@@ -52,13 +52,16 @@ jobs:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DOCTOR_EMAIL: ${{ secrets.E2E_DOCTOR_EMAIL }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
         run: |
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_PUBLISHABLE_KEY" ] \
-            && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] && [ -n "$DOCTOR_EMAIL" ]; then
+            && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] && [ -n "$DOCTOR_EMAIL" ] \
+            && [ -n "$CLERK_PUBLISHABLE_KEY" ] && [ -n "$CLERK_SECRET_KEY" ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping the end-to-end suite: this run cannot read NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY and E2E_DOCTOR_EMAIL. Expected on a fork."
+            echo "::notice::Skipping the end-to-end suite: Supabase, Clerk development credentials, or E2E_DOCTOR_EMAIL are unavailable. Expected on a fork."
           fi
 
   e2e:
@@ -69,14 +72,16 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      # An address that already has a doctor row in that project. The suite
-      # mints a magic-link session for it; it never creates the account.
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      # An existing Clerk development account linked to a doctor in the test database.
       E2E_DOCTOR_EMAIL: ${{ secrets.E2E_DOCTOR_EMAIL }}
       # No provider keys in CI, and none needed: nothing in this suite dictates
       # or extracts. The mock adapters keep a route that reaches a model from
       # failing on a missing key rather than on the thing under test.
       STT_PROVIDER: mock
       LLM_PROVIDER: mock
+      LLM_MOCK: "1"
       # Playwright's traces and screenshots land outside the checkout, so they
       # cannot be picked up as source changes.
       PLAYWRIGHT_OUTPUT_DIR: ${{ runner.temp }}

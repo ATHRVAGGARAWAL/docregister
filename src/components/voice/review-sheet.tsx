@@ -64,6 +64,7 @@ import type {
   PatientAlertRecord,
 } from "@/lib/clinical/safety";
 import { MedicationEditor } from "@/components/voice/medication-editor";
+import { VisitProgress } from "@/components/voice/visit-progress";
 import { ProcedureEditor } from "@/components/voice/procedure-editor";
 
 interface DraftUpdatePayload {
@@ -78,7 +79,10 @@ interface DraftUpdatePayload {
 }
 
 class DraftSaveError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
     super(message);
     this.name = "DraftSaveError";
   }
@@ -101,6 +105,8 @@ class DraftSaveError extends Error {
  */
 export function ReviewSheet({
   draft,
+  initialPatient = null,
+  actionError,
   onCommitted,
   onDiscard,
   onKeepForLater,
@@ -110,6 +116,9 @@ export function ReviewSheet({
   onStartNext,
 }: {
   draft: ReviewDraft;
+  /** Only supplied after the doctor explicitly selected this chart. */
+  initialPatient?: PatientMatch | null;
+  actionError?: string | null;
   onCommitted: (outcome: CommitOutcome) => void;
   onDiscard: () => void;
   onKeepForLater: () => void;
@@ -126,20 +135,40 @@ export function ReviewSheet({
     draft.extraction.consultation_fee_inr?.toString() ?? "",
   );
   const [phone, setPhone] = useState(draft.patientIdentity?.phone ?? "");
-  const [sex, setSex] = useState<PatientSex | "">(draft.patientIdentity?.sex ?? "");
-  const [drugs, setDrugs] = useState<ReviewMedication[]>(draft.extraction.prescription);
-  const [patient, setPatient] = useState<PatientMatch | null>(null);
-  const [patientCandidates, setPatientCandidates] = useState(draft.suggestedPatients);
+  const [sex, setSex] = useState<PatientSex | "">(
+    draft.patientIdentity?.sex ?? "",
+  );
+  const [drugs, setDrugs] = useState<ReviewMedication[]>(
+    draft.extraction.prescription,
+  );
+  const [patient, setPatient] = useState<PatientMatch | null>(initialPatient);
+  const [patientCandidates, setPatientCandidates] = useState(
+    initialPatient
+      ? [
+          initialPatient,
+          ...draft.suggestedPatients.filter(
+            (item) => item.id !== initialPatient.id,
+          ),
+        ]
+      : draft.suggestedPatients,
+  );
   const [matching, setMatching] = useState(false);
-  const [historyPatient, setHistoryPatient] = useState<PatientMatch | null>(null);
-  const [asNew, setAsNew] = useState(draft.suggestedPatients.length === 0);
+  const [historyPatient, setHistoryPatient] = useState<PatientMatch | null>(
+    null,
+  );
+  const [asNew, setAsNew] = useState(
+    !initialPatient && draft.suggestedPatients.length === 0,
+  );
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
-  const [saveFailureRecovery, setSaveFailureRecovery] = useState<"saved" | "screen" | null>(null);
+  const [saveFailureRecovery, setSaveFailureRecovery] = useState<
+    "saved" | "screen" | null
+  >(null);
   const [showTranscript, setShowTranscript] = useState(false);
   const [draftSaveQueue] = useState(() => {
     const version = (draft as ReviewDraft & { version?: number }).version;
-    const initialVersion = Number.isInteger(version) && version! > 0 ? version! : 1;
+    const initialVersion =
+      Number.isInteger(version) && version! > 0 ? version! : 1;
     return createDraftSaveQueue<DraftUpdatePayload>(
       initialVersion,
       async (payload, expectedVersion) => {
@@ -154,21 +183,28 @@ export function ReviewSheet({
             window.dispatchEvent(new Event("docregister:session-expired"));
           }
           throw new DraftSaveError(
-            typeof body?.error === "string" ? body.error : "Could not save your draft.",
+            typeof body?.error === "string"
+              ? body.error
+              : "Could not save your draft.",
             response.status,
           );
         }
         const nextVersion = Number(body?.version);
         return {
-          version: Number.isInteger(nextVersion) && nextVersion > 0
-            ? nextVersion
-            : expectedVersion + 1,
+          version:
+            Number.isInteger(nextVersion) && nextVersion > 0
+              ? nextVersion
+              : expectedVersion + 1,
         };
       },
     );
   });
-  const [autosaveState, setAutosaveState] = useState<"saved" | "saving" | "error" | "conflict">("saved");
-  const autosaveStateRef = useRef<"saved" | "saving" | "error" | "conflict">("saved");
+  const [autosaveState, setAutosaveState] = useState<
+    "saved" | "saving" | "error" | "conflict"
+  >("saved");
+  const autosaveStateRef = useRef<"saved" | "saving" | "error" | "conflict">(
+    "saved",
+  );
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstAutosave = useRef(true);
 
@@ -183,8 +219,9 @@ export function ReviewSheet({
   // unguessable, so a non-crypto fallback is the right trade against losing the
   // consultation.
   const [idempotencyKey] = useState(newIdempotencyKey);
-  const [uncertain, setUncertain] = useState(() =>
-    new Set(buildReviewChecklist(draft.extraction).map((item) => item.key)),
+  const [uncertain, setUncertain] = useState(
+    () =>
+      new Set(buildReviewChecklist(draft.extraction).map((item) => item.key)),
   );
   const [reviewedKeys, setReviewedKeys] = useState<Set<string>>(new Set());
   // Resolved once, on open. The rule table turns the model's verbatim
@@ -196,12 +233,14 @@ export function ReviewSheet({
   const [toothFindings, setToothFindings] = useState(() =>
     normaliseToothFindings(draft.extraction.tooth_findings ?? []),
   );
-  const [patientToothStatus, setPatientToothStatus] = useState<Map<number, ToothStatus>>(
-    new Map(),
-  );
+  const [patientToothStatus, setPatientToothStatus] = useState<
+    Map<number, ToothStatus>
+  >(new Map());
   const [chartLoading, setChartLoading] = useState(false);
   const [patientAlerts, setPatientAlerts] = useState<PatientAlertRecord[]>([]);
-  const [patientHistory, setPatientHistory] = useState<MedicalHistoryRecord[]>([]);
+  const [patientHistory, setPatientHistory] = useState<MedicalHistoryRecord[]>(
+    [],
+  );
   const checklist = useMemo(
     () =>
       buildReviewChecklist({
@@ -218,8 +257,12 @@ export function ReviewSheet({
   const [rawText, setRawText] = useState(draft.rawText);
   const [romanText, setRomanText] = useState(draft.romanText);
   const [degraded, setDegraded] = useState(draft.degraded);
-  const [commitOutcome, setCommitOutcome] = useState<CommitOutcome | null>(null);
-  const pendingReviewCount = checklist.filter((item) => !reviewedKeys.has(item.key)).length;
+  const [commitOutcome, setCommitOutcome] = useState<CommitOutcome | null>(
+    null,
+  );
+  const pendingReviewCount = checklist.filter(
+    (item) => !reviewedKeys.has(item.key),
+  ).length;
 
   // Has the doctor put anything of their own into this sheet? Only used to
   // decide whether an accidental dismissal is allowed to throw the visit away
@@ -230,7 +273,8 @@ export function ReviewSheet({
     age !== (draft.extraction.age_years?.toString() ?? "") ||
     diagnosis !== (draft.extraction.diagnosis ?? "") ||
     treatment !== (draft.extraction.treatment ?? "") ||
-    consultationFee !== (draft.extraction.consultation_fee_inr?.toString() ?? "") ||
+    consultationFee !==
+      (draft.extraction.consultation_fee_inr?.toString() ?? "") ||
     drugs !== draft.extraction.prescription ||
     procedures !== draft.extraction.procedures ||
     toothFindings !== draft.extraction.tooth_findings ||
@@ -238,10 +282,16 @@ export function ReviewSheet({
     sex !== (draft.patientIdentity?.sex ?? "") ||
     patient !== null;
 
+  const matchedIdentity = useRef(initialPatient ? `${name}\0${phone}` : null);
+
   // Re-run matching whenever the doctor changes the identity evidence. A
   // selected chart is cleared if the new shortlist no longer contains it;
   // this prevents a stale selection surviving a phone/name correction.
   useEffect(() => {
+    const identity = `${name}\0${phone}`;
+    if (matchedIdentity.current === identity) return;
+    matchedIdentity.current = identity;
+    const controller = new AbortController();
     const query = name.trim();
     const normalisedPhone = normalisePatientPhone(phone);
     if (!query && !normalisedPhone) {
@@ -258,10 +308,17 @@ export function ReviewSheet({
         const params = new URLSearchParams();
         if (query) params.set("name", query);
         if (normalisedPhone) params.set("phone", normalisedPhone);
-        const response = await fetch(`/api/patients/match?${params.toString()}`);
+        const response = await fetch(
+          `/api/patients/match?${params.toString()}`,
+          { signal: controller.signal },
+        );
         const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body?.error ?? "Could not search patient charts.");
-        const next = Array.isArray(body.matches) ? (body.matches as PatientMatch[]) : [];
+        if (!response.ok)
+          throw new Error(body?.error ?? "Could not search patient charts.");
+        const next = Array.isArray(body.matches)
+          ? (body.matches as PatientMatch[])
+          : [];
+        if (controller.signal.aborted) return;
         setPatientCandidates(next);
         // Identity evidence changed, so require an explicit re-selection even
         // when the old chart remains in the new shortlist.
@@ -271,15 +328,21 @@ export function ReviewSheet({
         // Keep the last shortlist visible; save still requires an explicit
         // choice, so a failed lookup cannot silently link a chart.
       } finally {
-        setMatching(false);
+        if (!controller.signal.aborted) setMatching(false);
       }
     }, 350);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [name, phone]);
 
   useEffect(() => {
     if (!patient?.id) {
-      const timer = window.setTimeout(() => setPatientToothStatus(new Map()), 0);
+      const timer = window.setTimeout(
+        () => setPatientToothStatus(new Map()),
+        0,
+      );
       return () => window.clearTimeout(timer);
     }
 
@@ -296,20 +359,22 @@ export function ReviewSheet({
           }),
         ]);
         const history = historyResponse.ok
-          ? await historyResponse.json() as PatientHistoryPayload
+          ? ((await historyResponse.json()) as PatientHistoryPayload)
           : null;
         const clinical = clinicalResponse.ok
-          ? await clinicalResponse.json() as {
+          ? ((await clinicalResponse.json()) as {
               findings?: ToothFindingRecord[];
               alerts?: PatientAlertRecord[];
               medicalHistory?: MedicalHistoryRecord[];
-            }
+            })
           : null;
         if (!controller.signal.aborted) {
-          setPatientToothStatus(deriveToothStatus(
-            (history?.toothProcedures ?? []) as ToothProcedureRecord[],
-            clinical?.findings ?? [],
-          ));
+          setPatientToothStatus(
+            deriveToothStatus(
+              (history?.toothProcedures ?? []) as ToothProcedureRecord[],
+              clinical?.findings ?? [],
+            ),
+          );
           // The same request already carried these; they were being thrown
           // away. An allergy the clinic recorded is worth more than any rule
           // this app could invent.
@@ -342,7 +407,9 @@ export function ReviewSheet({
     if (!item) return;
     setReviewIndex(index);
     markReviewed(item.key);
-    requestAnimationFrame(() => document.getElementById(item.targetId)?.focus());
+    requestAnimationFrame(() =>
+      document.getElementById(item.targetId)?.focus(),
+    );
   }
 
   async function retryFromAudio() {
@@ -362,7 +429,8 @@ export function ReviewSheet({
           body: JSON.stringify({ stage }),
         });
         const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload?.error ?? "Could not retry transcription.");
+        if (!response.ok)
+          throw new Error(payload?.error ?? "Could not retry transcription.");
         return payload;
       };
 
@@ -383,10 +451,14 @@ export function ReviewSheet({
         setAge(body.extraction.age_years?.toString() ?? "");
         setDiagnosis(body.extraction.diagnosis ?? "");
         setTreatment(body.extraction.treatment ?? "");
-        setConsultationFee(body.extraction.consultation_fee_inr?.toString() ?? "");
+        setConsultationFee(
+          body.extraction.consultation_fee_inr?.toString() ?? "",
+        );
         setDrugs(body.extraction.prescription ?? []);
         setProcedures(normaliseProcedures(body.extraction.procedures ?? []));
-        setToothFindings(normaliseToothFindings(body.extraction.tooth_findings ?? []));
+        setToothFindings(
+          normaliseToothFindings(body.extraction.tooth_findings ?? []),
+        );
         const nextUncertain = new Set(
           buildReviewChecklist(body.extraction).map((item) => item.key),
         );
@@ -395,7 +467,11 @@ export function ReviewSheet({
         setReviewIndex(0);
       }
     } catch (error) {
-      setRetryError(error instanceof Error ? error.message : "Could not retry transcription.");
+      setRetryError(
+        error instanceof Error
+          ? error.message
+          : "Could not retry transcription.",
+      );
     } finally {
       setRetrying(false);
     }
@@ -415,7 +491,16 @@ export function ReviewSheet({
     // `procedures` belongs in this list. Omitting it does not fail loudly — the
     // memo simply never recomputes, and every procedure edit stops autosaving
     // while every other field keeps working.
-    [age, consultationFee, diagnosis, drugs, name, procedures, toothFindings, treatment],
+    [
+      age,
+      consultationFee,
+      diagnosis,
+      drugs,
+      name,
+      procedures,
+      toothFindings,
+      treatment,
+    ],
   );
 
   // Voice capture already creates the draft server-side. Once a doctor starts
@@ -426,12 +511,19 @@ export function ReviewSheet({
       firstAutosave.current = false;
       return;
     }
-    if (commitOutcome || saving || !isDirty || autosaveStateRef.current === "conflict") return;
+    if (
+      commitOutcome ||
+      saving ||
+      !isDirty ||
+      autosaveStateRef.current === "conflict"
+    )
+      return;
     const timer = setTimeout(() => {
       autosaveTimerRef.current = null;
       autosaveStateRef.current = "saving";
       setAutosaveState("saving");
-      void draftSaveQueue.enqueue(draftPayload)
+      void draftSaveQueue
+        .enqueue(draftPayload)
         .then(() => {
           autosaveStateRef.current = "saved";
           setAutosaveState("saved");
@@ -455,7 +547,9 @@ export function ReviewSheet({
 
   async function save() {
     setSaveFailureRecovery(null);
-    const firstPendingReview = checklist.findIndex((item) => !reviewedKeys.has(item.key));
+    const firstPendingReview = checklist.findIndex(
+      (item) => !reviewedKeys.has(item.key),
+    );
     if (firstPendingReview >= 0) {
       setFailure("Review every flagged detail before saving this visit.");
       focusReviewItem(firstPendingReview);
@@ -506,32 +600,39 @@ export function ReviewSheet({
         // this screen still looks open. The draft endpoint then returns 404;
         // continue to the idempotent commit call so it can confirm that save
         // instead of trapping the doctor behind a false failure.
-        if (!(error instanceof DraftSaveError) || error.status !== 404) throw error;
+        if (!(error instanceof DraftSaveError) || error.status !== 404)
+          throw error;
       }
 
-      const commit = await fetch(`/api/encounters/${draft.encounterId}/commit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patientId: patient?.id,
-          newPatient: patient
-            ? undefined
-            : {
-                full_name: name.trim(),
-                phone: normalisePatientPhone(phone),
-                age_years: parseNumber(age),
-                sex: sex || null,
-              },
-          idempotencyKey,
-          consultationFeeInr: parseOptionalMoney(consultationFee),
-          toothFindings,
-        }),
-      });
+      const commit = await fetch(
+        `/api/encounters/${draft.encounterId}/commit`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            patientId: patient?.id,
+            newPatient: patient
+              ? undefined
+              : {
+                  full_name: name.trim(),
+                  phone: normalisePatientPhone(phone),
+                  age_years: parseNumber(age),
+                  sex: sex || null,
+                },
+            idempotencyKey,
+            consultationFeeInr: parseOptionalMoney(consultationFee),
+            toothFindings,
+          }),
+        },
+      );
       const commitBody = await commit.json().catch(() => null);
       if (!commit.ok) {
-        if (commit.status === 401) window.dispatchEvent(new Event("docregister:session-expired"));
+        if (commit.status === 401)
+          window.dispatchEvent(new Event("docregister:session-expired"));
         const message = (commitBody as { error?: unknown } | null)?.error;
-        throw new Error(typeof message === "string" ? message : "Could not save the visit.");
+        throw new Error(
+          typeof message === "string" ? message : "Could not save the visit.",
+        );
       }
 
       navigator.vibrate?.([8, 40, 8]);
@@ -541,7 +642,8 @@ export function ReviewSheet({
       });
       setCommitOutcome(outcome);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not save the visit.";
+      const message =
+        error instanceof Error ? error.message : "Could not save the visit.";
       setFailure(
         draftPersisted
           ? `${message} Your reviewed draft is in Register → Needs review. Try saving again now, or keep it for later.`
@@ -592,12 +694,14 @@ export function ReviewSheet({
               )}
               {commitOutcome.accountEntryError && (
                 <p className="mt-1 font-medium text-destructive">
-                  The visit was saved, but its amount could not be added to Accounts.
+                  The visit was saved, but its amount could not be added to
+                  Accounts.
                 </p>
               )}
               {commitOutcome.toothFindingError && (
                 <p className="mt-1 font-medium text-warning">
-                  The visit was saved, but structured tooth findings need to be added from the patient chart.
+                  The visit was saved, but structured tooth findings need to be
+                  added from the patient chart.
                 </p>
               )}
             </div>
@@ -635,93 +739,127 @@ export function ReviewSheet({
           if (!isDirty || confirmDiscard()) onDiscard();
         }}
       >
-      {/* No `aria-label` here: the sheet has a real `SheetTitle`, and an
+        {/* No `aria-label` here: the sheet has a real `SheetTitle`, and an
           aria-label on the container would win over it and announce a second,
           slightly different name for the same dialog. */}
-      <SheetContent
-        className="surface-elevated overflow-hidden sm:max-w-2xl"
-        // Escape and an outside tap are the two accidental paths to losing a
-        // reviewed visit; the explicit Discard button in the footer is
-        // unaffected by either. Outside-tap is refused outright rather than
-        // prompted: on a phone the sheet occupies most of the screen and the
-        // strip beside it is exactly where a thumb lands by mistake.
-        onEscapeKeyDown={(event) => {
-          if (saveFailureRecovery === "screen") {
-            event.preventDefault();
-            return;
-          }
-          if (saveFailureRecovery === "saved") return;
-          if (isDirty && !confirmDiscard()) event.preventDefault();
-        }}
-        onPointerDownOutside={(event) => event.preventDefault()}
-      >
-        <SheetHeader className="border-b border-border px-4 pb-3 pt-3 sm:px-6 sm:pb-4 sm:pt-5">
-          <div className="flex items-start gap-3">
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary-soft text-primary sm:size-10">
-              <ShieldCheck className="size-4" aria-hidden />
-            </span>
-            <div>
-              <SheetTitle className="text-base font-semibold tracking-[-0.025em] sm:text-lg">Review &amp; confirm</SheetTitle>
-              <SheetDescription className="mt-1 hidden leading-5 sm:block">
-                Check every clinical detail before it enters the patient register.
-              </SheetDescription>
+        <SheetContent
+          className="surface-elevated overflow-hidden sm:max-w-2xl"
+          // Escape and an outside tap are the two accidental paths to losing a
+          // reviewed visit; the explicit Discard button in the footer is
+          // unaffected by either. Outside-tap is refused outright rather than
+          // prompted: on a phone the sheet occupies most of the screen and the
+          // strip beside it is exactly where a thumb lands by mistake.
+          onEscapeKeyDown={(event) => {
+            if (saveFailureRecovery === "screen") {
+              event.preventDefault();
+              return;
+            }
+            if (saveFailureRecovery === "saved") return;
+            if (isDirty && !confirmDiscard()) event.preventDefault();
+          }}
+          onPointerDownOutside={(event) => event.preventDefault()}
+        >
+          <SheetHeader className="border-b border-border px-4 pb-3 pt-3 sm:px-6 sm:pb-4 sm:pt-5">
+            <div className="flex items-start gap-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary-soft text-primary sm:size-10">
+                <ShieldCheck className="size-4" aria-hidden />
+              </span>
+              <div>
+                <SheetTitle className="text-base font-semibold tracking-[-0.025em] sm:text-lg">
+                  Review &amp; confirm
+                </SheetTitle>
+                <SheetDescription className="mt-1 hidden leading-5 sm:block">
+                  Check every clinical detail before it enters the patient
+                  register.
+                </SheetDescription>
+              </div>
             </div>
-          </div>
-        </SheetHeader>
+            {draft.source === "manual" && <VisitProgress step={3} />}
+          </SheetHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 sm:px-6 sm:pb-5">
-          <Alert variant="default" role="note" className="surface-inset mb-3 mt-3 w-auto border-primary/20 bg-primary-soft">
-            <ShieldCheck className="mt-0.5 size-4 text-primary" aria-hidden />
-            <AlertTitle className="text-xs font-semibold">Not saved yet</AlertTitle>
-            <AlertDescription className="hidden sm:block">
-              Transcription and extraction are suggestions. You remain the final reviewer.
-            </AlertDescription>
-          </Alert>
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 sm:px-6 sm:pb-5">
+            {actionError && (
+              <Alert variant="destructive" role="alert" className="mt-3">
+                <AlertTitle>Action failed</AlertTitle>
+                <AlertDescription>{actionError}</AlertDescription>
+              </Alert>
+            )}
+            <Alert
+              variant="default"
+              role="note"
+              className="surface-inset mb-3 mt-3 w-auto border-primary/20 bg-primary-soft"
+            >
+              <ShieldCheck className="mt-0.5 size-4 text-primary" aria-hidden />
+              <AlertTitle className="text-xs font-semibold">
+                Awaiting confirmation
+              </AlertTitle>
+              <AlertDescription className="hidden sm:block">
+                Confirm the patient, clinical details and prescription before
+                saving the visit.
+              </AlertDescription>
+            </Alert>
 
-          {(draft.warnings.length > 0 || degraded || retryError) && (
-            /* Warning stock: solid tinted card, full-strength border, and an icon.
+            {(draft.warnings.length > 0 || degraded || retryError) && (
+              /* Warning stock: solid tinted card, full-strength border, and an icon.
                The three cues are redundant on purpose — this banner is the only
                thing standing between a bad transcription and a medical record. */
-            <div className="mb-3 flex gap-2.5 rounded-xl border border-warning/30 bg-warning-soft px-3.5 py-3">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
-              <ul className="space-y-0.5 text-xs leading-5 text-foreground">
-                {degraded && (
-                  <li>
-                    Transcribed by the backup engine — accuracy on mixed-language speech
-                    is lower than usual.
-                  </li>
-                )}
-                {draft.warnings.map((warning) => (
-                  <li key={warning}>{warning}</li>
-                ))}
-                {retryError && <li>{retryError}</li>}
-              </ul>
-            </div>
-          )}
+              <div className="mb-3 flex gap-2.5 rounded-xl border border-warning/30 bg-warning-soft px-3.5 py-3">
+                <AlertTriangle
+                  className="mt-0.5 size-4 shrink-0 text-warning"
+                  aria-hidden
+                />
+                <ul className="space-y-0.5 text-xs leading-5 text-foreground">
+                  {degraded && (
+                    <li>
+                      Transcribed by the backup engine — accuracy on
+                      mixed-language speech is lower than usual.
+                    </li>
+                  )}
+                  {draft.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                  {retryError && <li>{retryError}</li>}
+                </ul>
+              </div>
+            )}
 
-          {draft.transcriptId && (
-            <div className="surface-inset mb-3 flex items-center justify-between gap-3 rounded-xl px-3 py-2.5">
-              <p className="min-w-0 text-xs leading-4 text-muted-foreground">
-                <span className="sm:hidden">Audio kept temporarily for retry.</span>
-                <span className="hidden sm:inline">Audio is retained temporarily if the transcription needs another pass.</span>
-              </p>
-              <Button type="button" variant="outline" size="sm" onClick={retryFromAudio} disabled={retrying} className="shrink-0">
-                {retrying ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-                {retrying ? "Retrying…" : "Retry audio"}
-              </Button>
-            </div>
-          )}
+            {draft.transcriptId && (
+              <div className="surface-inset mb-3 flex items-center justify-between gap-3 rounded-xl px-3 py-2.5">
+                <p className="min-w-0 text-xs leading-4 text-muted-foreground">
+                  <span className="sm:hidden">
+                    Audio kept temporarily for retry.
+                  </span>
+                  <span className="hidden sm:inline">
+                    Audio is retained temporarily if the transcription needs
+                    another pass.
+                  </span>
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={retryFromAudio}
+                  disabled={retrying}
+                  className="shrink-0"
+                >
+                  {retrying ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                  ) : null}
+                  {retrying ? "Retrying…" : "Retry audio"}
+                </Button>
+              </div>
+            )}
 
-          {checklist.length > 0 && (
-            <ReviewNavigator
-              items={checklist}
-              activeIndex={reviewIndex}
-              reviewedKeys={reviewedKeys}
-              onFocus={focusReviewItem}
-            />
-          )}
+            {checklist.length > 0 && (
+              <ReviewNavigator
+                items={checklist}
+                activeIndex={reviewIndex}
+                reviewedKeys={reviewedKeys}
+                onFocus={focusReviewItem}
+              />
+            )}
 
-          {/*
+            {/*
             Above section 01, deliberately. This is what the chart already knows
             about the patient — an allergy, an anticoagulant — and it is only
             useful if it is read before the dentist decides anything. Placing it
@@ -731,308 +869,381 @@ export function ReviewSheet({
             It appears only once a chart is linked, because until then there is
             no record to speak for: a dictated name is not a patient yet.
           */}
-          <SafetyPanel
-            alerts={patientAlerts}
-            medicalHistory={patientHistory}
-            prescription={drugs}
-            procedures={procedures}
-            className="mb-3 sm:mb-4"
-          />
+            <SafetyPanel
+              alerts={patientAlerts}
+              medicalHistory={patientHistory}
+              prescription={drugs}
+              procedures={procedures}
+              className="mb-3 sm:mb-4"
+            />
 
-          <div className="space-y-3 sm:space-y-4">
-          {/* ---- Patient ---------------------------------------------------- */}
-          <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
-            <div className="flex items-center gap-2">
-              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">01</span>
-              <h3 className="text-sm font-semibold tracking-[-0.015em]">Patient &amp; chart</h3>
-            </div>
+            <div className="space-y-3 sm:space-y-4">
+              {/* ---- Patient ---------------------------------------------------- */}
+              <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
+                <div className="flex items-center gap-2">
+                  <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">
+                    01
+                  </span>
+                  <h3 className="text-sm font-semibold tracking-[-0.015em]">
+                    Patient &amp; chart
+                  </h3>
+                </div>
 
-            <Field label="Patient" flagged={uncertain.has("patient_name")}>
-              <Input
-                id={reviewFieldId("patient_name")}
-                value={name}
-                onChange={(event) => {
-                  setName(event.target.value);
-                  markReviewed("patient_name");
-                }}
-                autoComplete="off"
-                className="h-11"
-              />
-            </Field>
-
-            {(patientCandidates.length > 0 || asNew || matching) && (
-              <PatientPicker
-                candidates={patientCandidates}
-                selectedId={patient?.id ?? null}
-                asNew={asNew}
-                onSelect={(match) => {
-                  setPatient(match);
-                  setAsNew(false);
-                }}
-                onSelectNew={() => {
-                  setAsNew(true);
-                  setPatient(null);
-                }}
-                onViewHistory={(match) => {
-                  setPatient(match);
-                  setAsNew(false);
-                  setHistoryPatient(match);
-                }}
-                matching={matching}
-              />
-            )}
-
-            {asNew && (
-              <div className="grid gap-3 rounded-xl border border-primary/20 bg-primary-soft p-3 sm:grid-cols-2">
-                <Field label="New chart phone">
+                <Field label="Patient" flagged={uncertain.has("patient_name")}>
                   <Input
-                    id="review-new-patient-phone"
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    inputMode="tel"
-                    autoComplete="tel"
-                    placeholder="Optional, helps avoid duplicate charts"
+                    id={reviewFieldId("patient_name")}
+                    value={name}
+                    onChange={(event) => {
+                      setName(event.target.value);
+                      // A changed name invalidates an earlier chart choice immediately.
+                      // Do not allow a commit to race the debounced patient lookup.
+                      if (patient) {
+                        setPatient(null);
+                        setAsNew(false);
+                      }
+                      markReviewed("patient_name");
+                    }}
+                    autoComplete="off"
                     className="h-11"
                   />
                 </Field>
-                <Field label="Sex">
-                  <Select
-                    id="review-new-patient-sex"
-                    value={sex}
-                    onChange={(event) => setSex(event.target.value as PatientSex | "")}
-                    className="h-11"
-                  >
-                    <option value="">Not stated</option>
-                    {PATIENT_SEX_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </Select>
-                </Field>
-              </div>
-            )}
 
-            <div className="max-w-48">
-              <Field label="Age" flagged={uncertain.has("age_years")}>
-                <Input
-                  id={reviewFieldId("age_years")}
-                  value={age}
-                  onChange={(event) => {
-                    setAge(event.target.value);
-                    markReviewed("age_years");
-                  }}
-                  inputMode="numeric"
-                  className="tnum h-11"
-                />
-              </Field>
-            </div>
-          </section>
+                {(patientCandidates.length > 0 || asNew || matching) && (
+                  <PatientPicker
+                    candidates={patientCandidates}
+                    selectedId={patient?.id ?? null}
+                    asNew={asNew}
+                    onSelect={(match) => {
+                      setPatient(match);
+                      setAsNew(false);
+                    }}
+                    onSelectNew={() => {
+                      setAsNew(true);
+                      setPatient(null);
+                    }}
+                    onViewHistory={(match) => {
+                      setPatient(match);
+                      setAsNew(false);
+                      setHistoryPatient(match);
+                    }}
+                    matching={matching}
+                  />
+                )}
 
-          <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
-            <div className="flex items-center gap-2">
-              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">02</span>
-              <div>
-                <h3 className="text-sm font-semibold tracking-[-0.015em]">Dental chart &amp; findings</h3>
-                <p className="text-xs text-muted-foreground">
-                  {chartLoading
-                    ? "Loading the selected patient’s existing tooth history…"
-                    : patient
-                      ? "Existing history is shown underneath today’s highlighted teeth."
-                      : "Choose an existing patient to add their previous tooth history."}
-                </p>
-              </div>
-            </div>
-            <ToothFindingEditor
-              value={toothFindings}
-              onChange={setToothFindings}
-              status={patientToothStatus}
-              relatedTeeth={procedures
-                .map((procedure) => procedure.tooth_fdi)
-                .filter((tooth): tooth is number => typeof tooth === "number")
-                .concat(extractFdiTeeth(diagnosis), extractFdiTeeth(treatment))}
-              flaggedKeys={uncertain}
-              reviewedKeys={reviewedKeys}
-              onFieldChange={markReviewed}
-              title="What is wrong, and where?"
-              description="Teeth identified from dictation are highlighted. Tap any tooth to add or correct a finding."
-            />
-          </section>
+                {asNew && (
+                  <div className="grid gap-3 rounded-xl border border-primary/20 bg-primary-soft p-3 sm:grid-cols-2">
+                    <Field label="New chart phone">
+                      <Input
+                        id="review-new-patient-phone"
+                        value={phone}
+                        onChange={(event) => setPhone(event.target.value)}
+                        inputMode="tel"
+                        autoComplete="tel"
+                        placeholder="Optional, helps avoid duplicate charts"
+                        className="h-11"
+                      />
+                    </Field>
+                    <Field label="Sex">
+                      <Select
+                        id="review-new-patient-sex"
+                        value={sex}
+                        onChange={(event) =>
+                          setSex(event.target.value as PatientSex | "")
+                        }
+                        className="h-11"
+                      >
+                        <option value="">Not stated</option>
+                        {PATIENT_SEX_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  </div>
+                )}
 
-          <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
-            <div className="flex items-center gap-2">
-              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">03</span>
-              <h3 className="text-sm font-semibold tracking-[-0.015em]">Clinical assessment</h3>
-            </div>
+                <div className="max-w-48">
+                  <Field label="Age" flagged={uncertain.has("age_years")}>
+                    <Input
+                      id={reviewFieldId("age_years")}
+                      value={age}
+                      onChange={(event) => {
+                        setAge(event.target.value);
+                        markReviewed("age_years");
+                      }}
+                      inputMode="numeric"
+                      className="tnum h-11"
+                    />
+                  </Field>
+                </div>
+              </section>
 
-            {/* A textarea, not an input, because this is the confirmation screen.
+              <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
+                <div className="flex items-center gap-2">
+                  <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">
+                    02
+                  </span>
+                  <h3 className="text-sm font-semibold tracking-[-0.015em]">
+                    Clinical assessment
+                  </h3>
+                </div>
+
+                {/* A textarea, not an input, because this is the confirmation screen.
                 A real spoken diagnosis — "Type 2 diabetes mellitus, poorly
                 controlled; hypertension" — overflows a single line on a phone and
                 a one-line input hides the overflow, so the doctor would be signing
                 off on text they cannot see. It grows instead of scrolling. */}
-            <Field label="Diagnosis" flagged={uncertain.has("diagnosis")}>
-              <Textarea
-                id={reviewFieldId("diagnosis")}
-                value={diagnosis}
-                onChange={(event) => {
-                  setDiagnosis(event.target.value);
-                  markReviewed("diagnosis");
-                }}
-                rows={2}
-                className="resize-none"
-              />
-            </Field>
-
-            <Field label="Treatment" flagged={uncertain.has("treatment")}>
-              <Textarea
-                id={reviewFieldId("treatment")}
-                value={treatment}
-                onChange={(event) => {
-                  setTreatment(event.target.value);
-                  markReviewed("treatment");
-                }}
-                rows={2}
-                className="resize-none"
-              />
-            </Field>
-          </section>
-
-          {/* ---- Accounts -------------------------------------------------- */}
-          <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
-            <div className="flex items-center gap-2">
-              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">04</span>
-              <div>
-                <h3 className="text-sm font-semibold tracking-[-0.015em]">Procedures</h3>
-                <p className="text-xs text-muted-foreground">What was done, and to which tooth.</p>
-              </div>
-            </div>
-            <ProcedureEditor
-              value={procedures}
-              onChange={setProcedures}
-              flaggedKeys={uncertain}
-              reviewedKeys={reviewedKeys}
-              onFieldChange={markReviewed}
-            />
-          </section>
-
-          <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
-            <div className="flex items-center gap-2">
-              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">05</span>
-              <div>
-                <h3 className="text-sm font-semibold tracking-[-0.015em]">Consultation amount</h3>
-                <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
-                  Added to Accounts automatically when this visit is saved.
-                </p>
-              </div>
-            </div>
-
-            <div className="max-w-52">
-              <Field label="Amount" flagged={uncertain.has("consultation_fee_inr")}>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
-                  <Input
-                    id={reviewFieldId("consultation_fee_inr")}
-                    value={consultationFee}
+                <Field label="Diagnosis" flagged={uncertain.has("diagnosis")}>
+                  <Textarea
+                    id={reviewFieldId("diagnosis")}
+                    value={diagnosis}
                     onChange={(event) => {
-                      setConsultationFee(event.target.value);
-                      markReviewed("consultation_fee_inr");
+                      setDiagnosis(event.target.value);
+                      markReviewed("diagnosis");
                     }}
-                    inputMode="decimal"
-                    placeholder="Not stated"
-                    className="tnum h-11 pl-7 text-money"
+                    rows={2}
+                    className="resize-none"
                   />
+                </Field>
+
+                <Field label="Treatment" flagged={uncertain.has("treatment")}>
+                  <Textarea
+                    id={reviewFieldId("treatment")}
+                    value={treatment}
+                    onChange={(event) => {
+                      setTreatment(event.target.value);
+                      markReviewed("treatment");
+                    }}
+                    rows={2}
+                    className="resize-none"
+                  />
+                </Field>
+              </section>
+
+              <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
+                <div className="flex items-center gap-2">
+                  <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">
+                    03
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold tracking-[-0.015em]">
+                      Dental chart &amp; findings
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      {chartLoading
+                        ? "Loading the selected patient’s existing tooth history…"
+                        : patient
+                          ? "Existing history is shown underneath today’s highlighted teeth."
+                          : "Choose an existing patient to add their previous tooth history."}
+                    </p>
+                  </div>
                 </div>
-              </Field>
-            </div>
-          </section>
+                <ToothFindingEditor
+                  value={toothFindings}
+                  onChange={setToothFindings}
+                  status={patientToothStatus}
+                  relatedTeeth={procedures
+                    .map((procedure) => procedure.tooth_fdi)
+                    .filter(
+                      (tooth): tooth is number => typeof tooth === "number",
+                    )
+                    .concat(
+                      extractFdiTeeth(diagnosis),
+                      extractFdiTeeth(treatment),
+                    )}
+                  flaggedKeys={uncertain}
+                  reviewedKeys={reviewedKeys}
+                  onFieldChange={markReviewed}
+                  title="What is wrong, and where?"
+                  description="Teeth identified from dictation are highlighted. Tap any tooth to add or correct a finding."
+                />
+              </section>
 
-          {/* ---- Prescription ------------------------------------------------ */}
-          <section className="surface-inset rounded-xl p-3 sm:p-4">
-            <div className="mb-4 flex items-center gap-2">
-              <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">06</span>
-              <h3 className="text-sm font-semibold tracking-[-0.015em]">Prescription</h3>
-            </div>
-            <MedicationEditor
-              value={drugs}
-              onChange={setDrugs}
-              flaggedKeys={uncertain}
-              reviewedKeys={reviewedKeys}
-              onFieldChange={markReviewed}
-            />
+              {/* ---- Accounts -------------------------------------------------- */}
+              <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
+                <div className="flex items-center gap-2">
+                  <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">
+                    04
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold tracking-[-0.015em]">
+                      Procedures
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      What was done, and to which tooth.
+                    </p>
+                  </div>
+                </div>
+                <ProcedureEditor
+                  value={procedures}
+                  onChange={setProcedures}
+                  flaggedKeys={uncertain}
+                  reviewedKeys={reviewedKeys}
+                  onFieldChange={markReviewed}
+                />
+              </section>
 
-            {/* Below the editor, not above it: the doctor is reading the list
+              <section className="surface-inset space-y-3 rounded-xl p-3 sm:space-y-4 sm:p-4">
+                <div className="flex items-center gap-2">
+                  <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">
+                    05
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold tracking-[-0.015em]">
+                      Consultation amount
+                    </h3>
+                    <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
+                      Added to Accounts automatically when this visit is saved.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="max-w-52">
+                  <Field
+                    label="Amount"
+                    flagged={uncertain.has("consultation_fee_inr")}
+                  >
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                        ₹
+                      </span>
+                      <Input
+                        id={reviewFieldId("consultation_fee_inr")}
+                        value={consultationFee}
+                        onChange={(event) => {
+                          setConsultationFee(event.target.value);
+                          markReviewed("consultation_fee_inr");
+                        }}
+                        inputMode="decimal"
+                        placeholder="Not stated"
+                        className="tnum h-11 pl-7 text-money"
+                      />
+                    </div>
+                  </Field>
+                </div>
+              </section>
+
+              {/* ---- Prescription ------------------------------------------------ */}
+              <section className="surface-inset rounded-xl p-3 sm:p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <span className="tnum grid size-6 place-items-center rounded-md bg-primary-soft text-xs font-semibold text-primary">
+                    06
+                  </span>
+                  <h3 className="text-sm font-semibold tracking-[-0.015em]">
+                    Prescription
+                  </h3>
+                </div>
+                <MedicationEditor
+                  value={drugs}
+                  onChange={setDrugs}
+                  flaggedKeys={uncertain}
+                  reviewedKeys={reviewedKeys}
+                  onFieldChange={markReviewed}
+                />
+
+                {/* Below the editor, not above it: the doctor is reading the list
                 they just dictated, and a note about it belongs after the thing
                 it is about. Recomputed as they edit, so removing one of a pair
                 clears the note without a save. */}
-            <InteractionWarnings prescription={drugs} className="mt-4" />
-          </section>
+                <InteractionWarnings prescription={drugs} className="mt-4" />
+              </section>
 
-          {/* The evidence behind every field above. Provider output, never
+              {/* The evidence behind every field above. Provider output, never
               rewritten by the model that produced the structure. */}
-          <div className="rounded-xl border border-border bg-card p-3.5">
-            <button
-              type="button"
-              onClick={() => setShowTranscript((open) => !open)}
-              aria-expanded={showTranscript}
-              className="touch-manipulation rounded-lg text-xs font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-2"
-            >
-              {showTranscript ? "Hide" : "Show"} what you said
-            </button>
-            <AnimatePresence>
-              {showTranscript && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <p className="surface-inset mt-2 rounded-lg p-3 text-xs leading-relaxed text-foreground">
-                    {rawText}
-                    {romanText && romanText !== rawText && (
-                      <span className="text-muted-foreground mt-2 block">{romanText}</span>
+              {(rawText || romanText) && (
+                <div className="rounded-xl border border-border bg-card p-3.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowTranscript((open) => !open)}
+                    aria-expanded={showTranscript}
+                    className="touch-manipulation rounded-lg text-xs font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-2"
+                  >
+                    {showTranscript ? "Hide" : "Show"} what you said
+                  </button>
+                  <AnimatePresence>
+                    {showTranscript && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <p className="surface-inset mt-2 rounded-lg p-3 text-xs leading-relaxed text-foreground">
+                          {rawText}
+                          {romanText && romanText !== rawText && (
+                            <span className="text-muted-foreground mt-2 block">
+                              {romanText}
+                            </span>
+                          )}
+                        </p>
+                      </motion.div>
                     )}
-                  </p>
-                </motion.div>
+                  </AnimatePresence>
+                </div>
               )}
-            </AnimatePresence>
+            </div>
           </div>
-        </div>
-        </div>
 
-        <SheetFooter className="flex-col items-stretch gap-2 px-3 pt-2 sm:px-6 sm:pt-3">
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
-            <span className={cn("size-1.5 rounded-full", pendingReviewCount > 0 ? "bg-warning" : autosaveState === "error" || autosaveState === "conflict" ? "bg-destructive" : "bg-primary")} aria-hidden />
-            {pendingReviewCount > 0
-              ? `${pendingReviewCount} flagged detail${pendingReviewCount === 1 ? " still needs" : "s still need"} review`
-              : autosaveState === "saving"
-                ? "Saving draft…"
-                : autosaveState === "saved"
-                  ? "Draft saved for recovery"
-                  : autosaveState === "error"
-                    ? "Autosave failed — your edits remain on screen"
-                    : "This draft changed elsewhere — reload before saving"}
-          </p>
-          {failure && (
-            <p role="alert" className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive">
-              {failure}
-            </p>
-          )}
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={saveFailureRecovery === "saved" ? onKeepForLater : onDiscard}
+          <SheetFooter className="flex-col items-stretch gap-2 px-3 pt-2 sm:px-6 sm:pt-3">
+            <p
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+              aria-live="polite"
             >
-              {saveFailureRecovery === "saved" ? "Keep for later" : "Discard"}
-            </Button>
-            <Button size="lg" onClick={save} disabled={saving || pendingReviewCount > 0} className="flex-1">
-              {saving ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <Check className="size-4" aria-hidden />
-              )}
-              {saveFailureRecovery ? "Try saving again" : "Confirm & save"}
-            </Button>
-          </div>
-        </SheetFooter>
+              <span
+                className={cn(
+                  "size-1.5 rounded-full",
+                  pendingReviewCount > 0
+                    ? "bg-warning"
+                    : autosaveState === "error" || autosaveState === "conflict"
+                      ? "bg-destructive"
+                      : "bg-primary",
+                )}
+                aria-hidden
+              />
+              {pendingReviewCount > 0
+                ? `${pendingReviewCount} flagged detail${pendingReviewCount === 1 ? " still needs" : "s still need"} review`
+                : autosaveState === "saving"
+                  ? "Saving draft…"
+                  : autosaveState === "saved"
+                    ? "Draft saved for recovery"
+                    : autosaveState === "error"
+                      ? "Autosave failed — your edits remain on screen"
+                      : "This draft changed elsewhere — reload before saving"}
+            </p>
+            {failure && (
+              <p
+                role="alert"
+                className="rounded-xl border border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive"
+              >
+                {failure}
+              </p>
+            )}
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={
+                  saveFailureRecovery === "saved" ? onKeepForLater : onDiscard
+                }
+              >
+                {saveFailureRecovery === "saved" ? "Keep for later" : "Discard"}
+              </Button>
+              <Button
+                size="lg"
+                onClick={save}
+                disabled={saving || pendingReviewCount > 0}
+                className="flex-1"
+              >
+                {saving ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Check className="size-4" aria-hidden />
+                )}
+                {saveFailureRecovery ? "Try saving again" : "Confirm & save"}
+              </Button>
+            </div>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
 
@@ -1059,7 +1270,9 @@ export function ReviewSheet({
               : match;
           setPatientCandidates((current) => current.map(applyUpdate));
           setPatient((current) => (current ? applyUpdate(current) : current));
-          setHistoryPatient((current) => (current ? applyUpdate(current) : current));
+          setHistoryPatient((current) =>
+            current ? applyUpdate(current) : current,
+          );
         }}
       />
     </>
@@ -1116,7 +1329,9 @@ function PatientPicker({
       seen.set(key, (seen.get(key) ?? 0) + 1);
     }
     return new Set(
-      [...seen.entries()].filter(([, count]) => count > 1).map(([name]) => name),
+      [...seen.entries()]
+        .filter(([, count]) => count > 1)
+        .map(([name]) => name),
     );
   }, [candidates]);
 
@@ -1127,8 +1342,12 @@ function PatientPicker({
     () =>
       [...collisions].some((name) =>
         candidates
-          .filter((candidate) => candidate.full_name.trim().toLowerCase() === name)
-          .every((candidate) => !candidate.phone && candidate.age_years == null),
+          .filter(
+            (candidate) => candidate.full_name.trim().toLowerCase() === name,
+          )
+          .every(
+            (candidate) => !candidate.phone && candidate.age_years == null,
+          ),
       ),
     [candidates, collisions],
   );
@@ -1139,7 +1358,8 @@ function PatientPicker({
         Which chart is this? Nothing is linked until you choose.
       </legend>
       <p className="mt-1 text-xs leading-4 text-muted-foreground">
-        Open a chart to review the patient&rsquo;s complete recorded history before linking this visit.
+        Open a chart to review the patient&rsquo;s complete recorded history
+        before linking this visit.
         {matching && <span className="ml-2">Searching…</span>}
       </p>
 
@@ -1148,10 +1368,13 @@ function PatientPicker({
           role="alert"
           className="mt-2 flex gap-2 rounded-xl border border-destructive/25 bg-destructive/8 px-3 py-2.5 text-xs leading-relaxed text-foreground"
         >
-          <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-destructive" aria-hidden />
+          <AlertTriangle
+            className="mt-0.5 size-3.5 shrink-0 text-destructive"
+            aria-hidden
+          />
           <span>
-            Two charts share this name and neither has a phone number or age on file.
-            Confirm with the patient before saving, or start a new chart.
+            Two charts share this name and neither has a phone number or age on
+            file. Confirm with the patient before saving, or start a new chart.
           </span>
         </p>
       )}
@@ -1195,9 +1418,13 @@ function ReviewNavigator({
   onFocus: (index: number) => void;
 }) {
   const nextIndex = items.findIndex((item) => !reviewedKeys.has(item.key));
-  const targetIndex = nextIndex >= 0 ? nextIndex : Math.min(activeIndex, items.length - 1);
+  const targetIndex =
+    nextIndex >= 0 ? nextIndex : Math.min(activeIndex, items.length - 1);
   return (
-    <section aria-label="Fields to review" className="mb-3 rounded-xl border border-warning/30 bg-warning-soft p-3">
+    <section
+      aria-label="Fields to review"
+      className="mb-3 rounded-xl border border-warning/30 bg-warning-soft p-3"
+    >
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold">Review flagged details</p>
@@ -1205,7 +1432,13 @@ function ReviewNavigator({
             {reviewedKeys.size} of {items.length} checked
           </p>
         </div>
-        <Button type="button" size="sm" variant="outline" onClick={() => onFocus(targetIndex)} className="border-warning/30 bg-warning-soft text-warning">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => onFocus(targetIndex)}
+          className="border-warning/30 bg-warning-soft text-warning"
+        >
           {nextIndex >= 0 ? "Review next" : "Review again"}
         </Button>
       </div>
@@ -1222,7 +1455,8 @@ function ReviewNavigator({
                   : "border-warning/30 bg-warning-soft text-warning",
               )}
             >
-              {reviewedKeys.has(item.key) ? "✓ " : ""}{item.label}
+              {reviewedKeys.has(item.key) ? "✓ " : ""}
+              {item.label}
             </button>
           </li>
         ))}
@@ -1286,7 +1520,9 @@ function PatientOption({
       </span>
       {/* Tabular figures so the ages and phone tails line up down the column
           and two rows can be compared by scanning rather than by reading. */}
-      <span className="text-muted-foreground tnum mt-0.5 block text-xs">{detail}</span>
+      <span className="text-muted-foreground tnum mt-0.5 block text-xs">
+        {detail}
+      </span>
     </span>
   );
 
@@ -1325,10 +1561,14 @@ function PatientOption({
           aria-hidden
           className={cn(
             "grid size-4 shrink-0 place-items-center rounded-full border transition-colors",
-            checked ? "border-primary bg-primary" : "border-border bg-background",
+            checked
+              ? "border-primary bg-primary"
+              : "border-border bg-background",
           )}
         >
-          {checked && <span className="bg-primary-foreground size-1.5 rounded-full" />}
+          {checked && (
+            <span className="bg-primary-foreground size-1.5 rounded-full" />
+          )}
         </span>
         {!onOpenHistory && patientDetails}
       </label>
@@ -1393,7 +1633,10 @@ function Field({
  * fallback is not defensive padding, it is the documented configuration.
  */
 function newIdempotencyKey(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
   return `k-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -1427,7 +1670,6 @@ function parseOptionalMoney(value: string): number | null {
   return consultationFeeError(value) ? null : parseNumber(value);
 }
 
-
 /**
  * The one place a reviewed visit can be thrown away by accident.
  *
@@ -1438,5 +1680,7 @@ function parseOptionalMoney(value: string): number | null {
  */
 function confirmDiscard(): boolean {
   if (typeof window === "undefined") return true;
-  return window.confirm("Discard this visit? What you have entered will be lost.");
+  return window.confirm(
+    "Discard this visit? What you have entered will be lost.",
+  );
 }

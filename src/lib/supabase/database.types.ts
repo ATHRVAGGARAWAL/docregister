@@ -542,6 +542,8 @@ export type Database = {
       }
       doctors: {
         Row: {
+          clerk_user_id: string | null
+          email: string | null
           approved_at: string | null
           approved_by: string | null
           clinic_id: string
@@ -557,6 +559,8 @@ export type Database = {
           speciality: string | null
         }
         Insert: {
+          clerk_user_id?: string | null
+          email?: string | null
           approved_at?: string | null
           approved_by?: string | null
           clinic_id: string
@@ -572,6 +576,8 @@ export type Database = {
           speciality?: string | null
         }
         Update: {
+          clerk_user_id?: string | null
+          email?: string | null
           approved_at?: string | null
           approved_by?: string | null
           clinic_id?: string

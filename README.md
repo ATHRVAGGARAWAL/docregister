@@ -31,10 +31,11 @@ evidence behind every structured field is always one tap away.
 | Styling | **Tailwind CSS v4** + local 21st.dev Geist adaptations | v4's `@theme` keeps the solid black/white palette, component tokens, and chart palette in one auditable CSS source. |
 | Animation | **Motion** (`motion/react`) | Short, functional state transitions with a global reduced-motion policy; no ambient or decorative animation. |
 | Charts | **Recharts 3** | SVG, composable, and it accepts a custom `shape` — needed to render the 2px surface gap in the stacked column chart as genuine negative space rather than a fake surface-coloured stroke. |
-| Database / Auth / Storage | **Supabase** (Postgres, ap-south-1) | Row Level Security is the multi-tenant boundary, enforced in the database rather than by every query remembering `where clinic_id = …`. Auth, private object storage and Postgres in one India-region project. |
+| Database / Storage | **Supabase** (Postgres, ap-south-1) | Row Level Security enforces clinic isolation for queries authenticated with Clerk session tokens. |
+| Authentication | **Clerk** | Sign-in, sign-up, session refresh and account controls, linked to stable doctor IDs. |
 | STT | **Sarvam AI** (`saaras:v3`), ElevenLabs fallback | The engine actually built for code-mixed Indian clinical speech. Its `codemix` mode keeps Hinglish intact instead of forcing it to one language; `translit` gives a romanised transcript a doctor can skim on a phone. Providers sit behind one interface (`src/lib/stt/`) so a swap is one file. |
 | LLM | **Claude Opus 5** (`claude-opus-5`) | Structured outputs via `messages.parse()` + a Zod schema, so extraction is validated at the tool-call layer instead of parsed out of prose. Adaptive thinking; prompt caching on the static instruction block. |
-| Live transcript | Node **WebSocket proxy** (`server/stt-proxy.ts`) | Sarvam's realtime socket authenticates with the API key in a subprotocol — i.e. in client-side code. The proxy verifies the doctor's Supabase JWT, then dials upstream, so the key never reaches a browser. |
+| Live transcript | Node **WebSocket proxy** (`server/stt-proxy.ts`) | Sarvam's realtime socket authenticates with the API key in a subprotocol — i.e. in client-side code. The proxy verifies the doctor's Clerk session JWT, then dials upstream, so the key never reaches a browser. |
 
 **Residency.** ABDM's Health Data Management Policy requires personal health
 data to stay inside India. The Supabase project must be created in Mumbai
@@ -64,7 +65,7 @@ docregister/
 │   │   ├── page.tsx                    Server component: doctor + analytics + today's register
 │   │   ├── layout.tsx                  Fonts, metadata, theme bootstrap
 │   │   ├── globals.css                 Solid-surface design tokens and motion policy
-│   │   ├── login/page.tsx              Magic-link sign-in
+│   │   ├── sign-in/[[...sign-in]]/page.tsx  Clerk sign-in
 │   │   ├── auth/callback/route.ts      PKCE code exchange
 │   │   └── api/
 │   │       ├── encounters/transcribe/  1. audio → transcript
@@ -159,7 +160,7 @@ flagged `needs_review` rather than guessed.
 
 ```bash
 npm install
-cp .env.local.example .env.local     # fill in the two Supabase values
+cp .env.local.example .env.local     # fill in Supabase values; Clerk CLI adds its keys
 ```
 
 **1. Create the Supabase project in Mumbai (ap-south-1).** Region is fixed at
@@ -171,17 +172,20 @@ creation and ABDM requires India residency.
 npx supabase db push
 ```
 
-`0003` is not optional. Every RLS policy keys off `auth_clinic_id()`, which
-reads the `doctors` table — so a brand-new user with no `doctors` row cannot
-even create their own clinic. A `SECURITY DEFINER` trigger on `auth.users`
-breaks that deadlock at sign-up.
+Apply `0040_clerk_auth.sql` before using Clerk sessions with the database.
+It preserves doctor UUIDs and updates the existing tenant policies.
 
-`0016` moves historical visit fees into the doctor-scoped Accounts ledger,
-scrubs financial values from clinical records, and prevents them from being
-written back there. Apply it before opening the Accounts tab.
+**3. Set up Clerk.**
 
-**3. Enable email sign-in** (Authentication → Providers → Email) and add
-`http://localhost:3000/auth/callback` to the redirect allow-list.
+```bash
+clerk auth login
+clerk init --app app_3IxoXlaJOkQEfY1sHt5eDDauIsW
+clerk doctor
+```
+
+Enable Clerk's Supabase integration and add the Clerk instance as a third-party
+auth provider in Supabase. Follow [Clerk authentication](docs/clerk-authentication.md)
+for the session claim, migration, transcription service and testing setup.
 
 **4. Run it.**
 
@@ -199,7 +203,7 @@ npm run dev:https   # same pair, with a locally-trusted certificate
 ```
 
 and open the `https://<lan-ip>:3000` URL on the handset. Add that origin to the
-Supabase redirect allow-list too, or the magic link will bounce.
+Clerk configuration and `CLERK_AUTHORIZED_PARTIES` on the transcription service.
 
 One caveat, so it is not a surprise: the live-transcript proxy still speaks
 `ws://`, which an https page treats as mixed content and blocks. Dictation,
@@ -216,6 +220,15 @@ including a canned Hinglish live-transcript stream. Sign in, then optionally run
 **5. Go live** by filling in `SARVAM_API_KEY` and `ANTHROPIC_API_KEY`, then
 setting `STT_PROVIDER=sarvam` and `LLM_MOCK=0`.
 
+To use GPT-6 Astra for extraction and recall, set `LLM_PROVIDER=openai`,
+`LLM_MOCK=0`, and `OPENAI_API_KEY` in your local environment. Set
+`OPENAI_BASE_URL` to your Azure resource's `/openai/v1` endpoint when using
+Azure OpenAI. `OPENAI_MODEL` and `OPENAI_FAST_MODEL` default to `gpt-6-astra`;
+the fast workflow uses low reasoning and clinical extraction uses medium.
+The adapter uses the Responses API with strict JSON schemas and `store=false`.
+The local demo launcher reads `.env.demo.local`, so configure that file too
+when running `node demo/local-run/start.mjs`.
+
 ```bash
 npm run typecheck   # next typegen && tsc --noEmit
 npm run lint
@@ -226,9 +239,12 @@ npm run build
 
 ## Notes on the UI
 
-**Solid, system-native surfaces.** Page backgrounds are exactly white or black.
-Grouped content uses opaque `#f5f5f7` / `#1c1c1e` surfaces with hairline
-separators, while Apple blue is reserved for focus and primary action. The
+The current navigation, visit flow, recovery behavior, and remaining feature gaps
+are mapped in [Product workflows](docs/product-workflows.md).
+
+**A focused clinic workspace.** A neutral workspace background separates white
+(or dark) content panels. Consistent spacing and typography establish hierarchy,
+while blue identifies focus and primary actions. The
 default appearance follows the operating system and can be overridden with the
 System / Light / Dark control.
 
@@ -239,8 +255,8 @@ are fetched at runtime. Functional glyphs use the original 24×24 icon set in
 app lockup and install icons.
 
 **Compact clinical hierarchy.** Desktop uses a persistent sidebar and dense
-tables or grouped lists. Mobile uses one top menu for every workspace and keeps
-the safe-area-aware bottom edge for the voice dock. Review and detail surfaces
+tables or grouped lists. Mobile keeps Today, Schedule and Patients in the top navigation, with secondary
+tools in More. The voice dock appears during capture and recovery. Review and detail surfaces
 remain accessible Radix dialogs with sticky actions and explicit focus handling.
 
 **Accessibility is not colour alone.** Uncertain extracted fields carry a dot

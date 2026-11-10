@@ -15,6 +15,9 @@
 /** Origins the browser is allowed to open a connection to. */
 function connectOrigins(): string[] {
   const origins = new Set<string>(["'self'"]);
+  const clerk = clerkOrigin();
+  if (clerk) origins.add(clerk);
+  origins.add("https://*.protect.clerk.com:*");
 
   // Supabase: PostgREST and GoTrue over https, realtime over wss. Derived from
   // the configured URL rather than a wildcard, so a compromised bundle cannot
@@ -44,6 +47,18 @@ function connectOrigins(): string[] {
   return [...origins];
 }
 
+function clerkOrigin(): string | null {
+  const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  if (!key) return null;
+  try {
+    const host = Buffer.from(key.replace(/^pk_(test|live)_/, ""), "base64")
+      .toString("utf8").replace(/\$$/, "");
+    return new URL(`https://${host}`).origin;
+  } catch {
+    return null;
+  }
+}
+
 export function buildCsp(nonce: string, { dev }: { dev: boolean }): string {
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
@@ -64,7 +79,8 @@ export function buildCsp(nonce: string, { dev }: { dev: boolean }): string {
 
     // Next injects a nonce'd <style> for the critical CSS. Turbopack's dev
     // pipeline injects un-nonced ones too, hence the dev branch.
-    "style-src": ["'self'", dev ? "'unsafe-inline'" : `'nonce-${nonce}'`],
+    // Clerk's prebuilt controls inject styles at runtime in both environments.
+    "style-src": ["'self'", "'unsafe-inline'"],
 
     // Distinct from `style-src` on purpose. A CSP with a nonce on `style-src`
     // and no `style-src-attr` blocks every `style="..."` attribute — which
@@ -76,7 +92,7 @@ export function buildCsp(nonce: string, { dev }: { dev: boolean }): string {
 
     // blob: is the recorded dictation before upload. data: is the canvas
     // waveform readback.
-    "img-src": ["'self'", "blob:", "data:"],
+    "img-src": ["'self'", "blob:", "data:", "https://img.clerk.com"],
     "media-src": ["'self'", "blob:"],
 
     // next/font/google self-hosts at build time, so no Google origin here.
@@ -91,7 +107,7 @@ export function buildCsp(nonce: string, { dev }: { dev: boolean }): string {
     "base-uri": ["'none'"],
     "form-action": ["'self'"],
     "frame-ancestors": ["'none'"],
-    "frame-src": ["'none'"],
+    "frame-src": ["'self'", "https://challenges.cloudflare.com", "https://*.protect.clerk.com"],
   };
 
   // An HTTP page in production would leak session cookies and PHI on the wire.

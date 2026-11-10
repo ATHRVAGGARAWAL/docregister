@@ -6,10 +6,10 @@
  * talks to this authenticated proxy instead, and only the proxy holds that
  * key.
  *
- * The browser presents its Supabase access token instead. That token is
+ * The browser presents its Clerk session token. That token is
  * already scoped to one doctor, expires on its own, and is revocable.
  *
- *   browser --(ws, supabase JWT + Int16 PCM @16k)--> proxy --> ElevenLabs
+ *   browser --(ws, Clerk JWT + Int16 PCM @16k)--> proxy --> ElevenLabs
  *
  * Run with `npm run dev` (started alongside Next by concurrently) or
  * `npm run dev:proxy` on its own.
@@ -20,6 +20,7 @@ import { createServer } from "node:http";
 import { resolve } from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
+import { verifyToken } from "@clerk/backend";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 
 import {
@@ -64,6 +65,7 @@ const httpServer = createServer((request, response) => {
     config: {
       supabaseUrl: SUPABASE_URL,
       supabaseKey: SUPABASE_KEY,
+      clerkSecretKey: process.env.CLERK_SECRET_KEY,
       elevenLabsKey: ELEVENLABS_KEY,
       provider: STT_PROVIDER,
       // Mock transcripts are useful locally, but a production deployment that
@@ -159,8 +161,13 @@ server.on("connection", (client) => {
         client.close(1011, "proxy not configured");
         return;
       }
-      const { data: auth, error } = await supabase.auth.getUser(start.token);
-      if (error || !auth.user) {
+      try {
+        const claims = await verifyToken(start.token, {
+          secretKey: process.env.CLERK_SECRET_KEY,
+          authorizedParties: (process.env.CLERK_AUTHORIZED_PARTIES ?? "http://localhost:3000,http://127.0.0.1:3000").split(",").map(value => value.trim()),
+        });
+        if (!claims.sub || !claims.sid || claims.sts === "pending") throw new Error("Active session token required");
+      } catch {
         client.close(4401, "unauthorised");
         return;
       }
@@ -171,9 +178,22 @@ server.on("connection", (client) => {
       // the same budget without ever asking. Metered as the user, so the
       // policy applies per doctor exactly as it does over HTTP.
       const scoped = createClient(SUPABASE_URL, SUPABASE_KEY, {
-        auth: { persistSession: false, autoRefreshToken: false },
-        global: { headers: { Authorization: `Bearer ${start.token}` } },
+        accessToken: async () => start.token,
       });
+      const { data: doctorId, error: identityError } = await scoped.rpc("current_doctor_id");
+      if (identityError || !doctorId) {
+        client.close(4403, "clinic membership required");
+        return;
+      }
+      const { data: doctor, error: membershipError } = await scoped
+        .from("doctors")
+        .select("membership_status")
+        .eq("id", doctorId)
+        .maybeSingle();
+      if (membershipError || doctor?.membership_status !== "active") {
+        client.close(4403, "active clinic membership required");
+        return;
+      }
       const { data: allowed, error: limitError } = await scoped.rpc(
         "consume_rate_limit",
         { p_action: "transcribe" },

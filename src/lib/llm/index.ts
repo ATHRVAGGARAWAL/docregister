@@ -3,6 +3,7 @@ import "server-only";
 import { llmProviderName } from "@/lib/env";
 import { AnthropicProvider } from "./anthropic";
 import { GeminiProvider } from "./gemini";
+import { OpenAIProvider } from "./openai";
 import { LlmError as LlmErrorClass } from "./types";
 import type {
   LlmErrorCode,
@@ -36,7 +37,8 @@ export function getLlmProvider(): LlmProvider {
   if (existing) return existing;
 
   const created: LlmProvider =
-    name === "gemini" ? new GeminiProvider() : new AnthropicProvider();
+    name === "gemini" ? new GeminiProvider() :
+      name === "openai" ? new OpenAIProvider() : new AnthropicProvider();
   providers[name] = created;
   return created;
 }

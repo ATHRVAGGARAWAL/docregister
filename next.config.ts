@@ -31,6 +31,7 @@ const nextConfig: NextConfig = {
   // attached to fail. Private ranges only; this list is not consulted in a
   // production build.
   allowedDevOrigins: [
+    "docregister.localhost",
     "192.168.*.*",
     "172.16.*.*",
     "172.17.*.*",

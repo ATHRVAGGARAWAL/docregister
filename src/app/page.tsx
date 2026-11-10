@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 
 import { PendingApproval } from "@/components/clinic/pending-approval";
 import { Dashboard } from "@/components/dashboard/dashboard";
@@ -30,8 +31,9 @@ export default async function RegisterPage({
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
+  if (!(await auth()).isAuthenticated) redirect("/sign-in");
   const doctor = await getCurrentDoctor();
-  if (!doctor) redirect("/login");
+  if (!doctor) redirect("/onboarding");
 
   // Before anything is loaded, not after. Every query below resolves through
   // `auth_clinic_id()`, which is NULL until an owner admits this doctor — so

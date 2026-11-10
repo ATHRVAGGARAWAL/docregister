@@ -546,9 +546,12 @@ const PUBLIC_ROUTES = new Map([
   ["src/app/api/maintenance/audio-retention/route.ts", "machine endpoint on a shared secret"],
   [
     "src/app/api/auth/test-login/route.ts",
-    "allowlisted test identity protected by a separate high-entropy access code",
+    "retired endpoint returning 410; cannot create a session",
   ],
 ]);
+// Bootstrap authenticates with Clerk before a doctor record exists. Its
+// unauthenticated denial is exercised by the Clerk auth end-to-end tests.
+const IDENTITY_ROUTES = new Set(["src/app/api/auth/clinic/route.ts"]);
 
 test("the /api surface was found", () => {
   // A floor, not a count: every check below passes trivially against an empty
@@ -566,7 +569,7 @@ test("every route resolves a doctor before it does anything", async () => {
   // The rule `withDoctor` exists to enforce, checked where it can actually be
   // broken: by a new route file that never calls it. "Every route remembered to
   // authenticate" is not a security model, and this app holds patient records.
-  const unguarded = ROUTES.filter((route) => !PUBLIC_ROUTES.has(route.path)).flatMap((route) => {
+  const unguarded = ROUTES.filter((route) => !PUBLIC_ROUTES.has(route.path) && !IDENTITY_ROUTES.has(route.path)).flatMap((route) => {
     const wrapped = [...route.source.matchAll(new RegExp(`^export const ${HANDLER}\\s*=\\s*(\\w+)`, "gm"))];
     const bare = [...route.source.matchAll(new RegExp(`^export (?:async )?function ${HANDLER}\\b`, "gm"))];
 

@@ -68,18 +68,78 @@ export interface CommandWorkspace {
  * actually trying to do.
  */
 export const COMMAND_WORKSPACES: readonly CommandWorkspace[] = [
-  { id: "overview", label: "Overview", keywords: "home dashboard summary today numbers", icon: LayoutDashboardIcon },
-  { id: "register", label: "Register", keywords: "visits encounters daybook log drafts", icon: ClipboardListIcon },
-  { id: "patients", label: "Patients", keywords: "charts directory people records", icon: UsersRoundIcon },
-  { id: "recall", label: "Recall", keywords: "ask question search history", icon: HistoryIcon },
-  { id: "follow-ups", label: "Follow-ups", keywords: "callback review due reminders", icon: ClipboardClockIcon },
-  { id: "accounts", label: "Accounts", keywords: "money fees payments income expenses ledger", icon: LandmarkIcon },
-  { id: "schedule", label: "Schedule", keywords: "appointments chairs operatory booking diary calendar", icon: CalendarDaysIcon },
-  { id: "treatments", label: "Treatments", keywords: "plans quotes phases sittings course of treatment", icon: ToothIcon },
-  { id: "operations", label: "Lab & stock", keywords: "lab cases crown denture inventory materials expiry reorder", icon: ClipboardListIcon },
-  { id: "finance", label: "Finance", keywords: "invoices estimates outstanding receivables billing", icon: WalletCardsIcon },
-  { id: "reports", label: "Reports", keywords: "analytics trends business clinical performance", icon: ActivityIcon },
-  { id: "settings", label: "Settings", keywords: "profile preferences clinic account language", icon: Settings2Icon },
+  {
+    id: "overview",
+    label: "Today",
+    keywords: "home dashboard summary today numbers",
+    icon: LayoutDashboardIcon,
+  },
+  {
+    id: "register",
+    label: "Register",
+    keywords: "visits encounters daybook log drafts",
+    icon: ClipboardListIcon,
+  },
+  {
+    id: "patients",
+    label: "Patients",
+    keywords: "charts directory people records",
+    icon: UsersRoundIcon,
+  },
+  {
+    id: "recall",
+    label: "Search history",
+    keywords: "ask question search history",
+    icon: HistoryIcon,
+  },
+  {
+    id: "follow-ups",
+    label: "Follow-ups",
+    keywords: "callback review due reminders",
+    icon: ClipboardClockIcon,
+  },
+  {
+    id: "accounts",
+    label: "Cashbook",
+    keywords: "accounts money fees payments income expenses ledger",
+    icon: LandmarkIcon,
+  },
+  {
+    id: "schedule",
+    label: "Schedule",
+    keywords: "appointments chairs operatory booking diary calendar",
+    icon: CalendarDaysIcon,
+  },
+  {
+    id: "treatments",
+    label: "Treatments",
+    keywords: "plans quotes phases sittings course of treatment",
+    icon: ToothIcon,
+  },
+  {
+    id: "operations",
+    label: "Lab & stock",
+    keywords: "lab cases crown denture inventory materials expiry reorder",
+    icon: ClipboardListIcon,
+  },
+  {
+    id: "finance",
+    label: "Billing & payments",
+    keywords: "finance invoices estimates outstanding receivables billing",
+    icon: WalletCardsIcon,
+  },
+  {
+    id: "reports",
+    label: "Reports",
+    keywords: "analytics trends business clinical performance",
+    icon: ActivityIcon,
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    keywords: "profile preferences clinic account language",
+    icon: Settings2Icon,
+  },
 ];
 
 export interface CommandSources {
@@ -90,6 +150,7 @@ export interface CommandSources {
   onOpenVisit?: (entry: RegisterEntry) => void;
   patients: readonly PatientMatch[];
   onOpenPatient?: (patient: PatientMatch) => void;
+  onNewVisit?: () => void;
   onStartDictation?: () => void;
   onAddAccountEntry?: () => void;
   onExportRegister?: () => void;
@@ -108,6 +169,7 @@ export function buildCommandItems({
   onOpenVisit,
   patients,
   onOpenPatient,
+  onNewVisit,
   onStartDictation,
   onAddAccountEntry,
   onExportRegister,
@@ -154,11 +216,25 @@ export function buildCommandItems({
         label: visit.patient_name,
         detail: visit.diagnosis ?? undefined,
         meta: visitMeta(visit),
-        keywords: [visit.treatment ?? "", ...visit.drugs].join(" ").trim() || undefined,
-        icon: visit.status === "draft" ? ClipboardPenLineIcon : ClipboardListIcon,
+        keywords:
+          [visit.treatment ?? "", ...visit.drugs].join(" ").trim() || undefined,
+        icon:
+          visit.status === "draft" ? ClipboardPenLineIcon : ClipboardListIcon,
         run: () => onOpenVisit(visit),
       });
     }
+  }
+
+  if (onNewVisit) {
+    items.push({
+      id: "action:new-visit",
+      group: "actions",
+      label: "New visit",
+      detail: "Choose a patient and write a clinical note",
+      keywords: "manual type patient consultation",
+      icon: ClipboardPenLineIcon,
+      run: onNewVisit,
+    });
   }
 
   if (onStartDictation) {
@@ -209,7 +285,10 @@ export function buildCommandItems({
 function patientDetail(patient: PatientMatch): string | undefined {
   const parts: string[] = [];
   if (patient.age_years !== null) parts.push(`${patient.age_years} years`);
-  if (patient.visit_count) parts.push(patient.visit_count === 1 ? "1 visit" : `${patient.visit_count} visits`);
+  if (patient.visit_count)
+    parts.push(
+      patient.visit_count === 1 ? "1 visit" : `${patient.visit_count} visits`,
+    );
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 

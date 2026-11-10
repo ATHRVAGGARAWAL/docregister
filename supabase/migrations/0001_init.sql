@@ -30,7 +30,7 @@ create type stt_provider as enum ('sarvam', 'elevenlabs', 'indicconformer', 'moc
 -- ---------------------------------------------------------------------------
 
 create table clinics (
-  id           uuid primary key default uuid_generate_v4(),
+  id           uuid primary key default gen_random_uuid(),
   name         text not null,
   city         text,
   -- Every date bucket in this schema is computed `at time zone 'Asia/Kolkata'`,
@@ -66,7 +66,7 @@ create index doctors_clinic_idx on doctors (clinic_id);
 -- fuzzy-match against it, but a match is only ever a *suggestion* — the doctor
 -- confirms the patient in the review step before anything is committed.
 create table patients (
-  id              uuid primary key default uuid_generate_v4(),
+  id              uuid primary key default gen_random_uuid(),
   clinic_id       uuid not null references clinics (id) on delete cascade,
   full_name       text not null,
   -- lower(unaccent(full_name)) with whitespace collapsed; maintained by trigger.
@@ -114,7 +114,7 @@ create trigger patients_normalize_name
 -- The transcript of record is the *batch* result, not the live stream. The live
 -- WebSocket transcript exists only to give the doctor feedback while speaking.
 create table transcripts (
-  id             uuid primary key default uuid_generate_v4(),
+  id             uuid primary key default gen_random_uuid(),
   clinic_id      uuid not null references clinics (id) on delete cascade,
   doctor_id      uuid not null references doctors (id) on delete cascade,
   -- Supabase Storage object path in the private `recordings` bucket.
@@ -149,7 +149,7 @@ create index transcripts_doctor_idx on transcripts (doctor_id, created_at desc);
 -- ---------------------------------------------------------------------------
 
 create table encounters (
-  id            uuid primary key default uuid_generate_v4(),
+  id            uuid primary key default gen_random_uuid(),
   clinic_id     uuid not null references clinics (id) on delete cascade,
   doctor_id     uuid not null references doctors (id) on delete cascade,
   patient_id    uuid references patients (id) on delete set null,
@@ -217,7 +217,7 @@ create index encounters_pending_idx
 -- shorthand (BD, TDS, SOS, 1-0-1) is never emitted reliably by any STT engine,
 -- so it is parsed downstream rather than trusted from the transcript.
 create table prescription_items (
-  id           uuid primary key default uuid_generate_v4(),
+  id           uuid primary key default gen_random_uuid(),
   encounter_id uuid not null references encounters (id) on delete cascade,
   clinic_id    uuid not null references clinics (id) on delete cascade,
   drug_name    text not null,

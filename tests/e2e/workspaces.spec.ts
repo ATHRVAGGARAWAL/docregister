@@ -66,5 +66,5 @@ test("an unknown ?view= falls back to the overview rather than rendering nothing
   page,
 }) => {
   await page.goto("/?view=not-a-workspace");
-  await expect(currentWorkspace(page)).toHaveText("Overview");
+  await expect(currentWorkspace(page)).toHaveText("Today");
 });

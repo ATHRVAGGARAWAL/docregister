@@ -75,13 +75,13 @@ export function RecallWorkspace({
           <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary-soft">
             <SparklesIcon className="size-3.5" aria-hidden />
           </span>
-          Evidence-grounded recall
+          Patient history
         </p>
         <h1 className="mt-2.5 text-2xl font-semibold tracking-[-0.04em] sm:mt-3 sm:text-4xl">
-          Patient recall
+          Search history
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Ask naturally. Every answer stays tethered to the visits, dates, and medicines in your register.
+          Search previous diagnoses, treatments and prescriptions in your register.
         </p>
       </section>
 

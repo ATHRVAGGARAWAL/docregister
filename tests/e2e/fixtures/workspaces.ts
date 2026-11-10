@@ -1,7 +1,7 @@
 import type { Page } from "playwright/test";
 
 /**
- * The seven workspaces `?view=` can address, with the two things that prove one
+ * The twelve workspaces `?view=` can address, with the two things that prove one
  * of them actually rendered:
  *
  *  - `nav` is the label the sidebar marks `aria-current="page"`. It is the
@@ -21,23 +21,27 @@ export interface Workspace {
 }
 
 export const WORKSPACES: readonly Workspace[] = [
-  // The greeting depends on the hour in Asia/Kolkata, so match its shape.
-  { view: "overview", nav: "Overview", heading: /^Good (morning|afternoon|evening), / },
+  { view: "overview", nav: "Today", heading: /^Today$/ },
   { view: "register", nav: "Register", heading: "Patient register" },
   { view: "patients", nav: "Patients", heading: "Patient directory" },
-  { view: "recall", nav: "Recall", heading: "Patient recall" },
+  { view: "recall", nav: "Search history", heading: "Search history" },
   { view: "follow-ups", nav: "Follow-ups", heading: "Follow-up queue" },
-  { view: "accounts", nav: "Accounts", heading: "Accounts" },
+  { view: "accounts", nav: "Cashbook", heading: "Cashbook" },
+  { view: "schedule", nav: "Schedule", heading: /^Schedule$/ },
+  { view: "treatments", nav: "Treatments", heading: "Treatment plans" },
+  { view: "finance", nav: "Billing & payments", heading: "Billing & payments" },
+  { view: "operations", nav: "Lab & stock", heading: "Lab and inventory" },
+  { view: "reports", nav: "Reports", heading: /^Reports$/ },
   { view: "settings", nav: "Settings", heading: "Account & settings" },
 ];
 
 /**
  * The single nav item the app is currently claiming as the open workspace.
  *
- * Scoped to the primary navigation because `aria-current` is a general-purpose
+ * Scoped to the desktop sidebar because `aria-current` is a general-purpose
  * attribute, and a future breadcrumb or pagination control marking its own
  * current item must not silently become what these tests assert on.
  */
 export function currentWorkspace(page: Page) {
-  return page.locator('nav[aria-label="Primary navigation"] [aria-current="page"]');
+  return page.locator('.clinical-sidebar [aria-current="page"]');
 }

@@ -1,3 +1,5 @@
+import { ClerkProvider } from "@clerk/nextjs";
+import { shadcn } from "@clerk/ui/themes";
 import type { Metadata, Viewport } from "next";
 import { MotionConfig } from "motion/react";
 import { headers } from "next/headers";
@@ -76,11 +78,26 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <InlineScript html={THEME_SCRIPT} nonce={nonce} />
       </head>
       <body className="flex min-h-full flex-col overflow-x-hidden">
-        <ThemeSync />
-        {/* One switch covers every `motion/react` transition; the CSS media
-            query handles stylesheet animation and the waveform has its own
-            reduced-motion level meter. */}
-        <MotionConfig reducedMotion="user">{children}</MotionConfig>
+        <ClerkProvider
+          dynamic
+          nonce={nonce}
+          appearance={{ theme: shadcn }}
+          telemetry={false}
+          localization={{
+            signIn: { start: { title: "Sign in to docregister", titleCombined: "Continue to docregister" } },
+            signUp: { start: { title: "Create your docregister account", titleCombined: "Create your docregister account" } },
+          }}
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+          signInFallbackRedirectUrl="/"
+          signUpFallbackRedirectUrl="/onboarding"
+        >
+          <ThemeSync />
+          {/* One switch covers every `motion/react` transition; the CSS media
+          query handles stylesheet animation and the waveform has its own
+          reduced-motion level meter. */}
+          <MotionConfig reducedMotion="user">{children}</MotionConfig>
+        </ClerkProvider>
       </body>
     </html>
   );

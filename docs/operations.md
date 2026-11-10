@@ -333,49 +333,18 @@ Then set the same value as `AUDIO_RETENTION_SECRET` in the host and redeploy.
 Between those two steps the job reports `secret mismatch`, which is the intended
 signal rather than a fault.
 
-## Email delivery will rate-limit before a second doctor joins
+## Authentication and test accounts
 
-Supabase's built-in email sender is rate limited, and this project has already hit
-it: `/auth/v1/otp` answering `429: For security purposes, you can only request
-this after 36 seconds`. The per-address cooldown is roughly a minute, and the
-built-in sender also caps how many messages a project may send per hour.
+Clerk is the only sign-in provider. Configure account creation, email delivery,
+Google sign-in, and session settings in the Clerk Dashboard. See
+[Clerk authentication](clerk-authentication.md) for the Supabase database
+integration, migration, and local demo setup.
 
-That is survivable for one doctor signing in occasionally. It is not survivable
-the moment a colleague joins by clinic name and needs a link of their own while
-the first doctor is also signing in — and it is the sign-up path, so the failure
-lands on somebody's first impression of the app.
+Supabase magic links, password sign-in, and the old testing access code have been
+removed. `/login` redirects to `/sign-in`; `/api/auth/test-login` returns 410.
+Do not configure Supabase Auth SMTP or the retired `TEST_AUTH_*` settings.
 
-**Fix it before inviting anyone.** Supabase Dashboard → Project Settings → Auth →
-SMTP Settings, and point it at a real sender (Resend, SendGrid, Amazon SES, or
-the clinic's own provider). Custom SMTP removes the built-in cap; the per-address
-cooldown remains and is a reasonable anti-abuse measure.
-
-It is a dashboard change, not a code change — there is nothing to deploy.
-
-### What the app already does about it
-
-`src/app/login/page.tsx` parses the cooldown out of the provider's reply and
-turns it into a live countdown on the submit button, which stays disabled until
-it expires. The provider's own sentence is not shown: it names a number that is
-stale the instant it is painted, and the doctor is looking at the countdown.
-
-### Do not point the test suite at a working account
-
-`E2E_DOCTOR_EMAIL` must be a dedicated account. Every run mints a magic link, and
-that consumes the same per-address cooldown a real doctor needs to sign in — one
-suite run can lock somebody out of their own register. The suite uses
-`e2e-bot@docregister.test`, which owns its own clinic (`E2E Test Clinic
-(automated)`) seeded with obviously fictional patients, so tests never read a
-real patient record either.
-
-### Controlled production test access
-
-`TEST_AUTH_BYPASS_EMAILS` and `TEST_AUTH_ACCESS_CODE` enable the test-access
-field on `/login`. The shortcut only mints a normal RLS-governed session for an
-existing allowlisted user; it never creates an account, clinic, patient, visit,
-or demo record. The access code must be at least 24 characters and both values
-are server-only secrets.
-
-Remove either variable and redeploy to disable the endpoint. Keep seeded E2E
-data confined to `e2e-bot@docregister.test`; never add a real or manually tested
-doctor address to the seed workflow.
+`E2E_DOCTOR_EMAIL` must identify a dedicated Clerk development account with
+fictional clinical data. The suite uses Clerk testing helpers, and signup
+fixtures use `+clerk_test` addresses so they do not deliver email. Never point
+these tests at a real doctor's clinical workspace.

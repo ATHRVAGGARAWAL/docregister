@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import {
   ArrowUpRightIcon,
-  CalendarClockIcon,
   LoaderCircleIcon,
   SearchIcon,
   UsersRoundIcon,
+  PlusIcon,
 } from "@/components/icons";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { PatientMatch } from "@/hooks/use-voice-capture";
 import { formatCount, formatVisitDay, maskPhone } from "@/lib/format";
@@ -19,14 +20,7 @@ import { cn } from "@/lib/utils";
  *  list has settled before the doctor has finished reading what they typed. */
 const SEARCH_DEBOUNCE_MS = 300;
 
-/**
- * Every chart in the clinic, searchable.
- *
- * Charts remain cards at every breakpoint: names and recency are the dominant
- * scanning cues, while age, phone and visit count stay in a consistent place.
- * This avoids turning a wide desktop register into a dense spreadsheet that
- * cannot preserve the same one-handed reading order on a phone.
- */
+/** A searchable directory with stable positions for demographics and recency. */
 /**
  * Last-visit windows.
  *
@@ -52,6 +46,7 @@ export function PatientDirectory({
   days,
   onDaysChange,
   onOpenPatient,
+  onNewVisit,
 }: {
   patients: PatientMatch[];
   /** Charts matching the search. Not `patients.length`. */
@@ -67,6 +62,7 @@ export function PatientDirectory({
   days: number;
   onDaysChange: (days: number) => void;
   onOpenPatient: (patient: PatientMatch) => void;
+  onNewVisit: () => void;
 }) {
   // The box is typed into far faster than the network answers, so what is in it
   // is local and only becomes `query` once it has stopped changing.
@@ -89,26 +85,31 @@ export function PatientDirectory({
     <div className="space-y-7">
       <section className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-            <span className="grid size-6 place-items-center rounded-full border border-primary/20 bg-primary-soft">
-              <UsersRoundIcon className="size-3.5" aria-hidden />
-            </span>
-            Clinical index
+          <p className="text-xs font-medium text-muted-foreground">
+            Patient records
           </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
             Patient directory
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-            Every chart, organised for a fast glance between consultations.
+            Find a patient, review their history or start their next visit.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={onNewVisit}>
+            <PlusIcon aria-hidden />
+            New visit
+          </Button>
           {/*
             Filtered in Postgres, not here — see `loadPatients`. A window
             applied to the fetched page would narrow fifty rows and still report
             the count for the whole directory.
           */}
-          <div className="surface-inset flex w-fit items-center gap-1 rounded-full p-1" role="group" aria-label="Filter by last visit">
+          <div
+            className="surface-inset flex w-fit items-center gap-1 rounded-full p-1"
+            role="group"
+            aria-label="Filter by last visit"
+          >
             {RECENCY.map((option) => {
               const active = days === option.days;
               return (
@@ -118,7 +119,7 @@ export function PatientDirectory({
                   aria-pressed={active}
                   onClick={() => onDaysChange(option.days)}
                   className={cn(
-                    "pressable rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                    "pressable min-w-11 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                     active
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground",
@@ -129,28 +130,30 @@ export function PatientDirectory({
               );
             })}
           </div>
-        <p className="surface-inset flex w-fit items-center gap-2 rounded-full px-3.5 py-2 text-left text-xs font-medium text-muted-foreground sm:text-right">
-          {loading && !blank && (
-            <LoaderCircleIcon className="size-3.5 animate-spin" aria-hidden />
-          )}
-          {/* `totalCount` describes the last SUCCESSFUL response. After a
+          <p className="surface-inset flex w-fit items-center gap-2 rounded-full px-3.5 py-2 text-left text-xs font-medium text-muted-foreground sm:text-right">
+            {loading && !blank && (
+              <LoaderCircleIcon className="size-3.5 animate-spin" aria-hidden />
+            )}
+            {/* `totalCount` describes the last SUCCESSFUL response. After a
               failed load it is still whatever it was — 0 on the first attempt —
               so rendering it beside "Could not load patients" put a confident
               "0 patients" above an error that says the number is unknown. When
               the last request failed, the only honest count is the one we can
               see. */}
-          <span className="tnum">
-            {error
-              ? `${formatCount(patients.length)} shown`
-              : partial
-                ? `Showing ${formatCount(patients.length)} of ${formatCount(totalCount)} patients`
-                : `${formatCount(totalCount)} patient${totalCount === 1 ? "" : "s"}`}
-          </span>
-        </p>
+            <span className="tnum">
+              {!hasLoaded
+                ? "Loading patients…"
+                : error
+                  ? `${formatCount(patients.length)} shown`
+                  : partial
+                    ? `Showing ${formatCount(patients.length)} of ${formatCount(totalCount)} patients`
+                    : `${formatCount(totalCount)} patient${totalCount === 1 ? "" : "s"}`}
+            </span>
+          </p>
         </div>
       </section>
 
-      <section className="surface-elevated relative overflow-hidden rounded-[1.5rem] p-3 sm:p-4">
+      <section className="relative rounded-xl border border-border bg-background p-3">
         <form
           onSubmit={(event) => {
             // Nothing to submit — the debounce has already asked, or is about
@@ -170,8 +173,23 @@ export function PatientDirectory({
               placeholder="Search by name, or the last digits of a phone number"
               aria-label="Search patients"
               maxLength={120}
-              className="surface-inset h-13 rounded-[1.1rem] border-border bg-background pl-11 pr-4 text-[15px] shadow-none placeholder:text-muted-foreground/65"
+              className="h-11 rounded-lg bg-background pl-11 pr-20 text-sm"
+              data-shortcut-search
             />
+            {draft && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+                onClick={() => {
+                  setDraft("");
+                  onSearch("");
+                }}
+              >
+                Clear
+              </Button>
+            )}
           </div>
         </form>
       </section>
@@ -182,6 +200,14 @@ export function PatientDirectory({
             <AlertTitle>Could not load the patient list</AlertTitle>
             <AlertDescription>
               {error} Any names below are from your last successful search.
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-3"
+                onClick={() => onSearch(draft.trim())}
+              >
+                Retry
+              </Button>
             </AlertDescription>
           </Alert>
         )}
@@ -194,55 +220,54 @@ export function PatientDirectory({
             </p>
           </div>
         ) : blank ? (
-          !error && <EmptyDirectory query={query} />
+          !error && (
+            <>
+              <EmptyDirectory query={query} />
+              <div className="mt-4 flex justify-center">
+                <Button variant="outline" onClick={onNewVisit}>
+                  <PlusIcon aria-hidden />
+                  Start a new visit
+                </Button>
+              </div>
+            </>
+          )
         ) : (
           <>
-            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="overflow-hidden rounded-xl border border-border bg-background divide-y divide-border">
               {patients.map((patient) => (
                 <li key={patient.id}>
                   <button
                     type="button"
                     onClick={() => onOpenPatient(patient)}
-                    className={cn(
-                      "surface-card group relative flex min-h-44 w-full flex-col overflow-hidden rounded-[1.4rem] p-4 text-left",
-                      "transition-[transform,border-color,background-color] duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-card",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                    )}
+                    className="group flex min-h-20 w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-secondary sm:gap-4 sm:px-5"
                   >
-                    <span className="relative flex w-full items-start gap-3">
-                      <span aria-hidden className="relative grid size-12 shrink-0 place-items-center rounded-[1rem] border border-primary/20 bg-primary-soft text-sm font-semibold tracking-[-0.03em] text-primary">
-                        {patientInitials(patient.full_name)}
-                        <span className="absolute -bottom-1 -right-1 size-3 rounded-full border-2 border-card bg-emerald-400" aria-hidden />
-                      </span>
-                      <span className="min-w-0 flex-1 pt-0.5">
-                        <span className="block truncate text-[15px] font-semibold tracking-[-0.02em]">
-                          {patient.full_name}
-                        </span>
-                        <span className="mt-1 block truncate text-xs text-muted-foreground">
-                          {patient.age_years == null ? "Age not recorded" : `${patient.age_years} years`}
-                          <span aria-hidden> · </span>
-                          <span className="tnum">{maskPhone(patient.phone) ?? "No phone"}</span>
-                        </span>
-                      </span>
-                      <span className="grid size-8 shrink-0 place-items-center rounded-full border border-border bg-secondary text-muted-foreground transition-all group-hover:border-primary/25 group-hover:bg-primary-soft group-hover:text-primary">
-                        <ArrowUpRightIcon className="size-3.5" aria-hidden />
+                    <span className="workspace-initials" aria-hidden>
+                      {patientInitials(patient.full_name)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <strong className="block truncate text-sm font-semibold">
+                        {patient.full_name}
+                      </strong>
+                      <small className="mt-1 block text-xs text-muted-foreground">
+                        {patient.age_years == null
+                          ? "Age not recorded"
+                          : `${patient.age_years} years`}{" "}
+                        · {maskPhone(patient.phone) ?? "No phone"}
+                      </small>
+                    </span>
+                    <span className="hidden min-w-20 text-sm sm:block">
+                      {formatCount(patient.visit_count ?? 0)}{" "}
+                      <span className="text-xs text-muted-foreground">
+                        visits
                       </span>
                     </span>
-
-                    <span className="mt-auto grid w-full grid-cols-[auto_1fr] items-end gap-3 pt-5">
-                      <span>
-                        <span className="tnum block text-2xl font-semibold tracking-[-0.05em]">
-                          {formatCount(patient.visit_count ?? 0)}
-                        </span>
-                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                          recorded visit{patient.visit_count === 1 ? "" : "s"}
-                        </span>
-                      </span>
-                      <span className="flex items-center justify-end gap-1.5 text-right text-xs text-muted-foreground">
-                        <CalendarClockIcon className="size-3.5 text-primary/75" aria-hidden />
-                        <LastSeen occurredAt={patient.last_visit} />
-                      </span>
+                    <span className="hidden min-w-32 text-right text-xs text-muted-foreground sm:block">
+                      <LastSeen occurredAt={patient.last_visit} />
                     </span>
+                    <ArrowUpRightIcon
+                      className="size-4 shrink-0 text-muted-foreground group-hover:text-primary"
+                      aria-hidden
+                    />
                   </button>
                 </li>
               ))}
@@ -279,13 +304,15 @@ function EmptyDirectory({ query }: { query: string }) {
 }
 
 function patientInitials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase() || "PT";
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase() || "PT"
+  );
 }
 
 /**
@@ -293,7 +320,13 @@ function patientInitials(name: string): string {
  * attribute carries the full timestamp, which is what a phone's date detection
  * and anything scraping the page will read instead of guessing the year.
  */
-function LastSeen({ occurredAt, prefix = "" }: { occurredAt: string | null; prefix?: string }) {
+function LastSeen({
+  occurredAt,
+  prefix = "",
+}: {
+  occurredAt: string | null;
+  prefix?: string;
+}) {
   const day = formatVisitDay(occurredAt);
   if (!day) return <span className="text-muted-foreground">No visits yet</span>;
   return (

@@ -93,7 +93,7 @@ alter table app_private_settings enable row level security;
 revoke all on table app_private_settings from anon, authenticated;
 
 insert into app_private_settings (key, value)
-values ('clinic_invite_hmac', gen_random_bytes(32))
+values ('clinic_invite_hmac', extensions.gen_random_bytes(32))
 on conflict (key) do nothing;
 
 create table clinic_invites (

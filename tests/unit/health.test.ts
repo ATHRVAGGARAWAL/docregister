@@ -7,6 +7,7 @@ import { GET as webHealth } from "../../src/app/api/health/route.ts";
 const configuredStt = {
   supabaseUrl: "https://project.supabase.co",
   supabaseKey: "publishable-key",
+  clerkSecretKey: "clerk-secret-key",
   elevenLabsKey: "elevenlabs-key",
   provider: "elevenlabs",
 };
@@ -68,6 +69,14 @@ test("explicit mock mode is healthy without an ElevenLabs key", () => {
 
   assert.ok(response);
   assert.equal(response.statusCode, 200);
+});
+
+test("the transcription proxy requires Clerk authentication even in mock mode", () => {
+  const response = sttHealthResponse({ method: "GET", requestUrl: "/healthz", config: {
+    ...configuredStt, provider: "mock", allowMock: true, clerkSecretKey: "",
+  } });
+  assert.equal(response?.statusCode, 503);
+  assert.equal(response?.body.includes("clerk-secret-key"), false);
 });
 
 test("mock mode cannot make a production proxy look ready", () => {

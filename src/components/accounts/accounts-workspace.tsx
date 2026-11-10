@@ -151,7 +151,7 @@ export function AccountsWorkspace({ refreshKey = 0 }: { refreshKey?: number }) {
             </span>
             Practice finance
           </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Accounts</h1>
+          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Cashbook</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             A private, doctor-scoped view of cash flow without touching clinical records.
           </p>

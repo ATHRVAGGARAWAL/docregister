@@ -1,6 +1,7 @@
 export interface SttHealthConfig {
   supabaseUrl: string;
   supabaseKey: string;
+  clerkSecretKey?: string;
   elevenLabsKey: string;
   provider?: string;
   allowMock?: boolean;
@@ -53,7 +54,7 @@ export function sttHealthResponse({
     (provider === "mock" && config.allowMock === true) ||
     (provider === "elevenlabs" && Boolean(config.elevenLabsKey));
   const configured = Boolean(
-    config.supabaseUrl && config.supabaseKey && transcriptionConfigured,
+    config.supabaseUrl && config.supabaseKey && config.clerkSecretKey && transcriptionConfigured,
   );
   const body = JSON.stringify({
     status: configured ? "ok" : "unavailable",
