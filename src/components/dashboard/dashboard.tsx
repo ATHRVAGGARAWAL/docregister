@@ -1030,6 +1030,7 @@ export function Dashboard({
             finalText={capture.finalText}
             error={capture.error}
             liveTextUnavailable={capture.liveTextUnavailable}
+            liveTextEnabled={Boolean(liveProxyUrl)}
             onStart={() => void capture.start()}
             onStop={() => void capture.stop()}
             onCancel={capture.cancel}

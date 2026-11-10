@@ -96,3 +96,10 @@ third-party provider. The current hosted testing setup uses the same Clerk
 development instance as the local app. Switch to production Clerk keys and
 update the Supabase third-party provider together when moving to a production
 Clerk instance.
+
+Hosted testing transcribes recordings after stop through Vercel using ElevenLabs
+and extracts visit drafts with GPT-6 Astra. `NEXT_PUBLIC_STT_PROXY_URL` is empty
+in Vercel, so it does not require Railway. Set that variable to a deployed proxy's
+`wss://` URL to enable live text while recording. The local demo still uses its
+local proxy for live text. `npm run test:production` checks the web deployment;
+set `DOCREGISTER_STT_URL` to additionally check a live proxy when one is deployed.

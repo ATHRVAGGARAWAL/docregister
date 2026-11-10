@@ -45,6 +45,7 @@ export function VoiceDock({
   finalText,
   error,
   liveTextUnavailable,
+  liveTextEnabled = true,
   onStart,
   onStop,
   onCancel,
@@ -63,6 +64,7 @@ export function VoiceDock({
   finalText: string;
   error: string | null;
   liveTextUnavailable: boolean;
+  liveTextEnabled?: boolean;
   onStart: () => void;
   onStop: () => void;
   onCancel: () => void;
@@ -222,7 +224,11 @@ export function VoiceDock({
                     <span className="transcript-interim">{interimText}</span>
                   </>
                 ) : (
-                  <span className="text-muted-foreground">Listening for the patient details…</span>
+                  <span className="text-muted-foreground">
+                    {liveTextEnabled
+                      ? "Listening for the patient details…"
+                      : "Recording… Press stop to transcribe and review."}
+                  </span>
                 )}
               </p>
 

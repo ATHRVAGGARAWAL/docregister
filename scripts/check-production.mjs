@@ -5,8 +5,7 @@ const appUrl = withoutTrailingSlash(
   process.env.DOCREGISTER_APP_URL ?? "https://docregister.athrv.dev",
 );
 const sttUrl = withoutTrailingSlash(
-  process.env.DOCREGISTER_STT_URL ??
-    "https://docregister-production.up.railway.app",
+  process.env.DOCREGISTER_STT_URL ?? "",
 );
 
 const checks = [
@@ -14,10 +13,14 @@ const checks = [
   ["signed-out redirect", checkSignedOutRedirect],
   ["login page and security headers", checkLoginPage],
   ["API authentication boundary", checkAuthenticationBoundary],
-  ["STT readiness", checkSttHealth],
-  ["STT HEAD readiness", checkSttHead],
-  ["STT WebSocket upgrade", checkSttWebSocket],
+  ...(sttUrl ? [
+    ["STT readiness", checkSttHealth],
+    ["STT HEAD readiness", checkSttHead],
+    ["STT WebSocket upgrade", checkSttWebSocket],
+  ] : []),
 ];
+
+if (!sttUrl) console.log("Live proxy checks disabled; set DOCREGISTER_STT_URL to check a deployed proxy.");
 
 let failed = 0;
 
@@ -53,8 +56,21 @@ async function checkWebHealth() {
 
 async function checkSignedOutRedirect() {
   const response = await get(`${appUrl}/`, { redirect: "manual" });
-  assert.ok([302, 303, 307, 308].includes(response.status));
-  const destination = new URL(requiredHeader(response, "location"), appUrl);
+  let location;
+  if (response.status === 200) {
+    // Next.js may start streaming before auth resolves, then emit its redirect
+    // in HTML. A 200 alone is insufficient: require that explicit redirect.
+    const html = await response.text();
+    const tag = html.match(/<meta\b[^>]*id="__next-page-redirect"[^>]*>/)?.[0];
+    assert.ok(tag, "Signed-out page did not redirect to sign-in");
+    assert.match(tag, /http-equiv="refresh"/);
+    location = tag.match(/content="\d+;url=([^"]+)"/)?.[1];
+    assert.ok(location, "Missing streamed redirect destination");
+  } else {
+    assert.ok([302, 303, 307, 308].includes(response.status));
+    location = requiredHeader(response, "location");
+  }
+  const destination = new URL(location, appUrl);
   assert.equal(destination.origin, new URL(appUrl).origin);
   assert.equal(destination.pathname, "/sign-in");
 }
